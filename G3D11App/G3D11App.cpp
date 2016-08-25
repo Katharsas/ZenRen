@@ -3,10 +3,8 @@
 
 #include "stdafx.h"
 #include "G3D11App.h"
-#include <windows.h>
-#include <locale>
-#include <codecvt>
-#include <string>
+#include "Util.h"
+#include "D3D11Renderer.h"
 
 #define MAX_LOADSTRING 100
 
@@ -17,7 +15,7 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
-BOOL                InitInstance(HINSTANCE, int);
+HWND                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WindowProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
@@ -29,27 +27,23 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
-	// TODO: Place code here.
-	// create a "Hello World" message box using MessageBox()
-	//MessageBox(NULL,
-	//	L"Hello World!",
-	//	L"Just another Hello World program!",
-	//	MB_ICONEXCLAMATION | MB_OK);
-
 	// Initialize global strings
 	LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
 	LoadStringW(hInstance, IDC_G3D11APP, szWindowClass, MAX_LOADSTRING);
 	MyRegisterClass(hInstance);
 
-	// Perform application initialization:
-	if (!InitInstance (hInstance, nCmdShow))
-	{
+	// Initialize window:
+	HWND hWnd = InitInstance(hInstance, nCmdShow);
+	if (!hWnd) {
 		return FALSE;
 	}
 
+	// Initialize Direct3D:
+	InitD3D(hWnd);
+	
+	// Main message loop:
 	MSG msg;
 
-	// Main message loop:
 	while (TRUE) {
 		if (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
@@ -62,11 +56,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 			// shouldnt the game code run outside of else?
 		}
 	}
-	//while (GetMessageW(&msg, nullptr, 0, 0))
-	//{
-	//	TranslateMessage(&msg);
-	//	DispatchMessageW(&msg);
-	//}
+
+	// Clean up DirectX and COM
+	CleanD3D();
 
 	return (int) msg.wParam;
 }
@@ -99,27 +91,6 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 	return RegisterClassExW(&wcex);
 }
 
-const wchar_t* toChar(const std::wstring &string) {
-	return string.c_str();
-}
-
-std::wstring toWide(const std::string &string) {
-	std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-	std::wstring wide = converter.from_bytes(string);
-	return wide;
-}
-
-const wchar_t* toWideChar(const std::string &string) {
-	return toChar(toWide(string));
-}
-
-void println(const std::string &string) {
-	std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-	std::wstring wide = converter.from_bytes(string + "\n");
-	OutputDebugStringW(wide.c_str());
-}
-
-
 //
 //   FUNCTION: InitInstance(HINSTANCE, int)
 //
@@ -130,7 +101,7 @@ void println(const std::string &string) {
 //        In this function, we save the instance handle in a global variable and
 //        create and display the main program window.
 //
-BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
+HWND InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
 	hInst = hInstance; // Store instance handle in our global variable
 
@@ -138,7 +109,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	RECT viewSize = {0, 0, 1000, 800};
 	AdjustWindowRect(&viewSize, WS_OVERLAPPEDWINDOW, FALSE);
 
-	println(u8"Window Size:"); println(
+	util::println(u8"Window Size:"); util::println(
 		u8"    Width: " + std::to_string(viewSize.right - viewSize.left)
 		+ u8", Height: " + std::to_string(viewSize.bottom - viewSize.top)
 	);
@@ -149,15 +120,14 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 		viewSize.bottom - viewSize.top,
 		nullptr, nullptr, hInstance, nullptr);
 
-	if (!hWnd)
-	{
+	if (!hWnd) {
 		return FALSE;
 	}
 
 	ShowWindow(hWnd, nCmdShow);
 	UpdateWindow(hWnd);
 
-	return TRUE;
+	return hWnd;
 }
 
 //
@@ -186,8 +156,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 		PostQuitMessage(0);
 		break;
 	default:
-		return DefWindowProc(hWnd, message, wParam, lParam);
+		return DefWindowProcW(hWnd, message, wParam, lParam);
 	}
 	return 0;
 }
-
