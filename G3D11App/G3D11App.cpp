@@ -52,9 +52,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 				break;
 			}
 		}
-		else {
-			// shouldnt the game code run outside of else?
-		}
+		
+		RenderFrame();
 	}
 
 	// Clean up DirectX and COM
@@ -106,7 +105,7 @@ HWND InitInstance(HINSTANCE hInstance, int nCmdShow)
 	hInst = hInstance; // Store instance handle in our global variable
 
 	// set view size and calculate window size with borders/menu
-	RECT viewSize = {0, 0, 1000, 800};
+	RECT viewSize = {0, 0, 1000, 600};
 	AdjustWindowRect(&viewSize, WS_OVERLAPPEDWINDOW, FALSE);
 
 	util::println(u8"Window Size:"); util::println(

@@ -4,3 +4,4 @@
 
 void InitD3D(HWND hWnd);
 void CleanD3D();
+void RenderFrame(void);
