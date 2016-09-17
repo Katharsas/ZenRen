@@ -172,6 +172,14 @@
     <Image Include="G3D11App.ico" />
     <Image Include="small.ico" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\shaders.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shaders\toneMapping.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

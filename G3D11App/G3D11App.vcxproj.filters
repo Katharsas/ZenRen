@@ -68,4 +68,12 @@
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\shaders.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\toneMapping.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+  </ItemGroup>
 </Project>

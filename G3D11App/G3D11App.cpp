@@ -39,7 +39,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	}
 
 	// Initialize Direct3D:
-	InitD3D(hWnd);
+	initD3D(hWnd);
 	
 	// Main message loop:
 	MSG msg;
@@ -53,11 +53,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 			}
 		}
 		
-		RenderFrame();
+		renderFrame();
 	}
 
 	// Clean up DirectX and COM
-	CleanD3D();
+	cleanD3D();
 
 	return (int) msg.wParam;
 }
