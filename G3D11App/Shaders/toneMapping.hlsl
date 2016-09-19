@@ -4,14 +4,14 @@
 
 struct VS_INPUT
 {
-	float3 vPosition	: POSITION;
+	float4 position		: POSITION;
 	float2 vTex1		: TEXCOORD0;
-	uint vertexID		: SV_VertexID;
 };
 
 struct VS_OUTPUT
 {
-	float2 vTexcoord	: TEXCOORD0;
+	float2 texcoord	: TEXCOORD;
+	float4 position : SV_POSITION;
 };
 
 
@@ -19,7 +19,8 @@ VS_OUTPUT VS_Main(VS_INPUT Input)
 {
 	VS_OUTPUT Output;
 
-	Output.vTexcoord = Input.vTex1;
+	Output.texcoord = Input.vTex1;
+	Output.position = Input.position;
 
 	return Output;
 }

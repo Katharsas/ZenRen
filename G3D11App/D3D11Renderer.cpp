@@ -14,6 +14,8 @@
 #pragma comment (lib, "d3dx11.lib")
 #pragma comment (lib, "d3dx10.lib")
 
+#define DEBUG_D3D11
+
 // global declarations
 IDXGISwapChain *swapchain;
 ID3D11Device *device;
@@ -22,19 +24,34 @@ ID3D11DeviceContext *deviceContext;
 ID3D11RenderTargetView *backBuffer;    // 32-bit
 ID3D11RenderTargetView *backBufferHDR; // 64-bit
 ID3D11ShaderResourceView *backBufferHDRResource;
+ID3D11SamplerState *linearSamplerState;
 
+ID3D11Buffer *vertexBufferToneMapping;
 ID3D11VertexShader *vs_toneMapping;
 ID3D11PixelShader *ps_toneMapping;
 
-ID3D11Buffer *vertexBuffer;
-ID3D11VertexShader *vs_triangle;    // the vertex shader
-ID3D11PixelShader *ps_triangle;     // the pixel shader
+ID3D11Buffer *vertexBufferTriangle;
+ID3D11VertexShader *vs_triangle;
+ID3D11PixelShader *ps_triangle;
 
-ID3D11InputLayout *pLayout;
+ID3D11InputLayout *layoutTriangle;
+ID3D11InputLayout *layoutToneMapping;
 
-struct VERTEX {            // a struct to define a vertex
+struct POS {
+	POS(FLOAT x, FLOAT y, FLOAT z) { X = x; Y = y; Z = z; }
 	FLOAT X, Y, Z;
-	D3DXCOLOR Color;
+};
+struct UV {
+	UV(FLOAT u, FLOAT v) { U = u; V = v; }
+	FLOAT U, V;
+};
+struct VERTEX {
+	POS position;
+	D3DXCOLOR color;
+};
+struct QUAD {
+	POS position;
+	UV uvCoordinates;
 };
 
 void initSwapChainAndBackBuffer(HWND hWnd);
@@ -70,23 +87,29 @@ void cleanD3D()
 	swapchain->SetFullscreenState(FALSE, nullptr);    // switch to windowed mode
 
 	// close and release all existing COM objects
-	pLayout->Release();
+
+	layoutTriangle->Release();
 	vs_triangle->Release();
 	ps_triangle->Release();
-	vertexBuffer->Release();
+	vertexBufferTriangle->Release();
+
+	layoutToneMapping->Release();
+	vs_toneMapping->Release();
+	ps_toneMapping->Release();
+	vertexBufferToneMapping->Release();
+
 	swapchain->Release();
 	backBuffer->Release();
 	backBufferHDR->Release();
 	backBufferHDRResource->Release();
-	vs_toneMapping->Release();
-	ps_toneMapping->Release();
+	linearSamplerState->Release();
 	device->Release();
 	deviceContext->Release();
 }
 
 void renderFrame(void)
 {
-	// set the rtv
+	// set the HDR back buffer as rtv
 	deviceContext->OMSetRenderTargets(1, &backBufferHDR, nullptr);
 
 	// clear the back buffer to a deep blue
@@ -96,27 +119,40 @@ void renderFrame(void)
 	{
 		// set the shader objects avtive
 		deviceContext->VSSetShader(vs_triangle, 0, 0);
+		deviceContext->IASetInputLayout(layoutTriangle);
 		deviceContext->PSSetShader(ps_triangle, 0, 0);
 
 		// select which vertex buffer to display
 		UINT stride = sizeof(VERTEX);
 		UINT offset = 0;
-		deviceContext->IASetVertexBuffers(0, 1, &vertexBuffer, &stride, &offset);
-
-		// select which primtive type we are using
-		deviceContext->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		deviceContext->IASetVertexBuffers(0, 1, &vertexBufferTriangle, &stride, &offset);
 
 		// draw the vertex buffer to the back buffer
 		deviceContext->Draw(3, 0);
 	}
+	
+	// draw HDR back buffer to real back buffer via tone mapping
 
-	// map HDR to back buffer via tone mapping
-	// TODO: set toneMappingShaders
-	// TODO: create Quad as big as screen
-	// TODO: render that quad with backBufferHDRResource as texture to backbuffer
+	// set real back buffer as rtv
+	deviceContext->OMSetRenderTargets(1, &backBuffer, nullptr);
 
-	//deviceContext->VSSetShader(vs_toneMapping, 0, 0);
-	//deviceContext->PSSetShader(ps_toneMapping, 0, 0);
+	// set shaders and HDR buffer as texture
+	deviceContext->VSSetShader(vs_toneMapping, 0, 0);
+	deviceContext->IASetInputLayout(layoutToneMapping);
+	deviceContext->PSSetShader(ps_toneMapping, 0, 0);
+	deviceContext->PSSetShaderResources(0, 1, &backBufferHDRResource);
+	deviceContext->PSSetSamplers(0, 1, &linearSamplerState);
+
+	// select which vertex buffer to display
+	UINT stride = sizeof(QUAD);
+	UINT offset = 0;
+	deviceContext->IASetVertexBuffers(0, 1, &vertexBufferToneMapping, &stride, &offset);
+	
+	deviceContext->Draw(3, 0);
+
+	// unbind HDR back buffer texture so the next frame can use it as rtv again
+	ID3D11ShaderResourceView* srv = nullptr;
+	deviceContext->PSSetShaderResources(0, 1, &srv);
 
 	// switch the back buffer and the front buffer
 	swapchain->Present(0, 0);
@@ -210,45 +246,94 @@ void initPipelineTriangle()
 		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	};
 
-	device->CreateInputLayout(inputLayoutDesc, 2, VS->GetBufferPointer(), VS->GetBufferSize(), &pLayout);
-	deviceContext->IASetInputLayout(pLayout);
+	device->CreateInputLayout(inputLayoutDesc, 2, VS->GetBufferPointer(), VS->GetBufferSize(), &layoutTriangle);
+	VS->Release();
+	PS->Release();
 }
 
 void initPipelineToneMapping()
 {
-	ID3D10Blob *VS, *PS;
-	D3DX11CompileFromFileW(L"Shaders/toneMapping.hlsl", 0, 0, "VS_Main", "vs_4_0", 0, 0, 0, &VS, 0, 0);
-	D3DX11CompileFromFileW(L"Shaders/toneMapping.hlsl", 0, 0, "PS_Main", "ps_4_0", 0, 0, 0, &PS, 0, 0);
+	ID3D10Blob *VS, *PS, *errVS, *errPS;
+	HRESULT hr = D3DX11CompileFromFileW(L"Shaders/toneMapping.hlsl", 0, 0, "VS_Main", "vs_4_0", 0, 0, 0, &VS, &errVS, 0);
+	D3DX11CompileFromFileW(L"Shaders/toneMapping.hlsl", 0, 0, "PS_Main", "ps_4_0", 0, 0, 0, &PS, &errPS, 0);
+
+	if (errVS != nullptr) {
+		OutputDebugStringA((char*)errVS->GetBufferPointer());
+	}
+	if (errPS != nullptr) {
+		OutputDebugStringA((char*)errPS->GetBufferPointer());
+	}
 
 	device->CreateVertexShader(VS->GetBufferPointer(), VS->GetBufferSize(), nullptr, &vs_toneMapping);
 	device->CreatePixelShader(PS->GetBufferPointer(), PS->GetBufferSize(), nullptr, &ps_toneMapping);
 
-	// TODO layouts
+	D3D11_INPUT_ELEMENT_DESC inputLayoutDesc[] =
+	{
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	};
+
+	device->CreateInputLayout(inputLayoutDesc, 2, VS->GetBufferPointer(), VS->GetBufferSize(), &layoutToneMapping);
+	VS->Release();
+	PS->Release();
+
+	D3D11_SAMPLER_DESC samplerDesc = CD3D11_SAMPLER_DESC();
+	samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+	samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+	samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+	samplerDesc.MipLODBias = 0;
+	samplerDesc.MaxAnisotropy = 16;
+	samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+	samplerDesc.BorderColor[0] = 1.0f;
+	samplerDesc.BorderColor[1] = 1.0f;
+	samplerDesc.BorderColor[2] = 1.0f;
+	samplerDesc.BorderColor[3] = 1.0f;
+	samplerDesc.MinLOD = -3.402823466e+38F; // -FLT_MAX
+	samplerDesc.MaxLOD = 3.402823466e+38F; // FLT_MAX
+
+	device->CreateSamplerState(&samplerDesc, &linearSamplerState);
+	deviceContext->PSSetSamplers(0, 1, &linearSamplerState);
 }
 
 void initGraphics()
 {
-	// create a triangle using the VERTEX struct
-	VERTEX ourVertices[] = {
-		{ 0.0f, 0.5f, 0.0f, D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
-		{ 0.45f, -0.5, 0.0f, D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
-		{ -0.45f, -0.5f, 0.0f, D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f) }
+	VERTEX triangle[] = {
+		{ POS(0.0f, 0.5f, 0.0f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
+		{ POS(0.45f, -0.5, 0.0f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
+		{ POS(-0.45f, -0.5f, 0.0f), D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f) }
+	};
+
+	QUAD fullscreenQuad[] = {
+		{ POS(-1.0f, 1.0f, 0.0f), UV(0.0f, 0.0f) },
+		{ POS(1.0f, 1.0, 0.0f), UV(1.0f, 0.0f) },
+		{ POS(-1.0, -1.0, 0.0f), UV(0.0f, 1.0f) },
+		// TODO: other half
 	};
 
 	// create the vertex buffer
-	D3D11_BUFFER_DESC bd;
+	D3D11_BUFFER_DESC bd = CD3D11_BUFFER_DESC();
 	ZeroMemory(&bd, sizeof(bd));
 
 	bd.Usage = D3D11_USAGE_DYNAMIC;                // write access by CPU and GPU
-	bd.ByteWidth = sizeof(VERTEX) * 3;             // size is the VERTEX struct * 3
 	bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;       // use as a vertex buffer
 	bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;    // allow CPU to write in buffer
 
-	device->CreateBuffer(&bd, nullptr, &vertexBuffer); // create the buffer
+	bd.ByteWidth = sizeof(VERTEX) * 3;             // size is the VERTEX struct * 3
+	device->CreateBuffer(&bd, nullptr, &vertexBufferTriangle); // create the buffer
+	bd.ByteWidth = sizeof(QUAD) * 3;               // size is the VERTEX struct * 4
+	device->CreateBuffer(&bd, nullptr, &vertexBufferToneMapping); // create the buffer
 
 	// copy the vertices into the buffer
 	D3D11_MAPPED_SUBRESOURCE ms;
-	deviceContext->Map(vertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);   // map the buffer
-	memcpy(ms.pData, ourVertices, sizeof(ourVertices));                // copy the data
-	deviceContext->Unmap(vertexBuffer, 0);                                  // unmap the buffer
+	deviceContext->Map(vertexBufferTriangle, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);   // map the buffer
+	memcpy(ms.pData, triangle, sizeof(triangle));             // copy the data
+	deviceContext->Unmap(vertexBufferTriangle, 0);                                  // unmap the buffer
+
+	deviceContext->Map(vertexBufferToneMapping, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);// map the buffer
+	memcpy(ms.pData, fullscreenQuad, sizeof(fullscreenQuad));                 // copy the data
+	deviceContext->Unmap(vertexBufferToneMapping, 0);                               // unmap the buffer
+
+	// select which primtive type we are using
+	deviceContext->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
