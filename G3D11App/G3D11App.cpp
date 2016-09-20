@@ -105,19 +105,18 @@ HWND InitInstance(HINSTANCE hInstance, int nCmdShow)
 	hInst = hInstance; // Store instance handle in our global variable
 
 	// set view size and calculate window size with borders/menu
-	/*RECT viewSize = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
+	RECT viewSize = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
 	AdjustWindowRect(&viewSize, WS_OVERLAPPEDWINDOW, FALSE);
 
 	util::println(u8"Window Size:"); util::println(
 		u8"    Width: " + std::to_string(viewSize.right - viewSize.left)
 		+ u8", Height: " + std::to_string(viewSize.bottom - viewSize.top)
-	);*/
+	);
 
 	HWND hWnd = CreateWindowExW(0L, szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT, 0,
-		SCREEN_WIDTH, SCREEN_HEIGHT,
-		/*viewSize.right - viewSize.left,
-		viewSize.bottom - viewSize.top,*/
+		viewSize.right - viewSize.left,
+		viewSize.bottom - viewSize.top,
 		nullptr, nullptr, hInstance, nullptr);
 
 	if (!hWnd) {

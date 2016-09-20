@@ -148,7 +148,7 @@ void renderFrame(void)
 	UINT offset = 0;
 	deviceContext->IASetVertexBuffers(0, 1, &vertexBufferToneMapping, &stride, &offset);
 	
-	deviceContext->Draw(3, 0);
+	deviceContext->Draw(6, 0);
 
 	// unbind HDR back buffer texture so the next frame can use it as rtv again
 	ID3D11ShaderResourceView* srv = nullptr;
@@ -165,7 +165,7 @@ void initSwapChainAndBackBuffer(HWND hWnd)
 
 	// fill the swap chain description struct
 	swapChainDesc.BufferCount = 1;                                    // one back buffer
-	swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;     // use 32-bit color
+	swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;// use 32-bit color
 	swapChainDesc.BufferDesc.Width = SCREEN_WIDTH;                    // set the back buffer width
 	swapChainDesc.BufferDesc.Height = SCREEN_HEIGHT;                  // set the back buffer height
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;      // how swap chain is to be used
@@ -242,8 +242,8 @@ void initPipelineTriangle()
 	// create the input layout object
 	D3D11_INPUT_ELEMENT_DESC inputLayoutDesc[] =
 	{
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	};
 
 	device->CreateInputLayout(inputLayoutDesc, 2, VS->GetBufferPointer(), VS->GetBufferSize(), &layoutTriangle);
@@ -269,8 +269,8 @@ void initPipelineToneMapping()
 
 	D3D11_INPUT_ELEMENT_DESC inputLayoutDesc[] =
 	{
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	};
 
 	device->CreateInputLayout(inputLayoutDesc, 2, VS->GetBufferPointer(), VS->GetBufferSize(), &layoutToneMapping);
@@ -279,9 +279,10 @@ void initPipelineToneMapping()
 
 	D3D11_SAMPLER_DESC samplerDesc = CD3D11_SAMPLER_DESC();
 	samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-	samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
-	samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
-	samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+	//samplerDesc.Filter = D3D11_FILTER_ANISOTROPIC;
+	samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_BORDER;
+	samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_BORDER;
+	samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_BORDER;
 	samplerDesc.MipLODBias = 0;
 	samplerDesc.MaxAnisotropy = 16;
 	samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
@@ -308,31 +309,34 @@ void initGraphics()
 		{ POS(-1.0f, 1.0f, 0.0f), UV(0.0f, 0.0f) },
 		{ POS(1.0f, 1.0, 0.0f), UV(1.0f, 0.0f) },
 		{ POS(-1.0, -1.0, 0.0f), UV(0.0f, 1.0f) },
-		// TODO: other half
+
+		{ POS(-1.0, -1.0, 0.0f), UV(0.0f, 1.0f) },
+		{ POS(1.0f, 1.0, 0.0f), UV(1.0f, 0.0f) },
+		{ POS(1.0, -1.0, 0.0f), UV(1.0f, 1.0f) },
 	};
 
-	// create the vertex buffer
-	D3D11_BUFFER_DESC bd = CD3D11_BUFFER_DESC();
-	ZeroMemory(&bd, sizeof(bd));
+	// create the vertex buffers
+	D3D11_BUFFER_DESC bufferDesc = CD3D11_BUFFER_DESC();
+	ZeroMemory(&bufferDesc, sizeof(bufferDesc));
 
-	bd.Usage = D3D11_USAGE_DYNAMIC;                // write access by CPU and GPU
-	bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;       // use as a vertex buffer
-	bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;    // allow CPU to write in buffer
+	bufferDesc.Usage = D3D11_USAGE_DYNAMIC;                // write access by CPU and GPU
+	bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;       // use as a vertex buffer
+	bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;    // allow CPU to write in buffer
 
-	bd.ByteWidth = sizeof(VERTEX) * 3;             // size is the VERTEX struct * 3
-	device->CreateBuffer(&bd, nullptr, &vertexBufferTriangle); // create the buffer
-	bd.ByteWidth = sizeof(QUAD) * 3;               // size is the VERTEX struct * 4
-	device->CreateBuffer(&bd, nullptr, &vertexBufferToneMapping); // create the buffer
+	bufferDesc.ByteWidth = sizeof(VERTEX) * 3;             // size is the VERTEX struct * 3
+	device->CreateBuffer(&bufferDesc, nullptr, &vertexBufferTriangle); // create the buffer
+	bufferDesc.ByteWidth = sizeof(QUAD) * 6;               // size is the VERTEX struct * 4
+	device->CreateBuffer(&bufferDesc, nullptr, &vertexBufferToneMapping); // create the buffer
 
-	// copy the vertices into the buffer
+	// copy the vertices into the buffers
 	D3D11_MAPPED_SUBRESOURCE ms;
-	deviceContext->Map(vertexBufferTriangle, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);   // map the buffer
-	memcpy(ms.pData, triangle, sizeof(triangle));             // copy the data
-	deviceContext->Unmap(vertexBufferTriangle, 0);                                  // unmap the buffer
-
-	deviceContext->Map(vertexBufferToneMapping, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);// map the buffer
-	memcpy(ms.pData, fullscreenQuad, sizeof(fullscreenQuad));                 // copy the data
-	deviceContext->Unmap(vertexBufferToneMapping, 0);                               // unmap the buffer
+	deviceContext->Map(vertexBufferTriangle, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);    // map the buffer
+	memcpy(ms.pData, triangle, sizeof(triangle));                                    // copy the data
+	deviceContext->Unmap(vertexBufferTriangle, 0);                                   // unmap the buffer
+		
+	deviceContext->Map(vertexBufferToneMapping, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms); // map the buffer
+	memcpy(ms.pData, fullscreenQuad, sizeof(fullscreenQuad));                        // copy the data
+	deviceContext->Unmap(vertexBufferToneMapping, 0);                                // unmap the buffer
 
 	// select which primtive type we are using
 	deviceContext->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
