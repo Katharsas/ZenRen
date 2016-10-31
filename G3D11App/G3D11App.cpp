@@ -3,8 +3,12 @@
 
 #include "stdafx.h"
 #include "G3D11App.h"
+
+#include "conio.h"
+#include "resource.h"
 #include "Util.h"
 #include "D3D11Renderer.h"
+#include "g3log/logworker.hpp"
 
 #define MAX_LOADSTRING 100
 
@@ -24,6 +28,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_ LPWSTR    lpCmdLine,
                      _In_ int       nCmdShow)
 {
+	InitConsole();
+
+	// Configure Logger (make sure log dir exists, TODO: create dir if mising)
+	// https://github.com/KjellKod/g3sinks/blob/master/snippets/ColorCoutSink.hpp
+	auto worker = g3::LogWorker::createLogWorker();
+	auto defaultSink = worker->addDefaultLogger(u8"log", u8"../logs/");
+	auto consoleSink = worker->addSink(std2::make_unique<ColorCoutSink>(), &ColorCoutSink::ReceiveLogMessage);
+	g3::initializeLogging(worker.get());
+
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
@@ -59,10 +72,37 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	// Clean up DirectX and COM
 	cleanD3D();
 
+	CleanConsole();
+
 	return (int) msg.wParam;
 }
 
+void InitConsole() {
+	// Code from: http://stackoverflow.com/a/25927081/3552897
 
+	// Create console an, set title, disable closing it (closes with main window on ClearConsole() call)
+	AllocConsole();
+	SetConsoleTitleW(L"Log");
+	HWND hwnd = GetConsoleWindow();
+	HMENU hmenu = GetSystemMenu(hwnd, FALSE);
+	EnableMenuItem(hmenu, SC_CLOSE, MF_GRAYED);
+
+	// redirect all stdio things to this console, so that logger can use cout as sink
+	FILE *conin, *conout;
+	freopen_s(&conin, "conin$", "r", stdin);
+	freopen_s(&conout, "conout$", "w", stdout);
+	freopen_s(&conout, "conout$", "w", stderr);
+	std::wcout.clear();
+	std::cout.clear();
+	std::wcerr.clear();
+	std::cerr.clear();
+	std::wcin.clear();
+	std::cin.clear();
+}
+
+void CleanConsole() {
+	FreeConsole();
+}
 
 //
 //  FUNCTION: MyRegisterClass()

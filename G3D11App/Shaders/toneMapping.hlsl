@@ -37,16 +37,21 @@ struct PS_INPUT
 	float2 texcoord	: TEXCOORD;
 };
 
-float3 Uncharted2Tonemap(float3 x)
-{
+float3 ReinhardTonemap(float3 x) {
+	x = x * 1.4f; //exposure correction
+	return x / (1.0f + x); // Reinhard
+}
+
+float3 Uncharted2Tonemap(float3 x) {
+	x = x * 5.0f; //exposure correction
 	float A = 0.15f;
 	float B = 0.50f;
 	float C = 0.10f;
 	float D = 0.20f;
 	float E = 0.02f;
 	float F = 0.30f;
-
-	return ((x*(A*x + C*B) + D*E) / (x*(A*x + B) + D*F)) - E / F;
+	// Uncharted2 (may need parameter adjustment)
+	return ((x*(A*x + C*B) + D*E) / (x*(A*x + B) + D*F)) - E / F; 
 }
 
 float4 PS_Main(PS_INPUT input) : SV_TARGET
@@ -57,8 +62,12 @@ float4 PS_Main(PS_INPUT input) : SV_TARGET
 	// sample linear
 	float4 color = TX_BackBufferHDR.Sample(SS_Linear, input.texcoord);
 
-	// apply tonemapping
-	color = float4(Uncharted2Tonemap(color.rgb), 1.0f);
+	// This could be calculated by luminance of the picture to get eye adjustment effect.
+	float exposure = 1.0f; 
+
+	// apply tonemapping (just skip for linear mapping)
+	//color = float4(ReinhardTonemap(color.rgb * exposure), 1.0f);
+	color = float4(Uncharted2Tonemap(color.rgb * exposure), 1.0f);
 
 	// apply contrast
 	color = color * contrast;
