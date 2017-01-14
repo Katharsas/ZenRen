@@ -15,10 +15,10 @@ Shader::Shader(const std::string& sourceFile, const VertexInputLayoutDesc layout
 	D3DX11CompileFromFileW(sourceFileW.c_str(), 0, 0, "PS_Main", "ps_4_0", 0, 0, 0, &PS, &errPS, 0);
 
 	if (errVS != nullptr) {
-		OutputDebugStringA((char*)errVS->GetBufferPointer());
+		LOG(WARNING) << std::string((char*)errVS->GetBufferPointer());
 	}
 	if (errPS != nullptr) {
-		OutputDebugStringA((char*)errPS->GetBufferPointer());
+		LOG(WARNING) << std::string((char*)errPS->GetBufferPointer());
 	}
 
 	// encapsulate shader blobs into shader objects

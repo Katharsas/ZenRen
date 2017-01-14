@@ -28,13 +28,25 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_ LPWSTR    lpCmdLine,
                      _In_ int       nCmdShow)
 {
-	InitConsole();
-
 	// Configure Logger (make sure log dir exists, TODO: create dir if mising)
+
+	struct ConsoleSink {
+		void ReceiveLogMessage(g3::LogMessageMover logEntry) {
+			const LEVELS level = logEntry.get()._level;
+			const std::string levelPre = level == WARNING ? "! " : "  ";
+			const std::string levelPost = std::string((7 - level.text.length()), ' ');
+			const std::string logEntryString =
+				levelPre + "LOG__" + level.text + levelPost + " " + logEntry.get()._message + "\n";
+			const std::wstring logEntryW = util::utf8ToWide(logEntryString);
+			OutputDebugStringW(logEntryW.c_str());
+		}
+	};
+	
 	// https://github.com/KjellKod/g3sinks/blob/master/snippets/ColorCoutSink.hpp
-	auto worker = g3::LogWorker::createLogWorker();
-	auto defaultSink = worker->addDefaultLogger(u8"log", u8"../logs/");
-	auto consoleSink = worker->addSink(std2::make_unique<ColorCoutSink>(), &ColorCoutSink::ReceiveLogMessage);
+	const auto worker = g3::LogWorker::createLogWorker();
+	const auto defaultSink = worker->addDefaultLogger(u8"log", u8"../logs/");
+	const auto consoleSink = worker->addSink(
+		std2::make_unique<ConsoleSink>(), &ConsoleSink::ReceiveLogMessage);
 	g3::initializeLogging(worker.get());
 
 	UNREFERENCED_PARAMETER(hPrevInstance);
@@ -72,36 +84,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	// Clean up DirectX and COM
 	cleanD3D();
 
-	CleanConsole();
-
 	return (int) msg.wParam;
-}
-
-void InitConsole() {
-	// Code from: http://stackoverflow.com/a/25927081/3552897
-
-	// Create console an, set title, disable closing it (closes with main window on ClearConsole() call)
-	AllocConsole();
-	SetConsoleTitleW(L"Log");
-	HWND hwnd = GetConsoleWindow();
-	HMENU hmenu = GetSystemMenu(hwnd, FALSE);
-	EnableMenuItem(hmenu, SC_CLOSE, MF_GRAYED);
-
-	// redirect all stdio things to this console, so that logger can use cout as sink
-	FILE *conin, *conout;
-	freopen_s(&conin, "conin$", "r", stdin);
-	freopen_s(&conout, "conout$", "w", stdout);
-	freopen_s(&conout, "conout$", "w", stderr);
-	std::wcout.clear();
-	std::cout.clear();
-	std::wcerr.clear();
-	std::cerr.clear();
-	std::wcin.clear();
-	std::cin.clear();
-}
-
-void CleanConsole() {
-	FreeConsole();
 }
 
 //
@@ -148,10 +131,10 @@ HWND InitInstance(HINSTANCE hInstance, int nCmdShow)
 	RECT viewSize = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
 	AdjustWindowRect(&viewSize, WS_OVERLAPPEDWINDOW, FALSE);
 
-	util::println(u8"Window Size:"); util::println(
-		u8"    Width: " + std::to_string(viewSize.right - viewSize.left)
-		+ u8", Height: " + std::to_string(viewSize.bottom - viewSize.top)
-	);
+	LEVELS level = DEBUG;
+	LOG(level) << "Window Size:";
+	LOG(level) << "    Width: " + std::to_string(viewSize.right - viewSize.left);
+	LOG(level) << "    Height: " + std::to_string(viewSize.bottom - viewSize.top);
 
 	HWND hWnd = CreateWindowExW(0L, szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT, 0,
