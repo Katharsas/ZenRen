@@ -2,12 +2,12 @@
 //
 
 #include "stdafx.h"
-#include "G3D11App.h"
+#include "InitApp.h"
 
 #include "conio.h"
-#include "resource.h"
+#include "../resource.h"
 #include "Util.h"
-#include "D3D11Renderer.h"
+#include "renderer/D3D11Renderer.h"
 #include "g3log/logworker.hpp"
 
 #define MAX_LOADSTRING 100
@@ -64,7 +64,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	}
 
 	// Initialize Direct3D:
-	initD3D(hWnd);
+	renderer::initD3D(hWnd);
 	
 	// Main message loop:
 	MSG msg;
@@ -78,11 +78,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 			}
 		}
 		
-		renderFrame();
+		renderer::renderFrame();
 	}
 
 	// Clean up DirectX and COM
-	cleanD3D();
+	renderer::cleanD3D();
 
 	return (int) msg.wParam;
 }
