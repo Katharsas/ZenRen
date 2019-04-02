@@ -46,7 +46,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	const auto worker = g3::LogWorker::createLogWorker();
 	const auto defaultSink = worker->addDefaultLogger(u8"log", u8"../logs/");
 	const auto consoleSink = worker->addSink(
-		std2::make_unique<ConsoleSink>(), &ConsoleSink::ReceiveLogMessage);
+		std::make_unique<ConsoleSink>(), &ConsoleSink::ReceiveLogMessage);
 	g3::initializeLogging(worker.get());
 
 	UNREFERENCED_PARAMETER(hPrevInstance);

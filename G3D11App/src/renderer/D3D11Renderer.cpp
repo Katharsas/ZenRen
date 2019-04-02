@@ -13,8 +13,8 @@
 #include "ShaderManager.h"
 #include "Shader.h"
 #include "../Util.h"
-#include <vdfs/fileIndex.h>
-#include <zenload/zenParser.h>
+//#include <vdfs/fileIndex.h>
+//#include <zenload/zenParser.h>
 
 // include the Direct3D Library file
 #pragma comment (lib, "d3d11.lib")
@@ -64,13 +64,13 @@ namespace renderer
 
 	void initWorld()
 	{
-		VDFS::FileIndex vdf;
-		vdf.loadVDF(u8"../g1_data/worlds.VDF");
-		ZenLoad::ZenParser parser(u8"WORLD.ZEN", vdf);
-		parser.readHeader();
-		ZenLoad::oCWorldData world;
-		parser.readWorld(world);
-		ZenLoad::zCMesh* mesh = parser.getWorldMesh();
+		//VDFS::FileIndex vdf;
+		//vdf.loadVDF(u8"../g1_data/worlds.VDF");
+		//ZenLoad::ZenParser parser(u8"WORLD.ZEN", vdf);
+		//parser.readHeader();
+		//ZenLoad::oCWorldData world;
+		//parser.readWorld(world);
+		//ZenLoad::zCMesh* mesh = parser.getWorldMesh();
 	}
 
 	void initD3D(HWND hWnd)
@@ -80,7 +80,7 @@ namespace renderer
 		initSwapChainAndBackBuffer(hWnd);
 		initBackBufferHDR();
 
-		// // Set the viewport
+		// Set the viewport
 		D3D11_VIEWPORT viewport;
 		ZeroMemory(&viewport, sizeof(D3D11_VIEWPORT));
 
