@@ -2,6 +2,13 @@
 #include <windows.h>
 #include <winternl.h>
 
+/**
+ * This file tries to provide sleep timer with good precision by
+ * 1. calling NtSetTimerResolution to get 0,5ms resolution
+ * 2. increasing process priority to above normal
+ * 3. implementing sleep method based on WaitableTimer / WaitForSingleObject
+ */
+
 #define STATUS_SUCCESS 0
 #define STATUS_TIMER_RESOLUTION_NOT_SET 0xC0000245
 
@@ -16,6 +23,9 @@ namespace game
 
 	// The resolution that was actually obtained (may differ from requested resolution based on HW/OS support)
 	ULONG CurrentResolution = 0;
+
+	BOOL isMicroSleepInited = FALSE;
+	HANDLE waitableTimer;
 
 	void enablePreciseTimerResolution()
 	{
@@ -46,6 +56,37 @@ namespace game
 		if (!SetPriorityClass(GetCurrentProcess(), NORMAL_PRIORITY_CLASS))
 		{
 			LOG(WARNING) << "Failed to reset process priority!";
+		}
+	}
+
+	void initMicrosleep()
+	{
+		waitableTimer = CreateWaitableTimer(NULL, TRUE, NULL);
+		if (waitableTimer)
+		{
+			isMicroSleepInited = TRUE;
+		}
+	}
+
+	void cleanupMicrosleep()
+	{
+		CloseHandle(waitableTimer);
+	}
+
+	void microsleep(int64_t usec)
+	{
+		if (isMicroSleepInited)
+		{
+			LARGE_INTEGER ft;
+
+			// Convert to 100 nanosecond interval, negative value indicates relative time
+			ft.QuadPart = -(10 * usec);
+			SetWaitableTimer(waitableTimer, &ft, 0, NULL, NULL, 0);
+			WaitForSingleObject(waitableTimer, INFINITE);
+		}
+		else
+		{
+			LOG(FATAL) << "Waitable timer has not been initialized!";
 		}
 	}
 }

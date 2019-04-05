@@ -184,20 +184,28 @@ namespace renderer
 		swapChainDesc.SampleDesc.Count = 1;                               // how many multisamples
 		swapChainDesc.Windowed = TRUE;                                    // windowed/full-screen mode
 		swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;     // allow full-screen switching
-																		  // create a device, device context and swap chain using the information in the scd struct
-		D3D11CreateDeviceAndSwapChain(
+
+		const D3D_FEATURE_LEVEL level = D3D_FEATURE_LEVEL_11_0;           // require directx 11.0
+
+		// create a device, device context and swap chain using the information in the scd struct
+		HRESULT hr = D3D11CreateDeviceAndSwapChain(
 			nullptr,
 			D3D_DRIVER_TYPE_HARDWARE,
 			0,
 			D3D11_CREATE_DEVICE_DEBUG,
-			nullptr,
-			0,
+			&level,
+			1,
 			D3D11_SDK_VERSION,
 			&swapChainDesc,
 			&swapchain,
 			&device,
 			nullptr,
 			&deviceContext);
+
+		if (FAILED(hr))
+		{
+			LOG(FATAL) << "Could not create D3D11 device. Make sure your GPU supports DirectX 11.";
+		}
 
 		// get the address of the back buffer
 		ID3D11Texture2D* texture;
