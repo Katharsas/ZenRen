@@ -6,8 +6,10 @@
 
 #include "conio.h"
 #include "../resource.h"
+
+#include "Settings.h"
 #include "Util.h"
-#include "renderer/D3D11Renderer.h"
+#include "game/GameLoop.h"
 #include "g3log/logworker.hpp"
 
 #define MAX_LOADSTRING 100
@@ -63,8 +65,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		return FALSE;
 	}
 
-	// Initialize Direct3D:
-	renderer::initD3D(hWnd);
+	// Initialize
+	game::init(hWnd);
 	
 	// Main message loop:
 	MSG msg;
@@ -77,12 +79,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 				break;
 			}
 		}
-		
-		renderer::renderFrame();
+		game::execute();
 	}
 
-	// Clean up DirectX and COM
-	renderer::cleanD3D();
+	game::cleanup();
 
 	return (int) msg.wParam;
 }
@@ -128,7 +128,7 @@ HWND InitInstance(HINSTANCE hInstance, int nCmdShow)
 	hInst = hInstance; // Store instance handle in our global variable
 
 	// set view size and calculate window size with borders/menu
-	RECT viewSize = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
+	RECT viewSize = {0, 0, settings::SCREEN_WIDTH, settings::SCREEN_HEIGHT};
 	AdjustWindowRect(&viewSize, WS_OVERLAPPEDWINDOW, FALSE);
 
 	LEVELS level = DEBUG;

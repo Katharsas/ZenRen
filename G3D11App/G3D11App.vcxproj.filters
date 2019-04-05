@@ -54,6 +54,10 @@
     <ClCompile Include="src\renderer\ShaderManager.cpp">
       <Filter>Source</Filter>
     </ClCompile>
+    <ClCompile Include="src\game\TimerPrecision.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\game\GameLoop.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Util.h">
@@ -74,5 +78,10 @@
     <ClInclude Include="src\renderer\ShaderManager.h">
       <Filter>Source</Filter>
     </ClInclude>
+    <ClInclude Include="src\game\TimerPrecision.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="src\game\GameLoop.h" />
+    <ClInclude Include="src\Settings.h" />
   </ItemGroup>
 </Project>

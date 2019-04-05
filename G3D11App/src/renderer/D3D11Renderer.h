@@ -1,13 +1,9 @@
 #pragma once
 
-// define the screen resolution
-#define SCREEN_WIDTH  1366
-#define SCREEN_HEIGHT 768
-
 namespace renderer
 {
-
 	void initD3D(HWND hWnd);
+	// Clean up DirectX and COM
 	void cleanD3D();
 	void renderFrame(void);
 

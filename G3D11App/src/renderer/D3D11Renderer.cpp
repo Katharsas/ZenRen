@@ -10,6 +10,7 @@
 #include <d3dx11.h>
 #include <d3dx10.h>
 
+#include "Settings.h"
 #include "ShaderManager.h"
 #include "Shader.h"
 #include "../Util.h"
@@ -86,8 +87,8 @@ namespace renderer
 
 		viewport.TopLeftX = 0;
 		viewport.TopLeftY = 0;
-		viewport.Width = SCREEN_WIDTH;
-		viewport.Height = SCREEN_HEIGHT;
+		viewport.Width = settings::SCREEN_WIDTH;
+		viewport.Height = settings::SCREEN_HEIGHT;
 
 		deviceContext->RSSetViewports(1, &viewport);
 
@@ -176,8 +177,8 @@ namespace renderer
 		// fill the swap chain description struct
 		swapChainDesc.BufferCount = 1;                                    // one back buffer
 		swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;// use 32-bit color
-		swapChainDesc.BufferDesc.Width = SCREEN_WIDTH;                    // set the back buffer width
-		swapChainDesc.BufferDesc.Height = SCREEN_HEIGHT;                  // set the back buffer height
+		swapChainDesc.BufferDesc.Width = settings::SCREEN_WIDTH;          // set the back buffer width
+		swapChainDesc.BufferDesc.Height = settings::SCREEN_HEIGHT;        // set the back buffer height
 		swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;      // how swap chain is to be used
 		swapChainDesc.OutputWindow = hWnd;                                // the window to be used
 		swapChainDesc.SampleDesc.Count = 1;                               // how many multisamples
@@ -212,7 +213,7 @@ namespace renderer
 		auto format = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
 		// Create buffer texture
-		D3D11_TEXTURE2D_DESC desc = CD3D11_TEXTURE2D_DESC(format, SCREEN_WIDTH, SCREEN_HEIGHT);
+		D3D11_TEXTURE2D_DESC desc = CD3D11_TEXTURE2D_DESC(format, settings::SCREEN_WIDTH, settings::SCREEN_HEIGHT);
 		desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
 		desc.MipLevels = 1;
 
