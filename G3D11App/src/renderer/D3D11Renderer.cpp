@@ -38,6 +38,7 @@ namespace renderer
 	ID3D11SamplerState* linearSamplerState;
 
 	ID3D11Buffer* vertexBufferToneMapping;
+	ID3D11Buffer* indexBufferToneMapping;
 	ID3D11Buffer* vertexBufferTriangle;
 	ShaderManager* shaders;
 
@@ -106,6 +107,7 @@ namespace renderer
 		delete shaders;
 		vertexBufferTriangle->Release();
 		vertexBufferToneMapping->Release();
+		indexBufferToneMapping->Release();
 
 		swapchain->Release();
 		backBuffer->Release();
@@ -158,8 +160,9 @@ namespace renderer
 		UINT stride = sizeof(QUAD);
 		UINT offset = 0;
 		deviceContext->IASetVertexBuffers(0, 1, &vertexBufferToneMapping, &stride, &offset);
+		deviceContext->IASetIndexBuffer(indexBufferToneMapping, DXGI_FORMAT_R32_UINT, 0);
 
-		deviceContext->Draw(6, 0);
+		deviceContext->DrawIndexed(6, 0, 0);
 
 		// unbind HDR back buffer texture so the next frame can use it as rtv again
 		ID3D11ShaderResourceView* srv = nullptr;
@@ -281,35 +284,63 @@ namespace renderer
 		QUAD fullscreenQuad[] = {
 			{ POS(-1.0f, 1.0f, 0.0f), UV(0.0f, 0.0f) },
 			{ POS(1.0f, 1.0, 0.0f), UV(1.0f, 0.0f) },
-			{ POS(-1.0, -1.0, 0.0f), UV(0.0f, 1.0f) },
-
-			{ POS(-1.0, -1.0, 0.0f), UV(0.0f, 1.0f) },
-			{ POS(1.0f, 1.0, 0.0f), UV(1.0f, 0.0f) },
 			{ POS(1.0, -1.0, 0.0f), UV(1.0f, 1.0f) },
+			{ POS(-1.0, -1.0, 0.0f), UV(0.0f, 1.0f) },
 		};
 
-		// create the vertex buffers
-		D3D11_BUFFER_DESC bufferDesc = CD3D11_BUFFER_DESC();
-		ZeroMemory(&bufferDesc, sizeof(bufferDesc));
+		// make sure rotation of each triangle is clockwise
+		DWORD fullscreenQuadIndices[] = {
+				0, 1, 2,
+				0, 2, 3,
+		};
 
-		bufferDesc.Usage = D3D11_USAGE_DYNAMIC;                // write access by CPU and GPU
-		bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;       // use as a vertex buffer
-		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;    // allow CPU to write in buffer
+		// vertex buffer triangle (dynamic, mappable)
+		{
+			D3D11_BUFFER_DESC bufferDesc = CD3D11_BUFFER_DESC();
+			ZeroMemory(&bufferDesc, sizeof(bufferDesc));
 
-		bufferDesc.ByteWidth = sizeof(VERTEX) * 3;
-		device->CreateBuffer(&bufferDesc, nullptr, &vertexBufferTriangle);
-		bufferDesc.ByteWidth = sizeof(QUAD) * 6;
-		device->CreateBuffer(&bufferDesc, nullptr, &vertexBufferToneMapping);
+			bufferDesc.Usage = D3D11_USAGE_DYNAMIC;				// write access by CPU and read access by GPU
+			bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;	// use as a vertex buffer
+			bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;	// allow CPU to write in buffer
+			bufferDesc.ByteWidth = sizeof(VERTEX) * 3;
 
-		// copy the vertices into the buffers
-		D3D11_MAPPED_SUBRESOURCE ms;
-		deviceContext->Map(vertexBufferTriangle, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);    // map the buffer
-		memcpy(ms.pData, triangle, sizeof(triangle));                                    // copy the data
-		deviceContext->Unmap(vertexBufferTriangle, 0);                                   // unmap the buffer
+			// D3D11_USAGE_DYNAMIC allows writing from CPU multiple times by 'mapping' (see below)
+			// D3D11_USAGE_DEFAULT would only allow to write data once by passing a D3D11_MAPPED_SUBRESOURCE to next line (pInitialData)
+			device->CreateBuffer(&bufferDesc, nullptr, &vertexBufferTriangle);
+		}
+		// map to copy triangle vertices into its buffer
+		{
+			D3D11_MAPPED_SUBRESOURCE ms;
+			deviceContext->Map(vertexBufferTriangle, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);// map the buffer
+			memcpy(ms.pData, triangle, sizeof(triangle));													// copy the data
+			deviceContext->Unmap(vertexBufferTriangle, 0);											// unmap the buffer
+		}
+		// vertex buffer fullscreen quad
+		{
+			D3D11_BUFFER_DESC bufferDesc = CD3D11_BUFFER_DESC();
+			ZeroMemory(&bufferDesc, sizeof(bufferDesc));
 
-		deviceContext->Map(vertexBufferToneMapping, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms); // map the buffer
-		memcpy(ms.pData, fullscreenQuad, sizeof(fullscreenQuad));                        // copy the data
-		deviceContext->Unmap(vertexBufferToneMapping, 0);                                // unmap the buffer
+			bufferDesc.Usage = D3D11_USAGE_DEFAULT;				// can only be initialized once by CPU, read/write access by GPU
+			bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+			bufferDesc.ByteWidth = sizeof(QUAD) * 4;
+
+			D3D11_SUBRESOURCE_DATA initialData;
+			initialData.pSysMem = fullscreenQuad;
+			device->CreateBuffer(&bufferDesc, &initialData, &vertexBufferToneMapping);
+		}
+		// index buffer
+		{
+			D3D11_BUFFER_DESC indexBufferDesc;
+			ZeroMemory(&indexBufferDesc, sizeof(indexBufferDesc));
+
+			indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+			indexBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+			indexBufferDesc.ByteWidth = sizeof(DWORD) * 2 * 3;
+
+			D3D11_SUBRESOURCE_DATA initialData;
+			initialData.pSysMem = fullscreenQuadIndices;
+			device->CreateBuffer(&indexBufferDesc, &initialData, &indexBufferToneMapping);
+		}
 
 		// select which primtive type we are using
 		deviceContext->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
