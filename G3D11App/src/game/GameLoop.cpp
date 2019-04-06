@@ -16,9 +16,9 @@ namespace game
 	// logging
 	const int32_t sampleSize = 500; // number of frames until statistics are averaged and logged
 	
-	int32_t frameCounter = 0;
-	std::array<int32_t, sampleSize> timeRenderAll;
-	std::array<int32_t, sampleSize> timeSleepAll;
+	int32_t sampleIndex = 0;
+	std::array<int32_t, sampleSize> renderTimeSamples;
+	std::array<int32_t, sampleSize> sleepTimeSamples;
 
 	struct LoggingSettings
 	{
@@ -64,7 +64,7 @@ namespace game
 		const auto endTimeRender = std::chrono::high_resolution_clock::now();
 		const auto timeRender = endTimeRender - startTimeRender;
 		const auto timeRenderMicros = static_cast<int32_t> (timeRender / std::chrono::microseconds(1));
-		timeRenderAll[frameCounter] = timeRenderMicros;
+		renderTimeSamples[sampleIndex] = timeRenderMicros;
 
 		// sleep_for can wake up about once every 1,4ms
 		//std::this_thread::sleep_for(std::chrono::microseconds(100));
@@ -86,16 +86,16 @@ namespace game
 		const auto endTimeSleep = std::chrono::high_resolution_clock::now();
 		const auto timeSleep = endTimeSleep - endTimeRender;
 		const auto timeSleepMicros = static_cast<int32_t> (timeSleep / std::chrono::microseconds(1));
-		timeSleepAll[frameCounter] = timeSleepMicros;
+		sleepTimeSamples[sampleIndex] = timeSleepMicros;
 
-		frameCounter++;
+		sampleIndex++;
 	}
 
 	void logStats()
 	{
 		// log fps and frame times
-		const int32_t averageRenderTime = average(timeRenderAll);
-		const int32_t averageSleepTime = average(timeSleepAll);
+		const int32_t averageRenderTime = average(renderTimeSamples);
+		const int32_t averageSleepTime = average(sleepTimeSamples);
 		const int32_t fps = 1000000 / (averageRenderTime + averageSleepTime);
 
 		// log frame time divergence
@@ -110,7 +110,7 @@ namespace game
 
 		for (int i = 0; i < sampleSize; i++)
 		{
-			const int32_t ft = timeRenderAll[i] + timeSleepAll[i];
+			const int32_t ft = renderTimeSamples[i] + sleepTimeSamples[i];
 			const int32_t off = ft - frameTimeTarget;
 			frameTimeOffCount++;
 			if (off > 0)
@@ -129,9 +129,12 @@ namespace game
 		const int32_t offAverage = frameTimeOffSum / frameTimeOffCount;
 		const int32_t averageHigherPermille = divideOrZero(higherFrameTimePercentSum * 1000, higherFrameTimeCount);
 		const int32_t averageLowerPermille = divideOrZero(lowerFrameTimePercentSum * 1000, lowerFrameTimeCount);
-		const int32_t averagePromille = ((higherFrameTimePercentSum + lowerFrameTimePercentSum) * 1000) / (higherFrameTimeCount + lowerFrameTimeCount);
+		const int32_t averagePromille = (int32_t)((higherFrameTimePercentSum + lowerFrameTimePercentSum) * 1000) / (higherFrameTimeCount + lowerFrameTimeCount);
 
-		const LoggingSettings s = {};
+		
+		const LoggingSettings s = {
+			// overwrite logging defaults here
+		};
 		const std::string splitter = " | ";
 		std::stringstream log;
 		if (s.fps)					log << "FPS: " << fps << splitter;
@@ -147,7 +150,7 @@ namespace game
 		// uncomment for checking actual frametime distribution for single batch of samples
 		/*for (int i = 0; i < sampleSize; i++)
 		{
-			LOG(DEBUG) << "renderTime: " << timeRenderAll[i] << " sleepTime: " << timeSleepAll[i];
+			LOG(DEBUG) << "renderTime: " << renderTimeSamples[i] << " sleepTime: " << sleepTimeSamples[i];
 		}
 		Sleep(100);
 		exit(0);*/
@@ -156,10 +159,10 @@ namespace game
 	void execute()
 	{
 		renderAndSleep();
-		if (frameCounter >= sampleSize)
+		if (sampleIndex >= sampleSize)
 		{
 			logStats();
-			frameCounter = 0;
+			sampleIndex = 0;
 		}
 	}
 
