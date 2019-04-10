@@ -9,6 +9,7 @@
 #include <d3d11.h>
 #include <d3dx11.h>
 #include <d3dx10.h>
+#include <array>
 
 #include "Settings.h"
 #include "ShaderManager.h"
@@ -26,21 +27,28 @@
 
 namespace renderer
 {
+	struct Mesh
+	{
+		ID3D11Buffer* vertexBuffer;
+		int32_t vertexCount;
 
-	// global declarations
-	IDXGISwapChain* swapchain;
-	ID3D11Device* device;
-	ID3D11DeviceContext* deviceContext;
+		void release()
+		{
+			vertexBuffer->Release();
+		}
+	};
+	struct MeshIndexed
+	{
+		ID3D11Buffer* vertexBuffer;
+		ID3D11Buffer* indexBuffer;
+		int32_t indexCount;
 
-	ID3D11RenderTargetView* backBuffer;    // 32-bit
-	ID3D11RenderTargetView* backBufferHDR; // 64-bit
-	ID3D11ShaderResourceView* backBufferHDRResource;
-	ID3D11SamplerState* linearSamplerState;
-
-	ID3D11Buffer* vertexBufferToneMapping;
-	ID3D11Buffer* indexBufferToneMapping;
-	ID3D11Buffer* vertexBufferTriangle;
-	ShaderManager* shaders;
+		void release()
+		{
+			vertexBuffer->Release();
+			indexBuffer->Release();
+		}
+	};
 
 	struct POS {
 		POS(FLOAT x, FLOAT y, FLOAT z) { X = x; Y = y; Z = z; }
@@ -58,6 +66,22 @@ namespace renderer
 		POS position;
 		UV uvCoordinates;
 	};
+
+	// global declarations
+	IDXGISwapChain* swapchain;
+	ID3D11Device* device;
+	ID3D11DeviceContext* deviceContext;
+
+	ID3D11RenderTargetView* backBuffer;    // 32-bit
+	ID3D11RenderTargetView* backBufferHDR; // 64-bit
+	ID3D11ShaderResourceView* backBufferHDRResource;
+	ID3D11SamplerState* linearSamplerState;
+
+	ShaderManager* shaders;
+
+	MeshIndexed toneMappingQuad;
+	Mesh triangle;
+
 
 	void initSwapChainAndBackBuffer(HWND hWnd);
 	void initBackBufferHDR();
@@ -103,11 +127,10 @@ namespace renderer
 		swapchain->SetFullscreenState(FALSE, nullptr);    // switch to windowed mode
 
 		// close and release all existing COM objects
-
 		delete shaders;
-		vertexBufferTriangle->Release();
-		vertexBufferToneMapping->Release();
-		indexBufferToneMapping->Release();
+
+		triangle.release();
+		toneMappingQuad.release();
 
 		swapchain->Release();
 		backBuffer->Release();
@@ -137,10 +160,10 @@ namespace renderer
 			// select which vertex buffer to display
 			UINT stride = sizeof(VERTEX);
 			UINT offset = 0;
-			deviceContext->IASetVertexBuffers(0, 1, &vertexBufferTriangle, &stride, &offset);
+			deviceContext->IASetVertexBuffers(0, 1, &(triangle.vertexBuffer), &stride, &offset);
 
 			// draw the vertex buffer to the back buffer
-			deviceContext->Draw(3, 0);
+			deviceContext->Draw(triangle.vertexCount, 0);
 		}
 
 		// draw HDR back buffer to real back buffer via tone mapping
@@ -159,10 +182,10 @@ namespace renderer
 		// select which vertex buffer to display
 		UINT stride = sizeof(QUAD);
 		UINT offset = 0;
-		deviceContext->IASetVertexBuffers(0, 1, &vertexBufferToneMapping, &stride, &offset);
-		deviceContext->IASetIndexBuffer(indexBufferToneMapping, DXGI_FORMAT_R32_UINT, 0);
+		deviceContext->IASetVertexBuffers(0, 1, &(toneMappingQuad.vertexBuffer), &stride, &offset);
+		deviceContext->IASetIndexBuffer(toneMappingQuad.indexBuffer, DXGI_FORMAT_R32_UINT, 0);
 
-		deviceContext->DrawIndexed(6, 0, 0);
+		deviceContext->DrawIndexed(toneMappingQuad.indexCount, 0, 0);
 
 		// unbind HDR back buffer texture so the next frame can use it as rtv again
 		ID3D11ShaderResourceView* srv = nullptr;
@@ -275,21 +298,21 @@ namespace renderer
 
 	void initGraphics()
 	{
-		VERTEX triangle[] = {
+		std::array<VERTEX, 3> triangleData = { {
 			{ POS(0.0f, 0.5f, 0.0f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
 			{ POS(0.45f, -0.5, 0.0f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
 			{ POS(-0.45f, -0.5f, 0.0f), D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f) }
-		};
+		} };
 
-		QUAD fullscreenQuad[] = {
+		std::array<QUAD, 4> fullscreenQuadData = { {
 			{ POS(-1.0f, 1.0f, 0.0f), UV(0.0f, 0.0f) },
 			{ POS(1.0f, 1.0, 0.0f), UV(1.0f, 0.0f) },
 			{ POS(1.0, -1.0, 0.0f), UV(1.0f, 1.0f) },
 			{ POS(-1.0, -1.0, 0.0f), UV(0.0f, 1.0f) },
-		};
+		} };
 
 		// make sure rotation of each triangle is clockwise
-		DWORD fullscreenQuadIndices[] = {
+		std::array<DWORD, 6> fullscreenQuadIndices = {
 				0, 1, 2,
 				0, 2, 3,
 		};
@@ -302,18 +325,19 @@ namespace renderer
 			bufferDesc.Usage = D3D11_USAGE_DYNAMIC;				// write access by CPU and read access by GPU
 			bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;	// use as a vertex buffer
 			bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;	// allow CPU to write in buffer
-			bufferDesc.ByteWidth = sizeof(VERTEX) * 3;
+			bufferDesc.ByteWidth = sizeof(VERTEX) * triangleData.size();
 
 			// D3D11_USAGE_DYNAMIC allows writing from CPU multiple times by 'mapping' (see below)
 			// D3D11_USAGE_DEFAULT would only allow to write data once by passing a D3D11_MAPPED_SUBRESOURCE to next line (pInitialData)
-			device->CreateBuffer(&bufferDesc, nullptr, &vertexBufferTriangle);
+			device->CreateBuffer(&bufferDesc, nullptr, &(triangle.vertexBuffer));
+			triangle.vertexCount = triangleData.size();
 		}
 		// map to copy triangle vertices into its buffer
 		{
 			D3D11_MAPPED_SUBRESOURCE ms;
-			deviceContext->Map(vertexBufferTriangle, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);// map the buffer
-			memcpy(ms.pData, triangle, sizeof(triangle));													// copy the data
-			deviceContext->Unmap(vertexBufferTriangle, 0);											// unmap the buffer
+			deviceContext->Map(triangle.vertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);// map the buffer
+			memcpy(ms.pData, triangleData.data(), sizeof(triangleData));													// copy the data
+			deviceContext->Unmap(triangle.vertexBuffer, 0);											// unmap the buffer
 		}
 		// vertex buffer fullscreen quad
 		{
@@ -322,11 +346,11 @@ namespace renderer
 
 			bufferDesc.Usage = D3D11_USAGE_DEFAULT;				// can only be initialized once by CPU, read/write access by GPU
 			bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-			bufferDesc.ByteWidth = sizeof(QUAD) * 4;
+			bufferDesc.ByteWidth = sizeof(QUAD) * fullscreenQuadData.size();
 
 			D3D11_SUBRESOURCE_DATA initialData;
-			initialData.pSysMem = fullscreenQuad;
-			device->CreateBuffer(&bufferDesc, &initialData, &vertexBufferToneMapping);
+			initialData.pSysMem = fullscreenQuadData.data();
+			device->CreateBuffer(&bufferDesc, &initialData, &(toneMappingQuad.vertexBuffer));
 		}
 		// index buffer
 		{
@@ -335,11 +359,12 @@ namespace renderer
 
 			indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
 			indexBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-			indexBufferDesc.ByteWidth = sizeof(DWORD) * 2 * 3;
+			indexBufferDesc.ByteWidth = sizeof(DWORD) * fullscreenQuadIndices.size();
 
 			D3D11_SUBRESOURCE_DATA initialData;
-			initialData.pSysMem = fullscreenQuadIndices;
-			device->CreateBuffer(&indexBufferDesc, &initialData, &indexBufferToneMapping);
+			initialData.pSysMem = fullscreenQuadIndices.data();
+			device->CreateBuffer(&indexBufferDesc, &initialData, &(toneMappingQuad.indexBuffer));
+			toneMappingQuad.indexCount = fullscreenQuadIndices.size();
 		}
 
 		// select which primtive type we are using
