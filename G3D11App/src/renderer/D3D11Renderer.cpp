@@ -83,7 +83,6 @@ namespace renderer
 	Mesh triangle;
 
 	ID3D11DepthStencilView* depthStencilView;
-	ID3D11DepthStencilState* depthStencilState;
 
 	void initSwapChainAndBackBuffer(HWND hWnd);
 	void initDepthAndStencilBuffer();
@@ -143,7 +142,6 @@ namespace renderer
 		backBuffer->Release();
 		backBufferHDR->Release();
 		backBufferHDRResource->Release();
-		depthStencilState->Release();
 		linearSamplerState->Release();
 
 		device->Release();
@@ -297,8 +295,10 @@ namespace renderer
 		depthStencilStateDesc.FrontFace = defaultStencilOp;
 		depthStencilStateDesc.BackFace = defaultStencilOp;
 
+		ID3D11DepthStencilState* depthStencilState;
 		device->CreateDepthStencilState(&depthStencilStateDesc, &depthStencilState);
 		deviceContext->OMSetDepthStencilState(depthStencilState, 1);
+		depthStencilState->Release();
 	}
 
 	void initBackBufferHDR()
