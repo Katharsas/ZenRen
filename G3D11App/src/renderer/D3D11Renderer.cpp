@@ -151,7 +151,7 @@ namespace renderer
 	void renderFrame(void)
 	{
 		// clear depth and stencil buffer
-		deviceContext->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+		deviceContext->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 0.0f, 0);
 
 		// set the HDR back buffer as rtv
 		deviceContext->OMSetRenderTargets(1, &backBufferHDR, depthStencilView);
@@ -281,7 +281,7 @@ namespace renderer
 
 		depthStencilStateDesc.DepthEnable = TRUE;
 		depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-		depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_LESS;
+		depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_GREATER;
 		depthStencilStateDesc.StencilEnable = FALSE;
 		depthStencilStateDesc.StencilReadMask = D3D11_DEFAULT_STENCIL_READ_MASK;
 		depthStencilStateDesc.StencilWriteMask = D3D11_DEFAULT_STENCIL_WRITE_MASK;
@@ -358,16 +358,16 @@ namespace renderer
 	void initGraphics()
 	{
 		std::array<VERTEX, 3> triangleData = { {
-			{ POS(0.0f, 0.5f, 0.0f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
-			{ POS(0.45f, -0.5, 0.0f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
-			{ POS(-0.45f, -0.5f, 0.0f), D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f) }
+			{ POS(0.0f, 0.5f, 1.0f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
+			{ POS(0.45f, -0.5, 1.0f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
+			{ POS(-0.45f, -0.5f, 1.0f), D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f) }
 		} };
 
 		std::array<QUAD, 4> fullscreenQuadData = { {
-			{ POS(-1.0f, 1.0f, 0.0f), UV(0.0f, 0.0f) },
-			{ POS(1.0f, 1.0, 0.0f), UV(1.0f, 0.0f) },
-			{ POS(1.0, -1.0, 0.0f), UV(1.0f, 1.0f) },
-			{ POS(-1.0, -1.0, 0.0f), UV(0.0f, 1.0f) },
+			{ POS(-1.0f, 1.0f, 1.0f), UV(0.0f, 0.0f) },
+			{ POS(1.0f, 1.0, 1.0f), UV(1.0f, 0.0f) },
+			{ POS(1.0, -1.0, 1.0f), UV(1.0f, 1.0f) },
+			{ POS(-1.0, -1.0, 1.0f), UV(0.0f, 1.0f) },
 		} };
 
 		// make sure rotation of each triangle is clockwise
