@@ -3,12 +3,19 @@
 
 // Directx 11 Renderer according to this tutorial:
 // http://www.directxtutorial.com/Lesson.aspx?lessonid=11-4-2
+// And this one:
+// https://www.braynzarsoft.net/viewtutorial/q16390-braynzar-soft-directx-11-tutorials
+//
 // Beefed up with whatever code i could find on the internet.
 
 #include <windowsx.h>
 #include <d3d11.h>
 #include <d3dx11.h>
 #include <d3dx10.h>
+#pragma warning(push)
+#pragma warning(disable : 4838)
+#include <xnamath.h>
+#pragma warning(pop)
 #include <array>
 
 #include "Settings.h"
@@ -27,6 +34,24 @@
 
 namespace renderer
 {
+	struct CameraMatrices
+	{
+		XMMATRIX view;
+		XMMATRIX projection;
+	};
+
+	struct Camera
+	{
+		XMVECTOR position;
+		XMVECTOR target;
+		XMVECTOR up;
+	};
+
+	struct CbPerObject
+	{
+		XMMATRIX WVP;
+	};
+
 	struct Mesh
 	{
 		ID3D11Buffer* vertexBuffer;
@@ -79,17 +104,30 @@ namespace renderer
 
 	ShaderManager* shaders;
 
-	MeshIndexed toneMappingQuad;
+	Mesh toneMappingQuad;
+
+	MeshIndexed cube;
 	Mesh triangle;
-	Mesh triangle2;
+
+	CameraMatrices camMatrices;
+	Camera camera;
+
+	ID3D11Buffer* cbPerObjectBuffer;
 
 	ID3D11DepthStencilView* depthStencilView;
 
+	// scene state
+	float rot = 0.1f;
+	XMMATRIX cube1World;
+	XMMATRIX cube2World;
+
+	// forward definitions
 	void initSwapChainAndBackBuffer(HWND hWnd);
 	void initDepthAndStencilBuffer();
 	void initBackBufferHDR();
 	void initPipelineToneMapping();
-	void initGraphics();
+	void initVertexIndexBuffers();
+	void initConstantBufferPerObject();
 
 	void initWorld()
 	{
@@ -123,9 +161,22 @@ namespace renderer
 
 		deviceContext->RSSetViewports(1, &viewport);
 
+		// Set camera
+		camera = {
+			XMVectorSet(0.0f, 3.0f, -6.0f, 0.0f),
+			XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
+			XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f),
+		};
+
+		// Set view & projection matrix
+		camMatrices.view = XMMatrixLookAtLH(camera.position, camera.target, camera.up);
+		const float aspectRatio = static_cast<float>(settings::SCREEN_WIDTH) / settings::SCREEN_HEIGHT;
+		camMatrices.projection = XMMatrixPerspectiveFovLH(0.4f*3.14f, aspectRatio, 0.1f, 1000.0f);
+
 		shaders = new ShaderManager(device);
 		initPipelineToneMapping();
-		initGraphics();
+		initConstantBufferPerObject();
+		initVertexIndexBuffers();
 	}
 
 	void cleanD3D()
@@ -135,6 +186,7 @@ namespace renderer
 		// close and release all existing COM objects
 		delete shaders;
 
+		cube.release();
 		triangle.release();
 		toneMappingQuad.release();
 
@@ -144,21 +196,48 @@ namespace renderer
 		backBufferHDR->Release();
 		backBufferHDRResource->Release();
 		linearSamplerState->Release();
+		cbPerObjectBuffer->Release();
 
 		device->Release();
 		deviceContext->Release();
 	}
 
+	/* Calculates combined World-View-Projection-Matrix for use as constant buffer value
+	 */
+	CbPerObject calculateWvpConstantBuffer(const XMMATRIX objectsWorldMatrix, CameraMatrices viewAndProjection)
+	{
+		const XMMATRIX wvp = objectsWorldMatrix * camMatrices.view * camMatrices.projection;
+		return { XMMatrixTranspose(wvp) };
+	}
+
+	void updateObjects()
+	{
+		//Keep the cubes rotating
+		rot += .015f;
+		if (rot > 6.28f) rot = 0.0f;
+
+		cube1World = XMMatrixIdentity();
+		XMVECTOR rotAxis = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+		XMMATRIX Rotation = XMMatrixRotationAxis(rotAxis, rot);
+		XMMATRIX Translation = XMMatrixTranslation(0.0f, 0.0f, 4.0f);
+		cube1World = Translation * Rotation;
+
+		cube2World = XMMatrixIdentity();
+		Rotation = XMMatrixRotationAxis(rotAxis, -rot);
+		XMMATRIX Scale = XMMatrixScaling(1.3f, 1.3f, 1.3f);
+		cube2World = Rotation * Scale;
+	}
+
 	void renderFrame(void)
 	{
-		// clear depth and stencil buffer
-		deviceContext->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 0.0f, 0);
-
 		// set the HDR back buffer as rtv
 		deviceContext->OMSetRenderTargets(1, &backBufferHDR, depthStencilView);
 
 		// clear the back buffer to a deep blue
 		deviceContext->ClearRenderTargetView(backBufferHDR, D3DXCOLOR(0.0f, 0.2f, 0.4f, 1.0f));
+
+		// clear depth and stencil buffer
+		deviceContext->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 0.0f, 0);
 
 		// do 3D rendering here
 		{
@@ -168,17 +247,26 @@ namespace renderer
 			deviceContext->IASetInputLayout(triangleShader->getVertexLayout());
 			deviceContext->PSSetShader(triangleShader->getPixelShader(), 0, 0);
 
-			// select which vertex buffer to display
+			// select which vertex / index buffer to display
 			UINT stride = sizeof(VERTEX);
 			UINT offset = 0;
-			deviceContext->IASetVertexBuffers(0, 1, &(triangle.vertexBuffer), &stride, &offset);
+			deviceContext->IASetVertexBuffers(0, 1, &(cube.vertexBuffer), &stride, &offset);
+			deviceContext->IASetIndexBuffer(cube.indexBuffer, DXGI_FORMAT_R32_UINT, 0);
 
-			// draw the vertex buffer to the back buffer
-			deviceContext->Draw(triangle.vertexCount, 0);
+			// set the World/View/Projection matrix, send it to constant buffer, draw to HDR
+			// cube 1
+			CbPerObject cbPerObject = calculateWvpConstantBuffer(cube1World, camMatrices);
+			deviceContext->UpdateSubresource(cbPerObjectBuffer, 0, nullptr, &cbPerObject, 0, 0);
+			deviceContext->VSSetConstantBuffers(0, 1, &cbPerObjectBuffer);
 
-			// triangle 2
-			deviceContext->IASetVertexBuffers(0, 1, &(triangle2.vertexBuffer), &stride, &offset);
-			deviceContext->Draw(triangle2.vertexCount, 0);
+			deviceContext->DrawIndexed(cube.indexCount, 0, 0);
+
+			// cube 2
+			cbPerObject = calculateWvpConstantBuffer(cube2World, camMatrices);
+			deviceContext->UpdateSubresource(cbPerObjectBuffer, 0, nullptr, &cbPerObject, 0, 0);
+			deviceContext->VSSetConstantBuffers(0, 1, &cbPerObjectBuffer);
+
+			deviceContext->DrawIndexed(cube.indexCount, 0, 0);
 		}
 
 		// draw HDR back buffer to real back buffer via tone mapping
@@ -198,9 +286,10 @@ namespace renderer
 		UINT stride = sizeof(QUAD);
 		UINT offset = 0;
 		deviceContext->IASetVertexBuffers(0, 1, &(toneMappingQuad.vertexBuffer), &stride, &offset);
-		deviceContext->IASetIndexBuffer(toneMappingQuad.indexBuffer, DXGI_FORMAT_R32_UINT, 0);
+		//deviceContext->IASetIndexBuffer(toneMappingQuad.indexBuffer, DXGI_FORMAT_R32_UINT, 0);
 
-		deviceContext->DrawIndexed(toneMappingQuad.indexCount, 0, 0);
+		//deviceContext->DrawIndexed(toneMappingQuad.indexCount, 0, 0);
+		deviceContext->Draw(toneMappingQuad.vertexCount, 0);
 
 		// unbind HDR back buffer texture so the next frame can use it as rtv again
 		ID3D11ShaderResourceView* srv = nullptr;
@@ -360,31 +449,63 @@ namespace renderer
 		deviceContext->PSSetSamplers(0, 1, &linearSamplerState);
 	}
 
-	void initGraphics()
+	void initConstantBufferPerObject()
 	{
-		std::array<VERTEX, 3> triangleData = { {
-			{ POS(0.0f, 0.5f, 1.0f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
-			{ POS(0.45f, -0.5, 1.0f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
-			{ POS(-0.45f, -0.5f, 1.0f), D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f) }
+		D3D11_BUFFER_DESC cbbd;
+		ZeroMemory(&cbbd, sizeof(D3D11_BUFFER_DESC));
+
+		cbbd.Usage = D3D11_USAGE_DEFAULT;// TODO this should probably be dynamic, see https://www.gamedev.net/forums/topic/673486-difference-between-d3d11-usage-default-and-d3d11-usage-dynamic/
+		cbbd.ByteWidth = sizeof(CbPerObject);
+		cbbd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+		cbbd.CPUAccessFlags = 0;
+		cbbd.MiscFlags = 0;
+
+		device->CreateBuffer(&cbbd, nullptr, &cbPerObjectBuffer);
+	}
+
+	void initVertexIndexBuffers()
+	{
+		std::array<VERTEX, 8> cubeVerts = { {
+			{ POS(-1.0f, -1.0f, -1.0f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
+			{ POS(-1.0f, +1.0f, -1.0f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
+			{ POS(+1.0f, +1.0f, -1.0f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
+			{ POS(+1.0f, -1.0f, -1.0f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
+			{ POS(-1.0f, -1.0f, +1.0f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
+			{ POS(-1.0f, +1.0f, +1.0f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
+			{ POS(+1.0f, +1.0f, +1.0f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
+			{ POS(+1.0f, -1.0f, +1.0f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
 		} };
-		std::array<VERTEX, 3> triangleData2 = { {
-			{ POS(0.5f, 0.7f, 0.8f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
-			{ POS(0.95f, -0.3, 0.8f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
-			{ POS(0.05f, -0.3f, 0.8f), D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f) }
+		// make sure rotation of each triangle is clockwise
+		std::array<DWORD, 36> cubeIndices = { {
+			// front
+			0, 1, 2, 0, 2, 3,
+			// back
+			4, 6, 5, 4, 7, 6,
+			// left
+			4, 5, 1, 4, 1, 0,
+			// right
+			3, 2, 6, 3, 6, 7,
+			// top
+			1, 5, 6, 1, 6, 2,
+			// bottom
+			4, 0, 3, 4, 3, 7
 		} };
 
-		std::array<QUAD, 4> fullscreenQuadData = { {
+
+		std::array<VERTEX, 3> triangleData = { {
+			{ POS(+0.0f, +0.5f, +0.0f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
+			{ POS(+0.45f, -0.5f, +0.0f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
+			{ POS(-0.45f, -0.5f, +0.0f), D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f) },
+		} };
+
+		std::array<QUAD, 6> fullscreenQuadData = { {
 			{ POS(-1.0f, 1.0f, 1.0f), UV(0.0f, 0.0f) },
 			{ POS(1.0f, 1.0, 1.0f), UV(1.0f, 0.0f) },
 			{ POS(1.0, -1.0, 1.0f), UV(1.0f, 1.0f) },
+			{ POS(-1.0f, 1.0f, 1.0f), UV(0.0f, 0.0f) },
+			{ POS(1.0, -1.0, 1.0f), UV(1.0f, 1.0f) },
 			{ POS(-1.0, -1.0, 1.0f), UV(0.0f, 1.0f) },
 		} };
-
-		// make sure rotation of each triangle is clockwise
-		std::array<DWORD, 6> fullscreenQuadIndices = {
-				0, 1, 2,
-				0, 2, 3,
-		};
 
 		// vertex buffer triangle (dynamic, mappable)
 		{
@@ -396,51 +517,57 @@ namespace renderer
 			bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;	// allow CPU to write in buffer
 			bufferDesc.ByteWidth = sizeof(VERTEX) * triangleData.size();
 
-			// D3D11_USAGE_DYNAMIC allows writing from CPU multiple times by 'mapping' (see below)
-			// D3D11_USAGE_DEFAULT would only allow to write data once by passing a D3D11_MAPPED_SUBRESOURCE to next line (pInitialData)
+			// see https://docs.microsoft.com/en-us/windows/desktop/api/d3d11/ne-d3d11-d3d11_usage for cpu/gpu data exchange
 			device->CreateBuffer(&bufferDesc, nullptr, &(triangle.vertexBuffer));
 			triangle.vertexCount = triangleData.size();
-
-			device->CreateBuffer(&bufferDesc, nullptr, &(triangle2.vertexBuffer));
-			triangle2.vertexCount = triangleData.size();
 		}
 		// map to copy triangle vertices into its buffer
 		{
 			D3D11_MAPPED_SUBRESOURCE ms;
 			deviceContext->Map(triangle.vertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);// map the buffer
-			memcpy(ms.pData, triangleData.data(), sizeof(triangleData));													// copy the data
+			memcpy(ms.pData, triangleData.data(), sizeof(triangleData));									// copy the data
 			deviceContext->Unmap(triangle.vertexBuffer, 0);											// unmap the buffer
-
-			deviceContext->Map(triangle2.vertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);// map the buffer
-			memcpy(ms.pData, triangleData2.data(), sizeof(triangleData2));													// copy the data
-			deviceContext->Unmap(triangle2.vertexBuffer, 0);											// unmap the buffer
 		}
-		// vertex buffer fullscreen quad
+		// vertex buffer cube
 		{
 			D3D11_BUFFER_DESC bufferDesc = CD3D11_BUFFER_DESC();
 			ZeroMemory(&bufferDesc, sizeof(bufferDesc));
 
-			bufferDesc.Usage = D3D11_USAGE_DEFAULT;				// can only be initialized once by CPU, read/write access by GPU
+			bufferDesc.Usage = D3D11_USAGE_DEFAULT;
 			bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-			bufferDesc.ByteWidth = sizeof(QUAD) * fullscreenQuadData.size();
+			bufferDesc.ByteWidth = sizeof(VERTEX) * cubeVerts.size();
 
 			D3D11_SUBRESOURCE_DATA initialData;
-			initialData.pSysMem = fullscreenQuadData.data();
-			device->CreateBuffer(&bufferDesc, &initialData, &(toneMappingQuad.vertexBuffer));
+			initialData.pSysMem = cubeVerts.data();
+			device->CreateBuffer(&bufferDesc, &initialData, &(cube.vertexBuffer));
 		}
-		// index buffer
+		// index buffer cube
 		{
 			D3D11_BUFFER_DESC indexBufferDesc;
 			ZeroMemory(&indexBufferDesc, sizeof(indexBufferDesc));
 
 			indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
 			indexBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-			indexBufferDesc.ByteWidth = sizeof(DWORD) * fullscreenQuadIndices.size();
+			indexBufferDesc.ByteWidth = sizeof(DWORD) * cubeIndices.size();
 
 			D3D11_SUBRESOURCE_DATA initialData;
-			initialData.pSysMem = fullscreenQuadIndices.data();
-			device->CreateBuffer(&indexBufferDesc, &initialData, &(toneMappingQuad.indexBuffer));
-			toneMappingQuad.indexCount = fullscreenQuadIndices.size();
+			initialData.pSysMem = cubeIndices.data();
+			device->CreateBuffer(&indexBufferDesc, &initialData, &(cube.indexBuffer));
+			cube.indexCount = cubeIndices.size();
+		}
+		// vertex buffer fullscreen quad
+		{
+			D3D11_BUFFER_DESC bufferDesc = CD3D11_BUFFER_DESC();
+			ZeroMemory(&bufferDesc, sizeof(bufferDesc));
+
+			bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+			bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+			bufferDesc.ByteWidth = sizeof(QUAD) * fullscreenQuadData.size();
+
+			D3D11_SUBRESOURCE_DATA initialData;
+			initialData.pSysMem = fullscreenQuadData.data();
+			device->CreateBuffer(&bufferDesc, &initialData, &(toneMappingQuad.vertexBuffer));
+			toneMappingQuad.vertexCount = fullscreenQuadData.size();
 		}
 
 		// select which primtive type we are using

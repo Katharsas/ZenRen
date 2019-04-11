@@ -9,7 +9,7 @@
 namespace game
 {
 	// frame limiter
-	const BOOL frameLimiterEnabled = TRUE;
+	const bool frameLimiterEnabled = true;
 	const int32_t frameLimit = 120;
 	const int32_t frameTimeTarget = 1000000 / frameLimit;
 
@@ -22,13 +22,13 @@ namespace game
 
 	struct LoggingSettings
 	{
-		BOOL fps = TRUE;                       // average fps
-		BOOL renderTime = TRUE;                // average render time [usec]
-		BOOL sleepTime = frameLimiterEnabled;              // average sleep time [usec]
-		BOOL offsetTime = frameLimiterEnabled;             // average difference between target & actual frame time [usec]
-		BOOL offsetTimePermille = frameLimiterEnabled;     // offsetTime as percentage of target frame time [permille]
-		BOOL offsetPositivePermille = frameLimiterEnabled; // like offsetTimePermille, but only for frame times > target time
-		BOOL offsetNegativePermille = frameLimiterEnabled; // like offsetTimePermille, but only for frame times < target time
+		bool fps = true;                       // average fps
+		bool renderTime = true;                // average render time [usec]
+		bool sleepTime = frameLimiterEnabled;              // average sleep time [usec]
+		bool offsetTime = frameLimiterEnabled;             // average difference between target & actual frame time [usec]
+		bool offsetTimePermille = frameLimiterEnabled;     // offsetTime as percentage of target frame time [permille]
+		bool offsetPositivePermille = frameLimiterEnabled; // like offsetTimePermille, but only for frame times > target time
+		bool offsetNegativePermille = frameLimiterEnabled; // like offsetTimePermille, but only for frame times < target time
 	};
 
 	int32_t divideOrZero(float dividend, int32_t divisor)
@@ -59,26 +59,23 @@ namespace game
 	{
 		const auto startTimeRender = std::chrono::high_resolution_clock::now();
 
+		renderer::updateObjects();
 		renderer::renderFrame();
 
 		const auto endTimeRender = std::chrono::high_resolution_clock::now();
 		const auto timeRender = endTimeRender - startTimeRender;
 		const auto timeRenderMicros = static_cast<int32_t> (timeRender / std::chrono::microseconds(1));
 		renderTimeSamples[sampleIndex] = timeRenderMicros;
-
-		// sleep_for can wake up about once every 1,4ms
-		//std::this_thread::sleep_for(std::chrono::microseconds(100));
-
-		// microsleep can wake up about once every 0,5ms
-		if (!frameLimiterEnabled)
-		{
-			microsleep(100);
-		}
-		else
+		
+		if (frameLimiterEnabled)
 		{
 			const int32_t sleepTarget = frameTimeTarget - timeRenderMicros;
 			if (sleepTarget > 0)
 			{
+				// sleep_for can wake up about once every 1,4ms
+				//std::this_thread::sleep_for(std::chrono::microseconds(100));
+
+				// microsleep can wake up about once every 0,5ms
 				microsleep(sleepTarget + 470); // make sure we never get too short frametimes
 			}
 		}
