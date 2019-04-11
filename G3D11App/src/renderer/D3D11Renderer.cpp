@@ -82,8 +82,12 @@ namespace renderer
 	MeshIndexed toneMappingQuad;
 	Mesh triangle;
 
+	ID3D11Texture2D* depthStencilBuffer;
+	ID3D11DepthStencilView* depthStencilView;
+	ID3D11DepthStencilState* depthStencilState;
 
 	void initSwapChainAndBackBuffer(HWND hWnd);
+	void initDepthAndStencilBuffer();
 	void initBackBufferHDR();
 	void initPipelineToneMapping();
 	void initGraphics();
@@ -104,6 +108,7 @@ namespace renderer
 		//initWorld();
 
 		initSwapChainAndBackBuffer(hWnd);
+		initDepthAndStencilBuffer();
 		initBackBufferHDR();
 
 		// Set the viewport
@@ -114,6 +119,8 @@ namespace renderer
 		viewport.TopLeftY = 0;
 		viewport.Width = settings::SCREEN_WIDTH;
 		viewport.Height = settings::SCREEN_HEIGHT;
+		viewport.MinDepth = 0.0f;
+		viewport.MaxDepth = 1.0f;
 
 		deviceContext->RSSetViewports(1, &viewport);
 
@@ -133,18 +140,24 @@ namespace renderer
 		toneMappingQuad.release();
 
 		swapchain->Release();
+		depthStencilView->Release();
+		depthStencilBuffer->Release();
 		backBuffer->Release();
 		backBufferHDR->Release();
 		backBufferHDRResource->Release();
 		linearSamplerState->Release();
+
 		device->Release();
 		deviceContext->Release();
 	}
 
 	void renderFrame(void)
 	{
+		// clear depth and stencil buffer
+		deviceContext->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+
 		// set the HDR back buffer as rtv
-		deviceContext->OMSetRenderTargets(1, &backBufferHDR, nullptr);
+		deviceContext->OMSetRenderTargets(1, &backBufferHDR, depthStencilView);
 
 		// clear the back buffer to a deep blue
 		deviceContext->ClearRenderTargetView(backBufferHDR, D3DXCOLOR(0.0f, 0.2f, 0.4f, 1.0f));
@@ -240,6 +253,53 @@ namespace renderer
 		// use the texture address to create the render target
 		device->CreateRenderTargetView(texture, nullptr, &backBuffer);
 		texture->Release();
+	}
+
+	void initDepthAndStencilBuffer()
+	{
+		// create depth buffer
+		D3D11_TEXTURE2D_DESC depthStencilDesc;
+		ZeroMemory(&depthStencilDesc, sizeof(D3D11_TEXTURE2D_DESC));
+
+		depthStencilDesc.Width = settings::SCREEN_WIDTH;
+		depthStencilDesc.Height = settings::SCREEN_HEIGHT;
+		depthStencilDesc.MipLevels = 1;
+		depthStencilDesc.ArraySize = 1;
+		depthStencilDesc.Format = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
+		depthStencilDesc.SampleDesc.Count = 1;
+		depthStencilDesc.SampleDesc.Quality = 0;
+		depthStencilDesc.Usage = D3D11_USAGE_DEFAULT;
+		depthStencilDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+		depthStencilDesc.CPUAccessFlags = 0;
+		depthStencilDesc.MiscFlags = 0;
+
+		//ID3D11Texture2D* depthStencilBuffer;
+		device->CreateTexture2D(&depthStencilDesc, nullptr, &depthStencilBuffer);
+		device->CreateDepthStencilView(depthStencilBuffer, nullptr, &depthStencilView);
+		//depthStencilBuffer->Release();
+
+		// create and set depth state
+		D3D11_DEPTH_STENCIL_DESC depthStencilStateDesc;
+		ZeroMemory(&depthStencilStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
+
+		depthStencilStateDesc.DepthEnable = TRUE;
+		depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+		depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_LESS;
+		depthStencilStateDesc.StencilEnable = FALSE;
+		depthStencilStateDesc.StencilReadMask = D3D11_DEFAULT_STENCIL_READ_MASK;
+		depthStencilStateDesc.StencilWriteMask = D3D11_DEFAULT_STENCIL_WRITE_MASK;
+		const D3D11_DEPTH_STENCILOP_DESC defaultStencilOp =
+		{	
+			D3D11_STENCIL_OP_KEEP,
+			D3D11_STENCIL_OP_KEEP,
+			D3D11_STENCIL_OP_KEEP,
+			D3D11_COMPARISON_ALWAYS
+		};
+		depthStencilStateDesc.FrontFace = defaultStencilOp;
+		depthStencilStateDesc.BackFace = defaultStencilOp;
+
+		device->CreateDepthStencilState(&depthStencilStateDesc, &depthStencilState);
+		deviceContext->OMSetDepthStencilState(depthStencilState, 1);
 	}
 
 	void initBackBufferHDR()
