@@ -82,7 +82,6 @@ namespace renderer
 	MeshIndexed toneMappingQuad;
 	Mesh triangle;
 
-	ID3D11Texture2D* depthStencilBuffer;
 	ID3D11DepthStencilView* depthStencilView;
 	ID3D11DepthStencilState* depthStencilState;
 
@@ -141,10 +140,10 @@ namespace renderer
 
 		swapchain->Release();
 		depthStencilView->Release();
-		depthStencilBuffer->Release();
 		backBuffer->Release();
 		backBufferHDR->Release();
 		backBufferHDRResource->Release();
+		depthStencilState->Release();
 		linearSamplerState->Release();
 
 		device->Release();
@@ -273,10 +272,10 @@ namespace renderer
 		depthStencilDesc.CPUAccessFlags = 0;
 		depthStencilDesc.MiscFlags = 0;
 
-		//ID3D11Texture2D* depthStencilBuffer;
+		ID3D11Texture2D* depthStencilBuffer;
 		device->CreateTexture2D(&depthStencilDesc, nullptr, &depthStencilBuffer);
 		device->CreateDepthStencilView(depthStencilBuffer, nullptr, &depthStencilView);
-		//depthStencilBuffer->Release();
+		depthStencilBuffer->Release();
 
 		// create and set depth state
 		D3D11_DEPTH_STENCIL_DESC depthStencilStateDesc;
