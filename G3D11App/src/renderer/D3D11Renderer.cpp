@@ -81,6 +81,7 @@ namespace renderer
 
 	MeshIndexed toneMappingQuad;
 	Mesh triangle;
+	Mesh triangle2;
 
 	ID3D11DepthStencilView* depthStencilView;
 
@@ -174,6 +175,10 @@ namespace renderer
 
 			// draw the vertex buffer to the back buffer
 			deviceContext->Draw(triangle.vertexCount, 0);
+
+			// triangle 2
+			deviceContext->IASetVertexBuffers(0, 1, &(triangle2.vertexBuffer), &stride, &offset);
+			deviceContext->Draw(triangle2.vertexCount, 0);
 		}
 
 		// draw HDR back buffer to real back buffer via tone mapping
@@ -362,6 +367,11 @@ namespace renderer
 			{ POS(0.45f, -0.5, 1.0f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
 			{ POS(-0.45f, -0.5f, 1.0f), D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f) }
 		} };
+		std::array<VERTEX, 3> triangleData2 = { {
+			{ POS(0.5f, 0.7f, 0.8f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
+			{ POS(0.95f, -0.3, 0.8f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
+			{ POS(0.05f, -0.3f, 0.8f), D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f) }
+		} };
 
 		std::array<QUAD, 4> fullscreenQuadData = { {
 			{ POS(-1.0f, 1.0f, 1.0f), UV(0.0f, 0.0f) },
@@ -390,6 +400,9 @@ namespace renderer
 			// D3D11_USAGE_DEFAULT would only allow to write data once by passing a D3D11_MAPPED_SUBRESOURCE to next line (pInitialData)
 			device->CreateBuffer(&bufferDesc, nullptr, &(triangle.vertexBuffer));
 			triangle.vertexCount = triangleData.size();
+
+			device->CreateBuffer(&bufferDesc, nullptr, &(triangle2.vertexBuffer));
+			triangle2.vertexCount = triangleData.size();
 		}
 		// map to copy triangle vertices into its buffer
 		{
@@ -397,6 +410,10 @@ namespace renderer
 			deviceContext->Map(triangle.vertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);// map the buffer
 			memcpy(ms.pData, triangleData.data(), sizeof(triangleData));													// copy the data
 			deviceContext->Unmap(triangle.vertexBuffer, 0);											// unmap the buffer
+
+			deviceContext->Map(triangle2.vertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);// map the buffer
+			memcpy(ms.pData, triangleData2.data(), sizeof(triangleData2));													// copy the data
+			deviceContext->Unmap(triangle2.vertexBuffer, 0);											// unmap the buffer
 		}
 		// vertex buffer fullscreen quad
 		{
