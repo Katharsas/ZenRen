@@ -117,6 +117,8 @@ namespace renderer
 	const bool reverseZ = true;
 	ID3D11DepthStencilView* depthStencilView;
 
+	ID3D11RasterizerState* wireFrame;
+
 	// scene state
 	float rot = 0.1f;
 	XMMATRIX cube1World;
@@ -129,6 +131,7 @@ namespace renderer
 	void initPipelineToneMapping();
 	void initVertexIndexBuffers();
 	void initConstantBufferPerObject();
+	void initRasterizerStates();
 
 	void initWorld()
 	{
@@ -181,6 +184,7 @@ namespace renderer
 		initPipelineToneMapping();
 		initConstantBufferPerObject();
 		initVertexIndexBuffers();
+		initRasterizerStates();
 	}
 
 	void cleanD3D()
@@ -201,6 +205,7 @@ namespace renderer
 		backBufferHDRResource->Release();
 		linearSamplerState->Release();
 		cbPerObjectBuffer->Release();
+		wireFrame->Release();
 
 		device->Release();
 		deviceContext->Release();
@@ -246,6 +251,9 @@ namespace renderer
 
 		// do 3D rendering here
 		{
+			// set rasterizer state
+			deviceContext->RSSetState(wireFrame);
+
 			// set the shader objects avtive
 			Shader* triangleShader = shaders->getShader("testTriangle");
 			deviceContext->VSSetShader(triangleShader->getVertexShader(), 0, 0);
@@ -275,6 +283,9 @@ namespace renderer
 		}
 
 		// draw HDR back buffer to real back buffer via tone mapping
+
+		// set rasterizer state back to default
+		deviceContext->RSSetState(nullptr);
 
 		// set real back buffer as rtv
 		deviceContext->OMSetRenderTargets(1, &backBuffer, nullptr);
@@ -578,5 +589,16 @@ namespace renderer
 		// select which primtive type we are using
 		deviceContext->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	}
+
+	void initRasterizerStates()
+	{
+		D3D11_RASTERIZER_DESC wireFrameDesc;
+		ZeroMemory(&wireFrameDesc, sizeof(D3D11_RASTERIZER_DESC));
+
+		wireFrameDesc.FillMode = D3D11_FILL_WIREFRAME;
+		wireFrameDesc.CullMode = D3D11_CULL_NONE;
+		device->CreateRasterizerState(&wireFrameDesc, &wireFrame);
+	}
+
 
 }
