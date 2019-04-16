@@ -114,6 +114,7 @@ namespace renderer
 
 	ID3D11Buffer* cbPerObjectBuffer;
 
+	const bool reverseZ = true;
 	ID3D11DepthStencilView* depthStencilView;
 
 	// scene state
@@ -170,8 +171,11 @@ namespace renderer
 
 		// Set view & projection matrix
 		camMatrices.view = XMMatrixLookAtLH(camera.position, camera.target, camera.up);
+
 		const float aspectRatio = static_cast<float>(settings::SCREEN_WIDTH) / settings::SCREEN_HEIGHT;
-		camMatrices.projection = XMMatrixPerspectiveFovLH(0.4f*3.14f, aspectRatio, 0.1f, 1000.0f);
+		const float nearZ = 0.1f;
+		const float farZ = 1000.0f;
+		camMatrices.projection = XMMatrixPerspectiveFovLH(0.4f*3.14f, aspectRatio, reverseZ ? farZ : nearZ, reverseZ ? nearZ : farZ);
 
 		shaders = new ShaderManager(device);
 		initPipelineToneMapping();
@@ -237,7 +241,8 @@ namespace renderer
 		deviceContext->ClearRenderTargetView(backBufferHDR, D3DXCOLOR(0.0f, 0.2f, 0.4f, 1.0f));
 
 		// clear depth and stencil buffer
-		deviceContext->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 0.0f, 0);
+		const float zFar = reverseZ ? 0.0 : 1.0f;
+		deviceContext->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, zFar, 0);
 
 		// do 3D rendering here
 		{
@@ -375,7 +380,7 @@ namespace renderer
 
 		depthStencilStateDesc.DepthEnable = TRUE;
 		depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-		depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_GREATER;
+		depthStencilStateDesc.DepthFunc = reverseZ ? D3D11_COMPARISON_GREATER : D3D11_COMPARISON_LESS;
 		depthStencilStateDesc.StencilEnable = FALSE;
 		depthStencilStateDesc.StencilReadMask = D3D11_DEFAULT_STENCIL_READ_MASK;
 		depthStencilStateDesc.StencilWriteMask = D3D11_DEFAULT_STENCIL_WRITE_MASK;
@@ -491,20 +496,20 @@ namespace renderer
 			4, 0, 3, 4, 3, 7
 		} };
 
-
+		const float zNear = reverseZ ? 1.0f : 0.0f;
 		std::array<VERTEX, 3> triangleData = { {
-			{ POS(+0.0f, +0.5f, +0.0f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
-			{ POS(+0.45f, -0.5f, +0.0f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
-			{ POS(-0.45f, -0.5f, +0.0f), D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f) },
+			{ POS(+0.0f, +0.5f, zNear), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
+			{ POS(+0.45f, -0.5f, zNear), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
+			{ POS(-0.45f, -0.5f, zNear), D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f) },
 		} };
 
 		std::array<QUAD, 6> fullscreenQuadData = { {
-			{ POS(-1.0f, 1.0f, 1.0f), UV(0.0f, 0.0f) },
-			{ POS(1.0f, 1.0, 1.0f), UV(1.0f, 0.0f) },
-			{ POS(1.0, -1.0, 1.0f), UV(1.0f, 1.0f) },
-			{ POS(-1.0f, 1.0f, 1.0f), UV(0.0f, 0.0f) },
-			{ POS(1.0, -1.0, 1.0f), UV(1.0f, 1.0f) },
-			{ POS(-1.0, -1.0, 1.0f), UV(0.0f, 1.0f) },
+			{ POS(-1.0f, 1.0f, zNear), UV(0.0f, 0.0f) },
+			{ POS(1.0f, 1.0, zNear), UV(1.0f, 0.0f) },
+			{ POS(1.0, -1.0, zNear), UV(1.0f, 1.0f) },
+			{ POS(-1.0f, 1.0f, zNear), UV(0.0f, 0.0f) },
+			{ POS(1.0, -1.0, zNear), UV(1.0f, 1.0f) },
+			{ POS(-1.0, -1.0, zNear), UV(0.0f, 1.0f) },
 		} };
 
 		// vertex buffer triangle (dynamic, mappable)
