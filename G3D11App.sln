@@ -1,14 +1,14 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.28307.539
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.32602.291
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "G3D11App", "G3D11App\G3D11App.vcxproj", "{A107347B-1932-4E11-B800-7300227827EB}"
 	ProjectSection(ProjectDependencies) = postProject
-		{D7CCB0BB-C2E9-39C0-AA36-97FDB8EF07AA} = {D7CCB0BB-C2E9-39C0-AA36-97FDB8EF07AA}
+		{AC9DDD5F-3732-3CF7-B7FF-2C95FDC11A40} = {AC9DDD5F-3732-3CF7-B7FF-2C95FDC11A40}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "g3logger", "..\g3log\build\g3logger.vcxproj", "{D7CCB0BB-C2E9-39C0-AA36-97FDB8EF07AA}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "g3log", "..\g3log\build\g3log.vcxproj", "{AC9DDD5F-3732-3CF7-B7FF-2C95FDC11A40}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -38,18 +38,18 @@ Global
 		{A107347B-1932-4E11-B800-7300227827EB}.RelWithDebInfo|x64.Build.0 = Release|x64
 		{A107347B-1932-4E11-B800-7300227827EB}.RelWithDebInfo|x86.ActiveCfg = Release|Win32
 		{A107347B-1932-4E11-B800-7300227827EB}.RelWithDebInfo|x86.Build.0 = Release|Win32
-		{D7CCB0BB-C2E9-39C0-AA36-97FDB8EF07AA}.Debug|x64.ActiveCfg = Debug|Win32
-		{D7CCB0BB-C2E9-39C0-AA36-97FDB8EF07AA}.Debug|x86.ActiveCfg = Debug|Win32
-		{D7CCB0BB-C2E9-39C0-AA36-97FDB8EF07AA}.Debug|x86.Build.0 = Debug|Win32
-		{D7CCB0BB-C2E9-39C0-AA36-97FDB8EF07AA}.MinSizeRel|x64.ActiveCfg = MinSizeRel|Win32
-		{D7CCB0BB-C2E9-39C0-AA36-97FDB8EF07AA}.MinSizeRel|x86.ActiveCfg = MinSizeRel|Win32
-		{D7CCB0BB-C2E9-39C0-AA36-97FDB8EF07AA}.MinSizeRel|x86.Build.0 = MinSizeRel|Win32
-		{D7CCB0BB-C2E9-39C0-AA36-97FDB8EF07AA}.Release|x64.ActiveCfg = Release|Win32
-		{D7CCB0BB-C2E9-39C0-AA36-97FDB8EF07AA}.Release|x86.ActiveCfg = Release|Win32
-		{D7CCB0BB-C2E9-39C0-AA36-97FDB8EF07AA}.Release|x86.Build.0 = Release|Win32
-		{D7CCB0BB-C2E9-39C0-AA36-97FDB8EF07AA}.RelWithDebInfo|x64.ActiveCfg = RelWithDebInfo|Win32
-		{D7CCB0BB-C2E9-39C0-AA36-97FDB8EF07AA}.RelWithDebInfo|x86.ActiveCfg = RelWithDebInfo|Win32
-		{D7CCB0BB-C2E9-39C0-AA36-97FDB8EF07AA}.RelWithDebInfo|x86.Build.0 = RelWithDebInfo|Win32
+		{AC9DDD5F-3732-3CF7-B7FF-2C95FDC11A40}.Debug|x64.ActiveCfg = Debug|Win32
+		{AC9DDD5F-3732-3CF7-B7FF-2C95FDC11A40}.Debug|x86.ActiveCfg = Debug|Win32
+		{AC9DDD5F-3732-3CF7-B7FF-2C95FDC11A40}.Debug|x86.Build.0 = Debug|Win32
+		{AC9DDD5F-3732-3CF7-B7FF-2C95FDC11A40}.MinSizeRel|x64.ActiveCfg = MinSizeRel|Win32
+		{AC9DDD5F-3732-3CF7-B7FF-2C95FDC11A40}.MinSizeRel|x86.ActiveCfg = MinSizeRel|Win32
+		{AC9DDD5F-3732-3CF7-B7FF-2C95FDC11A40}.MinSizeRel|x86.Build.0 = MinSizeRel|Win32
+		{AC9DDD5F-3732-3CF7-B7FF-2C95FDC11A40}.Release|x64.ActiveCfg = Release|Win32
+		{AC9DDD5F-3732-3CF7-B7FF-2C95FDC11A40}.Release|x86.ActiveCfg = Release|Win32
+		{AC9DDD5F-3732-3CF7-B7FF-2C95FDC11A40}.Release|x86.Build.0 = Release|Win32
+		{AC9DDD5F-3732-3CF7-B7FF-2C95FDC11A40}.RelWithDebInfo|x64.ActiveCfg = RelWithDebInfo|Win32
+		{AC9DDD5F-3732-3CF7-B7FF-2C95FDC11A40}.RelWithDebInfo|x86.ActiveCfg = RelWithDebInfo|Win32
+		{AC9DDD5F-3732-3CF7-B7FF-2C95FDC11A40}.RelWithDebInfo|x86.Build.0 = RelWithDebInfo|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
