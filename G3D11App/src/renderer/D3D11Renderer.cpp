@@ -322,7 +322,7 @@ namespace renderer
 
 		// fill the swap chain description struct
 		swapChainDesc.BufferCount = 1;                                    // one back buffer
-		swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;// use 32-bit color
+		swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;     // use 32-bit color
 		swapChainDesc.BufferDesc.Width = settings::SCREEN_WIDTH;          // set the back buffer width
 		swapChainDesc.BufferDesc.Height = settings::SCREEN_HEIGHT;        // set the back buffer height
 		swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;      // how swap chain is to be used
@@ -338,7 +338,7 @@ namespace renderer
 			nullptr,
 			D3D_DRIVER_TYPE_HARDWARE,
 			0,
-			D3D11_CREATE_DEVICE_DEBUG,
+			D3D11_CREATE_DEVICE_DEBUG,//TODO this should be disabled for more performance in prod releases
 			&level,
 			1,
 			D3D11_SDK_VERSION,
@@ -357,8 +357,13 @@ namespace renderer
 		ID3D11Texture2D* texture;
 		swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&texture);
 
+		// since swapchain itself was described to be linear, we need to trigger sRGB conversion
+		D3D11_RENDER_TARGET_VIEW_DESC rtvDesc = CD3D11_RENDER_TARGET_VIEW_DESC(
+			D3D11_RTV_DIMENSION_TEXTURE2D,
+			DXGI_FORMAT_R8G8B8A8_UNORM_SRGB
+		);
 		// use the texture address to create the render target
-		device->CreateRenderTargetView(texture, nullptr, &backBuffer);
+		device->CreateRenderTargetView(texture, &rtvDesc, &backBuffer);
 		texture->Release();
 	}
 

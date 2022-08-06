@@ -12,7 +12,7 @@
 #define STATUS_SUCCESS 0
 #define STATUS_TIMER_RESOLUTION_NOT_SET 0xC0000245
 
-const HINSTANCE LibraryNtdll = LoadLibrary(L"NTDLL.dll");
+const HINSTANCE LibraryNtdll = LoadLibraryW(L"NTDLL.dll");
 extern "C" NTSYSAPI NTSTATUS NTAPI NtSetTimerResolution(ULONG DesiredResolution, BOOLEAN SetResolution, PULONG CurrentResolution);
 
 namespace game
