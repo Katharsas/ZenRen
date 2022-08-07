@@ -15,6 +15,7 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
+    <Text Include="lib\imgui\LICENSE.txt" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="G3D11App.rc">
@@ -58,6 +59,13 @@
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="src\game\GameLoop.cpp" />
+    <ClCompile Include="src\renderer\Gui.cpp" />
+    <ClCompile Include="lib\imgui\imgui.cpp" />
+    <ClCompile Include="lib\imgui\imgui_draw.cpp" />
+    <ClCompile Include="lib\imgui\imgui_impl_dx11.cpp" />
+    <ClCompile Include="lib\imgui\imgui_impl_win32.cpp" />
+    <ClCompile Include="lib\imgui\imgui_tables.cpp" />
+    <ClCompile Include="lib\imgui\imgui_widgets.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Util.h">
@@ -83,5 +91,14 @@
     </ClInclude>
     <ClInclude Include="src\game\GameLoop.h" />
     <ClInclude Include="src\Settings.h" />
+    <ClInclude Include="src\renderer\Gui.h" />
+    <ClInclude Include="lib\imgui\imconfig.h" />
+    <ClInclude Include="lib\imgui\imgui.h" />
+    <ClInclude Include="lib\imgui\imgui_impl_dx11.h" />
+    <ClInclude Include="lib\imgui\imgui_impl_win32.h" />
+    <ClInclude Include="lib\imgui\imgui_internal.h" />
+    <ClInclude Include="lib\imgui\imstb_rectpack.h" />
+    <ClInclude Include="lib\imgui\imstb_textedit.h" />
+    <ClInclude Include="lib\imgui\imstb_truetype.h" />
   </ItemGroup>
 </Project>

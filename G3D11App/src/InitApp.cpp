@@ -12,6 +12,8 @@
 #include "game/GameLoop.h"
 #include "g3log/logworker.hpp"
 
+#include <imgui/imgui.h>
+
 #define MAX_LOADSTRING 100
 
 // Global Variables:
@@ -152,6 +154,8 @@ HWND InitInstance(HINSTANCE hInstance, int nCmdShow)
 	return hWnd;
 }
 
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
 //
 //  FUNCTION: WndProc(HWND, UINT, WPARAM, LPARAM)
 //
@@ -164,6 +168,10 @@ HWND InitInstance(HINSTANCE hInstance, int nCmdShow)
 //
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+	if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam)) {
+		return true;
+	}
+
 	switch (message)
 	{
 	case WM_PAINT:

@@ -22,6 +22,8 @@
 #include "ShaderManager.h"
 #include "Shader.h"
 #include "../Util.h"
+#include "Gui.h"
+#include "imgui/imgui.h"
 //#include <vdfs/fileIndex.h>
 //#include <zenload/zenParser.h>
 
@@ -92,6 +94,10 @@ namespace renderer
 		UV uvCoordinates;
 	};
 
+	struct Settings {
+		bool wireframe = false;
+	};
+
 	// global declarations
 	IDXGISwapChain* swapchain;
 	ID3D11Device* device;
@@ -118,6 +124,9 @@ namespace renderer
 	ID3D11DepthStencilView* depthStencilView;
 
 	ID3D11RasterizerState* wireFrame;
+
+	//Settings previousSettings;
+	Settings settings;
 
 	// scene state
 	float rot = 0.1f;
@@ -152,6 +161,8 @@ namespace renderer
 		initDepthAndStencilBuffer();
 		initBackBufferHDR();
 
+		initGui(hWnd, device, deviceContext);
+
 		// Set the viewport
 		D3D11_VIEWPORT viewport;
 		ZeroMemory(&viewport, sizeof(D3D11_VIEWPORT));
@@ -185,11 +196,25 @@ namespace renderer
 		initConstantBufferPerObject();
 		initVertexIndexBuffers();
 		initRasterizerStates();
+
+		addGui("Renderer", {
+			[]() -> void {
+				bool tmp = settings.wireframe;
+				ImGui::Checkbox("Wireframe Mode", &tmp);
+				if (settings.wireframe != tmp) {
+					settings.wireframe = tmp;
+					LOG(DEBUG) << "OPTION CHANGED!";
+					// TODO change rasterizer state
+				}
+			}
+		});
 	}
 
 	void cleanD3D()
 	{
 		swapchain->SetFullscreenState(FALSE, nullptr);    // switch to windowed mode
+
+		cleanGui();
 
 		// close and release all existing COM objects
 		delete shaders;
@@ -306,6 +331,8 @@ namespace renderer
 
 		//deviceContext->DrawIndexed(toneMappingQuad.indexCount, 0, 0);
 		deviceContext->Draw(toneMappingQuad.vertexCount, 0);
+		
+		drawGui();
 
 		// unbind HDR back buffer texture so the next frame can use it as rtv again
 		ID3D11ShaderResourceView* srv = nullptr;
