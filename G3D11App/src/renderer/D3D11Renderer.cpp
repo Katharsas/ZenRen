@@ -96,6 +96,7 @@ namespace renderer
 
 	struct Settings {
 		bool wireframe = false;
+		bool reverseZ = true;// TODO a substantial part of the pipeline needs to be reinitialized for this to be changable at runtime!
 	};
 
 	// global declarations
@@ -120,12 +121,11 @@ namespace renderer
 
 	ID3D11Buffer* cbPerObjectBuffer;
 
-	const bool reverseZ = true;
 	ID3D11DepthStencilView* depthStencilView;
 
 	ID3D11RasterizerState* wireFrame;
 
-	//Settings previousSettings;
+	Settings settingsPrevious;
 	Settings settings;
 
 	// scene state
@@ -137,6 +137,7 @@ namespace renderer
 	void initSwapChainAndBackBuffer(HWND hWnd);
 	void initDepthAndStencilBuffer();
 	void initBackBufferHDR();
+	void initCamera();
 	void initPipelineToneMapping();
 	void initVertexIndexBuffers();
 	void initConstantBufferPerObject();
@@ -176,20 +177,7 @@ namespace renderer
 
 		deviceContext->RSSetViewports(1, &viewport);
 
-		// Set camera
-		camera = {
-			XMVectorSet(0.0f, 3.0f, -6.0f, 0.0f),
-			XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
-			XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f),
-		};
-
-		// Set view & projection matrix
-		camMatrices.view = XMMatrixLookAtLH(camera.position, camera.target, camera.up);
-
-		const float aspectRatio = static_cast<float>(settings::SCREEN_WIDTH) / settings::SCREEN_HEIGHT;
-		const float nearZ = 0.1f;
-		const float farZ = 1000.0f;
-		camMatrices.projection = XMMatrixPerspectiveFovLH(0.4f*3.14f, aspectRatio, reverseZ ? farZ : nearZ, reverseZ ? nearZ : farZ);
+		initCamera();
 
 		shaders = new ShaderManager(device);
 		initPipelineToneMapping();
@@ -199,13 +187,8 @@ namespace renderer
 
 		addGui("Renderer", {
 			[]() -> void {
-				bool tmp = settings.wireframe;
-				ImGui::Checkbox("Wireframe Mode", &tmp);
-				if (settings.wireframe != tmp) {
-					settings.wireframe = tmp;
-					LOG(DEBUG) << "OPTION CHANGED!";
-					// TODO change rasterizer state
-				}
+				ImGui::Checkbox("Wireframe Mode", &settings.wireframe);
+				ImGui::Checkbox("Reverse Z", &settings.reverseZ);
 			}
 		});
 	}
@@ -264,6 +247,14 @@ namespace renderer
 
 	void renderFrame(void)
 	{
+		// TODO this leaks d3d objects because reinitialization does not release previous objects!
+		if (settings.reverseZ != settingsPrevious.reverseZ) {
+			initDepthAndStencilBuffer();
+		}
+		if (settings.reverseZ != settingsPrevious.reverseZ) {
+			initCamera();
+		}
+
 		// set the HDR back buffer as rtv
 		deviceContext->OMSetRenderTargets(1, &backBufferHDR, depthStencilView);
 
@@ -271,13 +262,15 @@ namespace renderer
 		deviceContext->ClearRenderTargetView(backBufferHDR, D3DXCOLOR(0.0f, 0.2f, 0.4f, 1.0f));
 
 		// clear depth and stencil buffer
-		const float zFar = reverseZ ? 0.0 : 1.0f;
+		const float zFar = settings.reverseZ ? 0.0 : 1.0f;
 		deviceContext->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, zFar, 0);
 
 		// do 3D rendering here
 		{
 			// set rasterizer state
-			deviceContext->RSSetState(wireFrame);
+			if (settings.wireframe) {
+				deviceContext->RSSetState(wireFrame);
+			}
 
 			// set the shader objects avtive
 			Shader* triangleShader = shaders->getShader("testTriangle");
@@ -332,6 +325,7 @@ namespace renderer
 		//deviceContext->DrawIndexed(toneMappingQuad.indexCount, 0, 0);
 		deviceContext->Draw(toneMappingQuad.vertexCount, 0);
 		
+		settingsPrevious = settings;
 		drawGui();
 
 		// unbind HDR back buffer texture so the next frame can use it as rtv again
@@ -423,7 +417,7 @@ namespace renderer
 
 		depthStencilStateDesc.DepthEnable = TRUE;
 		depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-		depthStencilStateDesc.DepthFunc = reverseZ ? D3D11_COMPARISON_GREATER : D3D11_COMPARISON_LESS;
+		depthStencilStateDesc.DepthFunc = settings.reverseZ ? D3D11_COMPARISON_GREATER : D3D11_COMPARISON_LESS;
 		depthStencilStateDesc.StencilEnable = FALSE;
 		depthStencilStateDesc.StencilReadMask = D3D11_DEFAULT_STENCIL_READ_MASK;
 		depthStencilStateDesc.StencilWriteMask = D3D11_DEFAULT_STENCIL_WRITE_MASK;
@@ -474,6 +468,21 @@ namespace renderer
 		texture->Release();
 	}
 
+	void initCamera() {
+		camera = {
+			XMVectorSet(0.0f, 3.0f, -6.0f, 0.0f),
+			XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
+			XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f),
+		};
+
+		// Set view & projection matrix
+		camMatrices.view = XMMatrixLookAtLH(camera.position, camera.target, camera.up);
+
+		const float aspectRatio = static_cast<float>(settings::SCREEN_WIDTH) / settings::SCREEN_HEIGHT;
+		const float nearZ = 0.1f;
+		const float farZ = 1000.0f;
+		camMatrices.projection = XMMatrixPerspectiveFovLH(0.4f * 3.14f, aspectRatio, settings.reverseZ ? farZ : nearZ, settings.reverseZ ? nearZ : farZ);
+	}
 
 	void initPipelineToneMapping()
 	{
@@ -539,7 +548,7 @@ namespace renderer
 			4, 0, 3, 4, 3, 7
 		} };
 
-		const float zNear = reverseZ ? 1.0f : 0.0f;
+		const float zNear = settings.reverseZ ? 1.0f : 0.0f;
 		std::array<VERTEX, 3> triangleData = { {
 			{ POS(+0.0f, +0.5f, zNear), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
 			{ POS(+0.45f, -0.5f, zNear), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
