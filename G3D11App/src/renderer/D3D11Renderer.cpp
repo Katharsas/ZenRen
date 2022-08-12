@@ -19,6 +19,7 @@
 #include <array>
 
 #include "Settings.h"
+#include "Camera.h"
 #include "ShaderManager.h"
 #include "Shader.h"
 #include "../Util.h"
@@ -36,22 +37,9 @@
 
 namespace renderer
 {
-	struct CameraMatrices
-	{
-		XMMATRIX view;
-		XMMATRIX projection;
-	};
-
-	struct Camera
-	{
-		XMVECTOR position;
-		XMVECTOR target;
-		XMVECTOR up;
-	};
-
 	struct CbPerObject
 	{
-		XMMATRIX WVP;
+		XMMATRIX worldViewProjection;
 	};
 
 	struct Mesh
@@ -116,9 +104,6 @@ namespace renderer
 	MeshIndexed cube;
 	Mesh triangle;
 
-	CameraMatrices camMatrices;
-	Camera camera;
-
 	ID3D11Buffer* cbPerObjectBuffer;
 
 	ID3D11DepthStencilView* depthStencilView;
@@ -137,7 +122,6 @@ namespace renderer
 	void initSwapChainAndBackBuffer(HWND hWnd);
 	void initDepthAndStencilBuffer();
 	void initBackBufferHDR();
-	void initCamera();
 	void initPipelineToneMapping();
 	void initVertexIndexBuffers();
 	void initConstantBufferPerObject();
@@ -177,7 +161,7 @@ namespace renderer
 
 		deviceContext->RSSetViewports(1, &viewport);
 
-		initCamera();
+		camera::init(settings.reverseZ);
 
 		shaders = new ShaderManager(device);
 		initPipelineToneMapping();
@@ -219,14 +203,6 @@ namespace renderer
 		deviceContext->Release();
 	}
 
-	/* Calculates combined World-View-Projection-Matrix for use as constant buffer value
-	 */
-	CbPerObject calculateWvpConstantBuffer(const XMMATRIX objectsWorldMatrix, CameraMatrices viewAndProjection)
-	{
-		const XMMATRIX wvp = objectsWorldMatrix * camMatrices.view * camMatrices.projection;
-		return { XMMatrixTranspose(wvp) };
-	}
-
 	void updateObjects()
 	{
 		//Keep the cubes rotating
@@ -252,7 +228,7 @@ namespace renderer
 			initDepthAndStencilBuffer();
 		}
 		if (settings.reverseZ != settingsPrevious.reverseZ) {
-			initCamera();
+			camera::init(settings.reverseZ);
 		}
 
 		// set the HDR back buffer as rtv
@@ -286,14 +262,14 @@ namespace renderer
 
 			// set the World/View/Projection matrix, send it to constant buffer, draw to HDR
 			// cube 1
-			CbPerObject cbPerObject = calculateWvpConstantBuffer(cube1World, camMatrices);
+			CbPerObject cbPerObject = { camera::calculateWorldViewProjection(cube1World) };
 			deviceContext->UpdateSubresource(cbPerObjectBuffer, 0, nullptr, &cbPerObject, 0, 0);
 			deviceContext->VSSetConstantBuffers(0, 1, &cbPerObjectBuffer);
 
 			deviceContext->DrawIndexed(cube.indexCount, 0, 0);
 
 			// cube 2
-			cbPerObject = calculateWvpConstantBuffer(cube2World, camMatrices);
+			cbPerObject = { camera::calculateWorldViewProjection(cube2World) };
 			deviceContext->UpdateSubresource(cbPerObjectBuffer, 0, nullptr, &cbPerObject, 0, 0);
 			deviceContext->VSSetConstantBuffers(0, 1, &cbPerObjectBuffer);
 
@@ -466,22 +442,6 @@ namespace renderer
 
 		// Done
 		texture->Release();
-	}
-
-	void initCamera() {
-		camera = {
-			XMVectorSet(0.0f, 3.0f, -6.0f, 0.0f),
-			XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
-			XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f),
-		};
-
-		// Set view & projection matrix
-		camMatrices.view = XMMatrixLookAtLH(camera.position, camera.target, camera.up);
-
-		const float aspectRatio = static_cast<float>(settings::SCREEN_WIDTH) / settings::SCREEN_HEIGHT;
-		const float nearZ = 0.1f;
-		const float farZ = 1000.0f;
-		camMatrices.projection = XMMatrixPerspectiveFovLH(0.4f * 3.14f, aspectRatio, settings.reverseZ ? farZ : nearZ, settings.reverseZ ? nearZ : farZ);
 	}
 
 	void initPipelineToneMapping()
