@@ -161,7 +161,7 @@ namespace renderer
 
 		deviceContext->RSSetViewports(1, &viewport);
 
-		camera::init(settings.reverseZ);
+		camera::init();
 
 		shaders = new ShaderManager(device);
 		initPipelineToneMapping();
@@ -218,7 +218,7 @@ namespace renderer
 		cube2World = XMMatrixIdentity();
 		Rotation = XMMatrixRotationAxis(rotAxis, -rot);
 		XMMATRIX Scale = XMMatrixScaling(1.3f, 1.3f, 1.3f);
-		cube2World = Rotation * Scale;
+		cube2World = /*Rotation * */Scale;
 	}
 
 	void renderFrame(void)
@@ -227,9 +227,10 @@ namespace renderer
 		if (settings.reverseZ != settingsPrevious.reverseZ) {
 			initDepthAndStencilBuffer();
 		}
-		if (settings.reverseZ != settingsPrevious.reverseZ) {
-			camera::init(settings.reverseZ);
-		}
+		//if (settings.reverseZ != settingsPrevious.reverseZ) {
+		//	camera::init(settings.reverseZ);
+		//}
+		camera::updateCamera(settings.reverseZ);
 
 		// set the HDR back buffer as rtv
 		deviceContext->OMSetRenderTargets(1, &backBufferHDR, depthStencilView);

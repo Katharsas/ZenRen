@@ -3,14 +3,22 @@
 #include <array>
 
 #include "GameLoop.h"
+
+#include "Input.h"
 #include "TimerPrecision.h"
 #include "renderer/D3D11Renderer.h"
+#include "renderer/Camera.h";
 
 namespace game
 {
+	struct InputAction
+	{
+		void (*onInputActive)();
+	};
+
 	// frame limiter
 	const bool frameLimiterEnabled = true;
-	const int32_t frameLimit = 120;
+	const int32_t frameLimit = 40;
 	const int32_t frameTimeTarget = 1000000 / frameLimit;
 
 	// logging
@@ -19,6 +27,17 @@ namespace game
 	int32_t sampleIndex = 0;
 	std::array<int32_t, sampleSize> renderTimeSamples;
 	std::array<int32_t, sampleSize> sleepTimeSamples;
+
+	// input actions
+	const float cameraMoveSpeed = 0.3f;
+	const float cameraTurnSpeed = 0.07f;
+
+	std::map<std::string, InputAction> actions;
+	std::map<std::string, std::string> actionsToKeys;
+
+	void registerDigitalAction(std::string& actionName, InputAction inputAction) {
+		actions[actionName] = inputAction;
+	}
 
 	struct LoggingSettings
 	{
@@ -47,10 +66,54 @@ namespace game
 		return sum / sampleSize;
 	}
 
+	void registerCameraActions() {
+		registerDigitalAction(std::string("CAMERA_MOVE_FORWARDS"), { []() -> void {
+			renderer::camera::moveCameraDepth(cameraMoveSpeed);
+		} });
+		registerDigitalAction(std::string("CAMERA_MOVE_BACKWARDS"), { []() -> void {
+			renderer::camera::moveCameraDepth(cameraMoveSpeed * -1);
+		} });
+		registerDigitalAction(std::string("CAMERA_MOVE_LEFT"), { []() -> void {
+			renderer::camera::moveCameraHorizontal(cameraMoveSpeed * -1);
+		} });
+		registerDigitalAction(std::string("CAMERA_MOVE_RIGHT"), { []() -> void {
+			renderer::camera::moveCameraHorizontal(cameraMoveSpeed);
+		} });
+		registerDigitalAction(std::string("CAMERA_MOVE_UP"), { []() -> void {
+			renderer::camera::moveCameraVertical(cameraMoveSpeed);
+		} });
+		registerDigitalAction(std::string("CAMERA_MOVE_DOWN"), { []() -> void {
+			renderer::camera::moveCameraVertical(cameraMoveSpeed * -1);
+		} });
+		registerDigitalAction(std::string("CAMERA_TURN_LEFT"), { []() -> void {
+			renderer::camera::turnCameraHorizontal(cameraTurnSpeed * -1);
+		} });
+		registerDigitalAction(std::string("CAMERA_TURN_RIGHT"), { []() -> void {
+			renderer::camera::turnCameraHorizontal(cameraTurnSpeed);
+		} });
+	}
+
+	void setDefaultInputMap() {
+		actionsToKeys["CAMERA_MOVE_FORWARDS"] = "R";
+		actionsToKeys["CAMERA_MOVE_BACKWARDS"] = "F";
+
+		actionsToKeys["CAMERA_MOVE_LEFT"] = "A";
+		actionsToKeys["CAMERA_MOVE_RIGHT"] = "D";
+		actionsToKeys["CAMERA_MOVE_UP"] = "W";
+		actionsToKeys["CAMERA_MOVE_DOWN"] = "S";
+
+		actionsToKeys["CAMERA_TURN_LEFT"] = "Q";
+		actionsToKeys["CAMERA_TURN_RIGHT"] = "E";
+	}
+
 	void init(HWND hWnd)
 	{
 		enablePreciseTimerResolution();
 		initMicrosleep();
+
+		registerCameraActions();
+		setDefaultInputMap();
+
 		renderer::initD3D(hWnd);
 		LOG(DEBUG) << "Statistics in microseconds";
 	}
@@ -58,6 +121,19 @@ namespace game
 	void renderAndSleep()
 	{
 		const auto startTimeRender = std::chrono::high_resolution_clock::now();
+
+		for (auto& [actionname, keyname] : actionsToKeys) {
+			// if key is pressed
+			bool isPressed = game::input::isKeyUsed(keyname);
+			if (isPressed) {
+				// if action exists
+				auto actionIt = actions.find(actionname);
+				if (actionIt != actions.end()) {
+					auto action = actionIt->second;
+					action.onInputActive();
+				}
+			}
+		}
 
 		renderer::updateObjects();
 		renderer::renderFrame();

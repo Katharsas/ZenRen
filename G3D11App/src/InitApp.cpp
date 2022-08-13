@@ -10,6 +10,7 @@
 #include "Settings.h"
 #include "Util.h"
 #include "game/GameLoop.h"
+#include "game/Input.h"
 #include "g3log/logworker.hpp"
 
 #include <imgui/imgui.h>
@@ -169,6 +170,10 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam)) {
+		return true;
+	}
+
+	if (game::input::onKeyUsed(message, wParam, lParam)) {
 		return true;
 	}
 

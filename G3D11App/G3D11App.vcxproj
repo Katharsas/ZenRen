@@ -175,6 +175,7 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\game\Input.cpp" />
     <ClCompile Include="src\renderer\Camera.cpp" />
     <ClCompile Include="lib\imgui\imgui.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
@@ -226,6 +227,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\game\Input.h" />
     <ClInclude Include="src\renderer\Camera.h" />
     <ClInclude Include="lib\imgui\imconfig.h" />
     <ClInclude Include="lib\imgui\imgui.h" />
