@@ -243,3 +243,10 @@ ModelManifest.xml
 
 # FAKE - F# Make
 .fake/
+
+#########################
+# Custom
+#########################
+
+imgui.ini
+/G3D11App/lib/imgui/misc/

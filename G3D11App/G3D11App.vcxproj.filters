@@ -68,6 +68,7 @@
     <ClCompile Include="lib\imgui\imgui_widgets.cpp" />
     <ClCompile Include="src\renderer\Camera.cpp" />
     <ClCompile Include="src\game\Input.cpp" />
+    <ClCompile Include="src\game\PerfStats.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Util.h">
@@ -104,5 +105,6 @@
     <ClInclude Include="lib\imgui\imstb_truetype.h" />
     <ClInclude Include="src\renderer\Camera.h" />
     <ClInclude Include="src\game\Input.h" />
+    <ClInclude Include="src\game\PerfStats.h" />
   </ItemGroup>
 </Project>

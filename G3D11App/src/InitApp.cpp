@@ -15,6 +15,8 @@
 
 #include <imgui/imgui.h>
 
+
+#define ENABLE_LOGFILE false
 #define MAX_LOADSTRING 100
 
 // Global Variables:
@@ -49,7 +51,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	
 	// https://github.com/KjellKod/g3sinks/blob/master/snippets/ColorCoutSink.hpp
 	const auto worker = g3::LogWorker::createLogWorker();
-	const auto defaultSink = worker->addDefaultLogger(u8"log", u8"../logs/");
+	if (ENABLE_LOGFILE) {
+		const auto defaultSink = worker->addDefaultLogger(u8"log", u8"../logs/");
+	}
 	const auto consoleSink = worker->addSink(
 		std::make_unique<ConsoleSink>(), &ConsoleSink::ReceiveLogMessage);
 	g3::initializeLogging(worker.get());

@@ -175,6 +175,7 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\game\PerfStats.cpp" />
     <ClCompile Include="src\game\Input.cpp" />
     <ClCompile Include="src\renderer\Camera.cpp" />
     <ClCompile Include="lib\imgui\imgui.cpp">
@@ -227,6 +228,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\game\PerfStats.h" />
     <ClInclude Include="src\game\Input.h" />
     <ClInclude Include="src\renderer\Camera.h" />
     <ClInclude Include="lib\imgui\imconfig.h" />
