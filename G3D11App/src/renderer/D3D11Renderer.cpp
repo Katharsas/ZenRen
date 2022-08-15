@@ -9,7 +9,6 @@
 // Beefed up with whatever code i could find on the internet.
 
 #include <windowsx.h>
-#include <d3d11.h>
 #include <d3dx11.h>
 #include <d3dx10.h>
 #pragma warning(push)
@@ -20,6 +19,7 @@
 
 #include "Settings.h"
 #include "Camera.h"
+#include "PipelinePostProcess.h"
 #include "ShaderManager.h"
 #include "Shader.h"
 #include "../Util.h"
@@ -42,16 +42,6 @@ namespace renderer
 		XMMATRIX worldViewProjection;
 	};
 
-	struct Mesh
-	{
-		ID3D11Buffer* vertexBuffer;
-		int32_t vertexCount;
-
-		void release()
-		{
-			vertexBuffer->Release();
-		}
-	};
 	struct MeshIndexed
 	{
 		ID3D11Buffer* vertexBuffer;
@@ -65,21 +55,9 @@ namespace renderer
 		}
 	};
 
-	struct POS {
-		POS(FLOAT x, FLOAT y, FLOAT z) { X = x; Y = y; Z = z; }
-		FLOAT X, Y, Z;
-	};
-	struct UV {
-		UV(FLOAT u, FLOAT v) { U = u; V = v; }
-		FLOAT U, V;
-	};
 	struct VERTEX {
 		POS position;
 		D3DXCOLOR color;
-	};
-	struct QUAD {
-		POS position;
-		UV uvCoordinates;
 	};
 
 	struct Settings {
@@ -88,18 +66,13 @@ namespace renderer
 	};
 
 	// global declarations
+	D3d d3d;
+	
 	IDXGISwapChain* swapchain;
-	ID3D11Device* device;
-	ID3D11DeviceContext* deviceContext;
-
-	ID3D11RenderTargetView* backBuffer;    // 32-bit
-	ID3D11RenderTargetView* backBufferHDR; // 64-bit
-	ID3D11ShaderResourceView* backBufferHDRResource;
-	ID3D11SamplerState* linearSamplerState;
+	ID3D11RenderTargetView* linearBackBuffer; // 64-bit
+	ID3D11ShaderResourceView* linearBackBufferResource;
 
 	ShaderManager* shaders;
-
-	Mesh toneMappingQuad;
 
 	MeshIndexed cube;
 	Mesh triangle;
@@ -119,10 +92,9 @@ namespace renderer
 	XMMATRIX cube2World;
 
 	// forward definitions
-	void initSwapChainAndBackBuffer(HWND hWnd);
+	void initDeviceAndSwapChain(HWND hWnd);
 	void initDepthAndStencilBuffer();
 	void initBackBufferHDR();
-	void initPipelineToneMapping();
 	void initVertexIndexBuffers();
 	void initConstantBufferPerObject();
 	void initRasterizerStates();
@@ -142,11 +114,13 @@ namespace renderer
 	{
 		//initWorld();
 
-		initSwapChainAndBackBuffer(hWnd);
+		initDeviceAndSwapChain(hWnd);
+
+		postprocess::initBackBuffer(d3d, swapchain);
 		initDepthAndStencilBuffer();
 		initBackBufferHDR();
 
-		initGui(hWnd, device, deviceContext);
+		initGui(hWnd, d3d.device, d3d.deviceContext);
 
 		// Set the viewport
 		D3D11_VIEWPORT viewport;
@@ -159,12 +133,13 @@ namespace renderer
 		viewport.MinDepth = 0.0f;
 		viewport.MaxDepth = 1.0f;
 
-		deviceContext->RSSetViewports(1, &viewport);
+		d3d.deviceContext->RSSetViewports(1, &viewport);
 
 		camera::init();
 
-		shaders = new ShaderManager(device);
-		initPipelineToneMapping();
+		shaders = new ShaderManager(d3d.device);
+		postprocess::initLinearSampler(d3d);
+		postprocess::initVertexBuffers(d3d, settings.reverseZ);
 		initConstantBufferPerObject();
 		initVertexIndexBuffers();
 		initRasterizerStates();
@@ -188,19 +163,19 @@ namespace renderer
 
 		cube.release();
 		triangle.release();
-		toneMappingQuad.release();
 
 		swapchain->Release();
 		depthStencilView->Release();
-		backBuffer->Release();
-		backBufferHDR->Release();
-		backBufferHDRResource->Release();
-		linearSamplerState->Release();
+		
+		postprocess::clean();
+
+		linearBackBuffer->Release();
+		linearBackBufferResource->Release();
 		cbPerObjectBuffer->Release();
 		wireFrame->Release();
 
-		device->Release();
-		deviceContext->Release();
+		d3d.device->Release();
+		d3d.deviceContext->Release();
 	}
 
 	void updateObjects()
@@ -223,20 +198,24 @@ namespace renderer
 
 	void renderFrame(void)
 	{
-		// TODO this leaks d3d objects because reinitialization does not release previous objects!
+		auto deviceContext = d3d.deviceContext;
+
+		
 		if (settings.reverseZ != settingsPrevious.reverseZ) {
+			postprocess::reInitVertexBuffers(d3d, settings.reverseZ);
+		}
+		if (settings.reverseZ != settingsPrevious.reverseZ) {
+			// TODO this leaks d3d objects because reinitialization does not release previous objects!
 			initDepthAndStencilBuffer();
 		}
-		//if (settings.reverseZ != settingsPrevious.reverseZ) {
-		//	camera::init(settings.reverseZ);
-		//}
+
 		camera::updateCamera(settings.reverseZ);
 
-		// set the HDR back buffer as rtv
-		deviceContext->OMSetRenderTargets(1, &backBufferHDR, depthStencilView);
+		// set the linear back buffer as rtv
+		deviceContext->OMSetRenderTargets(1, &linearBackBuffer, depthStencilView);
 
 		// clear the back buffer to a deep blue
-		deviceContext->ClearRenderTargetView(backBufferHDR, D3DXCOLOR(0.0f, 0.2f, 0.4f, 1.0f));
+		deviceContext->ClearRenderTargetView(linearBackBuffer, D3DXCOLOR(0.0f, 0.2f, 0.4f, 1.0f));
 
 		// clear depth and stencil buffer
 		const float zFar = settings.reverseZ ? 0.0 : 1.0f;
@@ -276,44 +255,19 @@ namespace renderer
 
 			deviceContext->DrawIndexed(cube.indexCount, 0, 0);
 		}
-
-		// draw HDR back buffer to real back buffer via tone mapping
-
-		// set rasterizer state back to default
-		deviceContext->RSSetState(nullptr);
-
-		// set real back buffer as rtv
-		deviceContext->OMSetRenderTargets(1, &backBuffer, nullptr);
-
-		// set shaders and HDR buffer as texture
-		Shader* toneMappingShader = shaders->getShader("toneMapping");
-		deviceContext->VSSetShader(toneMappingShader->getVertexShader(), 0, 0);
-		deviceContext->IASetInputLayout(toneMappingShader->getVertexLayout());
-		deviceContext->PSSetShader(toneMappingShader->getPixelShader(), 0, 0);
-		deviceContext->PSSetShaderResources(0, 1, &backBufferHDRResource);
-		deviceContext->PSSetSamplers(0, 1, &linearSamplerState);
-
-		// select which vertex buffer to display
-		UINT stride = sizeof(QUAD);
-		UINT offset = 0;
-		deviceContext->IASetVertexBuffers(0, 1, &(toneMappingQuad.vertexBuffer), &stride, &offset);
-		//deviceContext->IASetIndexBuffer(toneMappingQuad.indexBuffer, DXGI_FORMAT_R32_UINT, 0);
-
-		//deviceContext->DrawIndexed(toneMappingQuad.indexCount, 0, 0);
-		deviceContext->Draw(toneMappingQuad.vertexCount, 0);
 		
+		// postprocessing pipeline renders linear backbuffer to real backbuffer
+		postprocess::draw(d3d, linearBackBufferResource, shaders);
+
+		// gui does not output shading information so it goes to real sRGB backbuffer as well
 		settingsPrevious = settings;
 		drawGui();
-
-		// unbind HDR back buffer texture so the next frame can use it as rtv again
-		ID3D11ShaderResourceView* srv = nullptr;
-		deviceContext->PSSetShaderResources(0, 1, &srv);
 
 		// switch the back buffer and the front buffer
 		swapchain->Present(0, 0);
 	}
 
-	void initSwapChainAndBackBuffer(HWND hWnd)
+	void initDeviceAndSwapChain(HWND hWnd)
 	{
 		DXGI_SWAP_CHAIN_DESC swapChainDesc;
 		ZeroMemory(&swapChainDesc, sizeof(DXGI_SWAP_CHAIN_DESC));
@@ -342,27 +296,14 @@ namespace renderer
 			D3D11_SDK_VERSION,
 			&swapChainDesc,
 			&swapchain,
-			&device,
+			&d3d.device,
 			nullptr,
-			&deviceContext);
+			&d3d.deviceContext);
 
 		if (FAILED(hr))
 		{
 			LOG(FATAL) << "Could not create D3D11 device. Make sure your GPU supports DirectX 11.";
 		}
-
-		// get the address of the back buffer
-		ID3D11Texture2D* texture;
-		swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&texture);
-
-		// since swapchain itself was described to be linear, we need to trigger sRGB conversion
-		D3D11_RENDER_TARGET_VIEW_DESC rtvDesc = CD3D11_RENDER_TARGET_VIEW_DESC(
-			D3D11_RTV_DIMENSION_TEXTURE2D,
-			DXGI_FORMAT_R8G8B8A8_UNORM_SRGB
-		);
-		// use the texture address to create the render target
-		device->CreateRenderTargetView(texture, &rtvDesc, &backBuffer);
-		texture->Release();
 	}
 
 	void initDepthAndStencilBuffer()
@@ -384,8 +325,8 @@ namespace renderer
 		depthStencilDesc.MiscFlags = 0;
 
 		ID3D11Texture2D* depthStencilBuffer;
-		device->CreateTexture2D(&depthStencilDesc, nullptr, &depthStencilBuffer);
-		device->CreateDepthStencilView(depthStencilBuffer, nullptr, &depthStencilView);
+		d3d.device->CreateTexture2D(&depthStencilDesc, nullptr, &depthStencilBuffer);
+		d3d.device->CreateDepthStencilView(depthStencilBuffer, nullptr, &depthStencilView);
 		depthStencilBuffer->Release();
 
 		// create and set depth state
@@ -409,8 +350,8 @@ namespace renderer
 		depthStencilStateDesc.BackFace = defaultStencilOp;
 
 		ID3D11DepthStencilState* depthStencilState;
-		device->CreateDepthStencilState(&depthStencilStateDesc, &depthStencilState);
-		deviceContext->OMSetDepthStencilState(depthStencilState, 1);
+		d3d.device->CreateDepthStencilState(&depthStencilStateDesc, &depthStencilState);
+		d3d.deviceContext->OMSetDepthStencilState(depthStencilState, 1);
 		depthStencilState->Release();
 	}
 
@@ -424,14 +365,14 @@ namespace renderer
 		desc.MipLevels = 1;
 
 		ID3D11Texture2D* texture;
-		device->CreateTexture2D(&desc, nullptr, &texture);
+		d3d.device->CreateTexture2D(&desc, nullptr, &texture);
 
 		// Create RTV
 		D3D11_RENDER_TARGET_VIEW_DESC descRTV = CD3D11_RENDER_TARGET_VIEW_DESC(
 			D3D11_RTV_DIMENSION_TEXTURE2D,
 			format
 		);
-		device->CreateRenderTargetView(texture, &descRTV, &backBufferHDR);
+		d3d.device->CreateRenderTargetView(texture, &descRTV, &linearBackBuffer);
 
 		// Create SRV
 		D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = CD3D11_SHADER_RESOURCE_VIEW_DESC(
@@ -439,32 +380,10 @@ namespace renderer
 			format
 		);
 		descSRV.Texture2D.MipLevels = 1;
-		device->CreateShaderResourceView((ID3D11Resource*)texture, &descSRV, &backBufferHDRResource);
+		d3d.device->CreateShaderResourceView((ID3D11Resource*)texture, &descSRV, &linearBackBufferResource);
 
 		// Done
 		texture->Release();
-	}
-
-	void initPipelineToneMapping()
-	{
-		D3D11_SAMPLER_DESC samplerDesc = CD3D11_SAMPLER_DESC();
-		samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-		//samplerDesc.Filter = D3D11_FILTER_ANISOTROPIC;
-		samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
-		samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
-		samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
-		samplerDesc.MipLODBias = 0;
-		samplerDesc.MaxAnisotropy = 16;
-		samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
-		samplerDesc.BorderColor[0] = 1.0f;
-		samplerDesc.BorderColor[1] = 1.0f;
-		samplerDesc.BorderColor[2] = 1.0f;
-		samplerDesc.BorderColor[3] = 1.0f;
-		samplerDesc.MinLOD = -3.402823466e+38F; // -FLT_MAX
-		samplerDesc.MaxLOD = 3.402823466e+38F; // FLT_MAX
-
-		device->CreateSamplerState(&samplerDesc, &linearSamplerState);
-		deviceContext->PSSetSamplers(0, 1, &linearSamplerState);
 	}
 
 	void initConstantBufferPerObject()
@@ -478,7 +397,7 @@ namespace renderer
 		cbbd.CPUAccessFlags = 0;
 		cbbd.MiscFlags = 0;
 
-		device->CreateBuffer(&cbbd, nullptr, &cbPerObjectBuffer);
+		d3d.device->CreateBuffer(&cbbd, nullptr, &cbPerObjectBuffer);
 	}
 
 	void initVertexIndexBuffers()
@@ -516,15 +435,6 @@ namespace renderer
 			{ POS(-0.45f, -0.5f, zNear), D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f) },
 		} };
 
-		std::array<QUAD, 6> fullscreenQuadData = { {
-			{ POS(-1.0f, 1.0f, zNear), UV(0.0f, 0.0f) },
-			{ POS(1.0f, 1.0, zNear), UV(1.0f, 0.0f) },
-			{ POS(1.0, -1.0, zNear), UV(1.0f, 1.0f) },
-			{ POS(-1.0f, 1.0f, zNear), UV(0.0f, 0.0f) },
-			{ POS(1.0, -1.0, zNear), UV(1.0f, 1.0f) },
-			{ POS(-1.0, -1.0, zNear), UV(0.0f, 1.0f) },
-		} };
-
 		// vertex buffer triangle (dynamic, mappable)
 		{
 			D3D11_BUFFER_DESC bufferDesc = CD3D11_BUFFER_DESC();
@@ -536,15 +446,15 @@ namespace renderer
 			bufferDesc.ByteWidth = sizeof(VERTEX) * triangleData.size();
 
 			// see https://docs.microsoft.com/en-us/windows/desktop/api/d3d11/ne-d3d11-d3d11_usage for cpu/gpu data exchange
-			device->CreateBuffer(&bufferDesc, nullptr, &(triangle.vertexBuffer));
+			d3d.device->CreateBuffer(&bufferDesc, nullptr, &(triangle.vertexBuffer));
 			triangle.vertexCount = triangleData.size();
 		}
 		// map to copy triangle vertices into its buffer
 		{
 			D3D11_MAPPED_SUBRESOURCE ms;
-			deviceContext->Map(triangle.vertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);// map the buffer
+			d3d.deviceContext->Map(triangle.vertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);// map the buffer
 			memcpy(ms.pData, triangleData.data(), sizeof(triangleData));									// copy the data
-			deviceContext->Unmap(triangle.vertexBuffer, 0);											// unmap the buffer
+			d3d.deviceContext->Unmap(triangle.vertexBuffer, 0);											// unmap the buffer
 		}
 		// vertex buffer cube
 		{
@@ -557,7 +467,7 @@ namespace renderer
 
 			D3D11_SUBRESOURCE_DATA initialData;
 			initialData.pSysMem = cubeVerts.data();
-			device->CreateBuffer(&bufferDesc, &initialData, &(cube.vertexBuffer));
+			d3d.device->CreateBuffer(&bufferDesc, &initialData, &(cube.vertexBuffer));
 		}
 		// index buffer cube
 		{
@@ -570,26 +480,12 @@ namespace renderer
 
 			D3D11_SUBRESOURCE_DATA initialData;
 			initialData.pSysMem = cubeIndices.data();
-			device->CreateBuffer(&indexBufferDesc, &initialData, &(cube.indexBuffer));
+			d3d.device->CreateBuffer(&indexBufferDesc, &initialData, &(cube.indexBuffer));
 			cube.indexCount = cubeIndices.size();
-		}
-		// vertex buffer fullscreen quad
-		{
-			D3D11_BUFFER_DESC bufferDesc = CD3D11_BUFFER_DESC();
-			ZeroMemory(&bufferDesc, sizeof(bufferDesc));
-
-			bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-			bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-			bufferDesc.ByteWidth = sizeof(QUAD) * fullscreenQuadData.size();
-
-			D3D11_SUBRESOURCE_DATA initialData;
-			initialData.pSysMem = fullscreenQuadData.data();
-			device->CreateBuffer(&bufferDesc, &initialData, &(toneMappingQuad.vertexBuffer));
-			toneMappingQuad.vertexCount = fullscreenQuadData.size();
 		}
 
 		// select which primtive type we are using
-		deviceContext->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		d3d.deviceContext->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	}
 
 	void initRasterizerStates()
@@ -599,7 +495,7 @@ namespace renderer
 
 		wireFrameDesc.FillMode = D3D11_FILL_WIREFRAME;
 		wireFrameDesc.CullMode = D3D11_CULL_NONE;
-		device->CreateRasterizerState(&wireFrameDesc, &wireFrame);
+		d3d.device->CreateRasterizerState(&wireFrameDesc, &wireFrame);
 	}
 
 

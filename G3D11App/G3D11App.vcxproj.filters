@@ -69,6 +69,7 @@
     <ClCompile Include="src\renderer\Camera.cpp" />
     <ClCompile Include="src\game\Input.cpp" />
     <ClCompile Include="src\game\PerfStats.cpp" />
+    <ClCompile Include="src\renderer\PipelinePostProcess.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Util.h">
@@ -106,5 +107,6 @@
     <ClInclude Include="src\renderer\Camera.h" />
     <ClInclude Include="src\game\Input.h" />
     <ClInclude Include="src\game\PerfStats.h" />
+    <ClInclude Include="src\renderer\PipelinePostProcess.h" />
   </ItemGroup>
 </Project>
