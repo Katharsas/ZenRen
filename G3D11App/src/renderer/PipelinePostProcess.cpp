@@ -1,8 +1,6 @@
 #include "stdafx.h"
 #include "PipelinePostProcess.h"
 
-#include <array>
-
 #include "Settings.h"
 #include "Shader.h"
 

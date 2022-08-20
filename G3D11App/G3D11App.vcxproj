@@ -175,6 +175,8 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\imgui\imgui_custom.cpp" />
+    <ClCompile Include="src\renderer\PipelineWorld.cpp" />
     <ClCompile Include="src\renderer\PipelinePostProcess.cpp" />
     <ClCompile Include="src\game\PerfStats.cpp" />
     <ClCompile Include="src\game\Input.cpp" />
@@ -229,6 +231,8 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\imgui\imgui_custom.h" />
+    <ClInclude Include="src\renderer\PipelineWorld.h" />
     <ClInclude Include="src\renderer\PipelinePostProcess.h" />
     <ClInclude Include="src\game\PerfStats.h" />
     <ClInclude Include="src\game\Input.h" />

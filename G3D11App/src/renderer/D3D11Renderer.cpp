@@ -11,15 +11,11 @@
 #include <windowsx.h>
 #include <d3dx11.h>
 #include <d3dx10.h>
-#pragma warning(push)
-#pragma warning(disable : 4838)
-#include <xnamath.h>
-#pragma warning(pop)
-#include <array>
 
 #include "Settings.h"
 #include "Camera.h"
 #include "PipelinePostProcess.h"
+#include "PipelineWorld.h"
 #include "ShaderManager.h"
 #include "Shader.h"
 #include "../Util.h"
@@ -37,29 +33,6 @@
 
 namespace renderer
 {
-	struct CbPerObject
-	{
-		XMMATRIX worldViewProjection;
-	};
-
-	struct MeshIndexed
-	{
-		ID3D11Buffer* vertexBuffer;
-		ID3D11Buffer* indexBuffer;
-		int32_t indexCount;
-
-		void release()
-		{
-			vertexBuffer->Release();
-			indexBuffer->Release();
-		}
-	};
-
-	struct VERTEX {
-		POS position;
-		D3DXCOLOR color;
-	};
-
 	struct Settings {
 		bool wireframe = false;
 		bool reverseZ = true;// TODO a substantial part of the pipeline needs to be reinitialized for this to be changable at runtime!
@@ -74,11 +47,6 @@ namespace renderer
 
 	ShaderManager* shaders;
 
-	MeshIndexed cube;
-	Mesh triangle;
-
-	ID3D11Buffer* cbPerObjectBuffer;
-
 	ID3D11DepthStencilView* depthStencilView;
 
 	ID3D11RasterizerState* wireFrame;
@@ -86,17 +54,10 @@ namespace renderer
 	Settings settingsPrevious;
 	Settings settings;
 
-	// scene state
-	float rot = 0.1f;
-	XMMATRIX cube1World;
-	XMMATRIX cube2World;
-
 	// forward definitions
 	void initDeviceAndSwapChain(HWND hWnd);
 	void initDepthAndStencilBuffer();
 	void initBackBufferHDR();
-	void initVertexIndexBuffers();
-	void initConstantBufferPerObject();
 	void initRasterizerStates();
 
 	void initWorld()
@@ -140,8 +101,8 @@ namespace renderer
 		shaders = new ShaderManager(d3d.device);
 		postprocess::initLinearSampler(d3d);
 		postprocess::initVertexBuffers(d3d, settings.reverseZ);
-		initConstantBufferPerObject();
-		initVertexIndexBuffers();
+		world::initConstantBufferPerObject(d3d);
+		world::initVertexIndexBuffers(d3d, settings.reverseZ);
 		initRasterizerStates();
 
 		addGui("Renderer", {
@@ -161,8 +122,7 @@ namespace renderer
 		// close and release all existing COM objects
 		delete shaders;
 
-		cube.release();
-		triangle.release();
+		world::clean();
 
 		swapchain->Release();
 		depthStencilView->Release();
@@ -171,29 +131,15 @@ namespace renderer
 
 		linearBackBuffer->Release();
 		linearBackBufferResource->Release();
-		cbPerObjectBuffer->Release();
 		wireFrame->Release();
 
 		d3d.device->Release();
 		d3d.deviceContext->Release();
 	}
 
-	void updateObjects()
+	void update()
 	{
-		//Keep the cubes rotating
-		rot += .015f;
-		if (rot > 6.28f) rot = 0.0f;
-
-		cube1World = XMMatrixIdentity();
-		XMVECTOR rotAxis = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-		XMMATRIX Rotation = XMMatrixRotationAxis(rotAxis, rot);
-		XMMATRIX Translation = XMMatrixTranslation(0.0f, 0.0f, 4.0f);
-		cube1World = Translation * Rotation;
-
-		cube2World = XMMatrixIdentity();
-		Rotation = XMMatrixRotationAxis(rotAxis, -rot);
-		XMMATRIX Scale = XMMatrixScaling(1.3f, 1.3f, 1.3f);
-		cube2World = /*Rotation * */Scale;
+		world::updateObjects();
 	}
 
 	void renderFrame(void)
@@ -221,40 +167,13 @@ namespace renderer
 		const float zFar = settings.reverseZ ? 0.0 : 1.0f;
 		deviceContext->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, zFar, 0);
 
-		// do 3D rendering here
-		{
-			// set rasterizer state
-			if (settings.wireframe) {
-				deviceContext->RSSetState(wireFrame);
-			}
-
-			// set the shader objects avtive
-			Shader* triangleShader = shaders->getShader("testTriangle");
-			deviceContext->VSSetShader(triangleShader->getVertexShader(), 0, 0);
-			deviceContext->IASetInputLayout(triangleShader->getVertexLayout());
-			deviceContext->PSSetShader(triangleShader->getPixelShader(), 0, 0);
-
-			// select which vertex / index buffer to display
-			UINT stride = sizeof(VERTEX);
-			UINT offset = 0;
-			deviceContext->IASetVertexBuffers(0, 1, &(cube.vertexBuffer), &stride, &offset);
-			deviceContext->IASetIndexBuffer(cube.indexBuffer, DXGI_FORMAT_R32_UINT, 0);
-
-			// set the World/View/Projection matrix, send it to constant buffer, draw to HDR
-			// cube 1
-			CbPerObject cbPerObject = { camera::calculateWorldViewProjection(cube1World) };
-			deviceContext->UpdateSubresource(cbPerObjectBuffer, 0, nullptr, &cbPerObject, 0, 0);
-			deviceContext->VSSetConstantBuffers(0, 1, &cbPerObjectBuffer);
-
-			deviceContext->DrawIndexed(cube.indexCount, 0, 0);
-
-			// cube 2
-			cbPerObject = { camera::calculateWorldViewProjection(cube2World) };
-			deviceContext->UpdateSubresource(cbPerObjectBuffer, 0, nullptr, &cbPerObject, 0, 0);
-			deviceContext->VSSetConstantBuffers(0, 1, &cbPerObjectBuffer);
-
-			deviceContext->DrawIndexed(cube.indexCount, 0, 0);
+		// set rasterizer state
+		if (settings.wireframe) {
+			deviceContext->RSSetState(wireFrame);
 		}
+
+		// draw world to linear buffer
+		world::draw(d3d, shaders);
 		
 		// postprocessing pipeline renders linear backbuffer to real backbuffer
 		postprocess::draw(d3d, linearBackBufferResource, shaders);
@@ -386,108 +305,6 @@ namespace renderer
 		texture->Release();
 	}
 
-	void initConstantBufferPerObject()
-	{
-		D3D11_BUFFER_DESC cbbd;
-		ZeroMemory(&cbbd, sizeof(D3D11_BUFFER_DESC));
-
-		cbbd.Usage = D3D11_USAGE_DEFAULT;// TODO this should probably be dynamic, see https://www.gamedev.net/forums/topic/673486-difference-between-d3d11-usage-default-and-d3d11-usage-dynamic/
-		cbbd.ByteWidth = sizeof(CbPerObject);
-		cbbd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-		cbbd.CPUAccessFlags = 0;
-		cbbd.MiscFlags = 0;
-
-		d3d.device->CreateBuffer(&cbbd, nullptr, &cbPerObjectBuffer);
-	}
-
-	void initVertexIndexBuffers()
-	{
-		std::array<VERTEX, 8> cubeVerts = { {
-			{ POS(-1.0f, -1.0f, -1.0f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
-			{ POS(-1.0f, +1.0f, -1.0f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
-			{ POS(+1.0f, +1.0f, -1.0f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
-			{ POS(+1.0f, -1.0f, -1.0f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
-			{ POS(-1.0f, -1.0f, +1.0f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
-			{ POS(-1.0f, +1.0f, +1.0f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
-			{ POS(+1.0f, +1.0f, +1.0f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
-			{ POS(+1.0f, -1.0f, +1.0f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
-		} };
-		// make sure rotation of each triangle is clockwise
-		std::array<DWORD, 36> cubeIndices = { {
-			// front
-			0, 1, 2, 0, 2, 3,
-			// back
-			4, 6, 5, 4, 7, 6,
-			// left
-			4, 5, 1, 4, 1, 0,
-			// right
-			3, 2, 6, 3, 6, 7,
-			// top
-			1, 5, 6, 1, 6, 2,
-			// bottom
-			4, 0, 3, 4, 3, 7
-		} };
-
-		const float zNear = settings.reverseZ ? 1.0f : 0.0f;
-		std::array<VERTEX, 3> triangleData = { {
-			{ POS(+0.0f, +0.5f, zNear), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
-			{ POS(+0.45f, -0.5f, zNear), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
-			{ POS(-0.45f, -0.5f, zNear), D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f) },
-		} };
-
-		// vertex buffer triangle (dynamic, mappable)
-		{
-			D3D11_BUFFER_DESC bufferDesc = CD3D11_BUFFER_DESC();
-			ZeroMemory(&bufferDesc, sizeof(bufferDesc));
-
-			bufferDesc.Usage = D3D11_USAGE_DYNAMIC;				// write access by CPU and read access by GPU
-			bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;	// use as a vertex buffer
-			bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;	// allow CPU to write in buffer
-			bufferDesc.ByteWidth = sizeof(VERTEX) * triangleData.size();
-
-			// see https://docs.microsoft.com/en-us/windows/desktop/api/d3d11/ne-d3d11-d3d11_usage for cpu/gpu data exchange
-			d3d.device->CreateBuffer(&bufferDesc, nullptr, &(triangle.vertexBuffer));
-			triangle.vertexCount = triangleData.size();
-		}
-		// map to copy triangle vertices into its buffer
-		{
-			D3D11_MAPPED_SUBRESOURCE ms;
-			d3d.deviceContext->Map(triangle.vertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);// map the buffer
-			memcpy(ms.pData, triangleData.data(), sizeof(triangleData));									// copy the data
-			d3d.deviceContext->Unmap(triangle.vertexBuffer, 0);											// unmap the buffer
-		}
-		// vertex buffer cube
-		{
-			D3D11_BUFFER_DESC bufferDesc = CD3D11_BUFFER_DESC();
-			ZeroMemory(&bufferDesc, sizeof(bufferDesc));
-
-			bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-			bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-			bufferDesc.ByteWidth = sizeof(VERTEX) * cubeVerts.size();
-
-			D3D11_SUBRESOURCE_DATA initialData;
-			initialData.pSysMem = cubeVerts.data();
-			d3d.device->CreateBuffer(&bufferDesc, &initialData, &(cube.vertexBuffer));
-		}
-		// index buffer cube
-		{
-			D3D11_BUFFER_DESC indexBufferDesc;
-			ZeroMemory(&indexBufferDesc, sizeof(indexBufferDesc));
-
-			indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-			indexBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-			indexBufferDesc.ByteWidth = sizeof(DWORD) * cubeIndices.size();
-
-			D3D11_SUBRESOURCE_DATA initialData;
-			initialData.pSysMem = cubeIndices.data();
-			d3d.device->CreateBuffer(&indexBufferDesc, &initialData, &(cube.indexBuffer));
-			cube.indexCount = cubeIndices.size();
-		}
-
-		// select which primtive type we are using
-		d3d.deviceContext->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	}
-
 	void initRasterizerStates()
 	{
 		D3D11_RASTERIZER_DESC wireFrameDesc;
@@ -497,6 +314,5 @@ namespace renderer
 		wireFrameDesc.CullMode = D3D11_CULL_NONE;
 		d3d.device->CreateRasterizerState(&wireFrameDesc, &wireFrame);
 	}
-
-
+	
 }

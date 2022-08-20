@@ -24,6 +24,19 @@ namespace renderer
 		}
 	};
 
+	struct MeshIndexed
+	{
+		ID3D11Buffer* vertexBuffer;
+		ID3D11Buffer* indexBuffer;
+		int32_t indexCount;
+
+		void release()
+		{
+			vertexBuffer->Release();
+			indexBuffer->Release();
+		}
+	};
+
 	struct D3d {
 		ID3D11Device* device;
 		ID3D11DeviceContext* deviceContext;
@@ -32,6 +45,6 @@ namespace renderer
 	void initD3D(HWND hWnd);
 	// Clean up DirectX and COM
 	void cleanD3D();
-	void updateObjects();
+	void update();
 	void renderFrame(void);
 }

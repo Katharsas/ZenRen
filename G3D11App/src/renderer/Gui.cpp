@@ -5,6 +5,7 @@
 #include <d3d11.h>
 
 #include "imgui/imgui.h"
+#include "imgui/imgui_custom.h"
 #include "imgui/imgui_impl_win32.h"
 #include "imgui/imgui_impl_dx11.h"
 
@@ -45,17 +46,21 @@ namespace renderer {
 		ImGui_ImplDX11_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
+		ImGui::Begin("Settings");
 
 		for (const auto& entry : windowToGuiComponents) {
 			auto windowName = entry.first;
 			auto buildCommands = entry.second;
-			ImGui::Begin(windowName.c_str());
+
+			ImGui::SameLine();
+			ImGui::BeginGroupPanel(windowName.c_str(), ImVec2(0, 0));
 			for (const auto& command : buildCommands) {
 				command.buildGui();
 			}
-			ImGui::End();
+			ImGui::EndGroupPanel();
 		}
 
+		ImGui::End();
 		ImGui::Render();
 		ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 	}

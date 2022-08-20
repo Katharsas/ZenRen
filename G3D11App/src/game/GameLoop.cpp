@@ -87,10 +87,12 @@ namespace game
 		renderer::addGui("Graphics", {
 			[]() -> void {
 				ImGui::Checkbox("Framelimiter", &settings.frameLimiterEnabled);
+				ImGui::PushItemWidth(40);
 				ImGui::InputInt("Frame Limit", &settings.frameLimit, 0);
 				if (settings.frameLimit < 10) {
 					settings.frameLimit = 10;
 				}
+				ImGui::PopItemWidth();
 			}
 		});
 
@@ -117,7 +119,7 @@ namespace game
 			}
 		}
 
-		renderer::updateObjects();
+		renderer::update();
 		renderer::renderFrame();
 
 		frameTime.renderEndSleepStart();

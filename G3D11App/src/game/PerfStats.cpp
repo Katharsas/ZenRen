@@ -1,8 +1,6 @@
 #include "stdafx.h"
 #include "PerfStats.h"
 
-#include <array>
-
 namespace game::stats {
 
 	struct LoggingSettings
