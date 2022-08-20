@@ -184,7 +184,11 @@ namespace game
 		stats::addFrameSample(frameTime, frameTimeTarget);
 	}
 
-
+	void onWindowResized(uint32_t width, uint32_t height)
+	{
+		LOG(DEBUG) << "Resizing game window! Width: " << width << ", Height: " << height;
+		renderer::onWindowResize(width, height);
+	}
 
 	void execute()
 	{

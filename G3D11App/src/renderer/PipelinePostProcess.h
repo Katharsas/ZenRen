@@ -12,6 +12,6 @@ namespace renderer::postprocess
 	void initLinearSampler(D3d d3d);
 	void initVertexBuffers(D3d d3d, bool reverseZ);
 	void reInitVertexBuffers(D3d d3d, bool reverseZ);
-	void clean();
+	void clean(bool onlyBackBuffer = false);
 }
 

@@ -121,10 +121,12 @@ namespace renderer::postprocess
 		initVertexBuffers(d3d, reverseZ);
 	}
 
-	void clean()
+	void clean(bool onlyBackBuffer)
 	{
-		toneMappingQuad.release();
 		backBuffer->Release();
-		linearSamplerState->Release();
+		if (!onlyBackBuffer) {
+			toneMappingQuad.release();
+			linearSamplerState->Release();
+		}
 	}
 }

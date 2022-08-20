@@ -4,6 +4,11 @@
 
 namespace renderer
 {
+	struct BufferSize {
+		uint32_t width;
+		uint32_t height;
+	};
+
 	struct POS {
 		POS(FLOAT x, FLOAT y, FLOAT z) { X = x; Y = y; Z = z; }
 		FLOAT X, Y, Z;
@@ -43,6 +48,7 @@ namespace renderer
 	};
 
 	void initD3D(HWND hWnd);
+	void onWindowResize(uint32_t width, uint32_t height);
 	// Clean up DirectX and COM
 	void cleanD3D();
 	void update();

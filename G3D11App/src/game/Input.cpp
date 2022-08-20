@@ -20,18 +20,16 @@ namespace game::input {
     bool onKeyUsed(UINT message, WPARAM keycode, LPARAM extendedParameters) {
         if (message == WM_KEYUP) {
             auto keyname = getKeyname(extendedParameters);
-            LOG(DEBUG) << "Key released: " << keyname;
+            //LOG(DEBUG) << "Key released: " << keyname;
 
             keyState[keyname] = false;
-
             return true;
         }
         else if (message == WM_KEYDOWN) {
             auto keyname = getKeyname(extendedParameters);
-            LOG(DEBUG) << "Key pressed: " << keyname;
+            //LOG(DEBUG) << "Key pressed: " << keyname;
 
             keyState[keyname] = true;
-
             return true;
         }
         return false;

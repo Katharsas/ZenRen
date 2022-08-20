@@ -24,6 +24,9 @@ HINSTANCE hInst;                                // current instance
 WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
 WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 
+uint32_t windowClientWidth = settings::SCREEN_WIDTH;
+uint32_t windowClientHeight = settings::SCREEN_HEIGHT;
+
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 HWND                InitInstance(HINSTANCE, int);
@@ -135,7 +138,7 @@ HWND InitInstance(HINSTANCE hInstance, int nCmdShow)
 	hInst = hInstance; // Store instance handle in our global variable
 
 	// set view size and calculate window size with borders/menu
-	RECT viewSize = {0, 0, settings::SCREEN_WIDTH, settings::SCREEN_HEIGHT};
+	RECT viewSize = {0, 0, windowClientWidth, windowClientHeight};
 	AdjustWindowRect(&viewSize, WS_OVERLAPPEDWINDOW, FALSE);
 
 	LEVELS level = DEBUG;
@@ -173,16 +176,49 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 //
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+	static bool in_sizemove = false;
+	static bool minimized = false;
+
 	if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam)) {
-		return true;
+		return 0;// TODO is this correct check?
 	}
 
 	if (game::input::onKeyUsed(message, wParam, lParam)) {
-		return true;
+		return 0;
 	}
 
 	switch (message)
 	{
+	case WM_SIZE:
+		{
+			windowClientWidth = LOWORD(lParam);
+			windowClientHeight = HIWORD(lParam);
+
+			minimized = wParam == SIZE_MINIMIZED;
+			if (!minimized && !in_sizemove) {
+				game::onWindowResized(windowClientWidth, windowClientHeight);
+			}
+		}
+		break;
+	case WM_ENTERSIZEMOVE:
+		{
+			in_sizemove = true;
+		}
+		break;
+	case WM_EXITSIZEMOVE:
+		{
+			in_sizemove = false;
+			game::onWindowResized(windowClientWidth, windowClientHeight);
+		}
+		break;
+	case WM_GETMINMAXINFO:
+		{
+			// prevent the window from being resized too small
+			auto info = reinterpret_cast<MINMAXINFO*>(lParam);
+			info->ptMinTrackSize.x = 320;
+			info->ptMinTrackSize.y = 200;
+		}
+		break;
 	case WM_PAINT:
 		{
 			//PAINTSTRUCT ps;

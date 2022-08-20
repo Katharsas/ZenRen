@@ -53,11 +53,13 @@ namespace renderer
 
 	Settings settingsPrevious;
 	Settings settings;
+	BufferSize clientSize;
 
 	// forward definitions
-	void initDeviceAndSwapChain(HWND hWnd);
-	void initDepthAndStencilBuffer();
-	void initBackBufferHDR();
+	void initDeviceAndSwapChain(HWND hWnd, BufferSize& size);
+	void initDepthAndStencilBuffer(BufferSize& size);
+	void initLinearBackBuffer(BufferSize& size);
+	void initViewport(BufferSize& size);
 	void initRasterizerStates();
 
 	void initWorld()
@@ -73,28 +75,20 @@ namespace renderer
 
 	void initD3D(HWND hWnd)
 	{
-		//initWorld();
+		clientSize = {
+			settings::SCREEN_WIDTH,
+			settings::SCREEN_HEIGHT
+		};
 
-		initDeviceAndSwapChain(hWnd);
+		initDeviceAndSwapChain(hWnd, clientSize);
 
 		postprocess::initBackBuffer(d3d, swapchain);
-		initDepthAndStencilBuffer();
-		initBackBufferHDR();
+		initDepthAndStencilBuffer(clientSize);
+		initLinearBackBuffer(clientSize);
 
 		initGui(hWnd, d3d.device, d3d.deviceContext);
 
-		// Set the viewport
-		D3D11_VIEWPORT viewport;
-		ZeroMemory(&viewport, sizeof(D3D11_VIEWPORT));
-
-		viewport.TopLeftX = 0;
-		viewport.TopLeftY = 0;
-		viewport.Width = settings::SCREEN_WIDTH;
-		viewport.Height = settings::SCREEN_HEIGHT;
-		viewport.MinDepth = 0.0f;
-		viewport.MaxDepth = 1.0f;
-
-		d3d.deviceContext->RSSetViewports(1, &viewport);
+		initViewport(clientSize);
 
 		camera::init();
 
@@ -111,6 +105,46 @@ namespace renderer
 				ImGui::Checkbox("Reverse Z", &settings.reverseZ);
 			}
 		});
+	}
+
+	void initViewport(BufferSize& size) {
+		D3D11_VIEWPORT viewport;
+		ZeroMemory(&viewport, sizeof(D3D11_VIEWPORT));
+
+		viewport.TopLeftX = 0;
+		viewport.TopLeftY = 0;
+		viewport.Width = size.width;
+		viewport.Height = size.height;
+		viewport.MinDepth = 0.0f;
+		viewport.MaxDepth = 1.0f;
+
+		d3d.deviceContext->RSSetViewports(1, &viewport);
+	}
+
+	void onWindowResize(uint32_t width, uint32_t height) {
+		clientSize = { width, height };
+
+		// see https://docs.microsoft.com/en-us/windows/win32/direct3ddxgi/d3d10-graphics-programming-guide-dxgi#handling-window-resizing
+		if (swapchain) {
+			d3d.deviceContext->OMSetRenderTargets(0, 0, 0);
+
+			depthStencilView->Release();
+			linearBackBuffer->Release();
+			linearBackBufferResource->Release();
+			postprocess::clean(true);
+
+			d3d.deviceContext->Flush();
+
+			// Preserve the existing buffer count and format.
+			// Automatically choose the width and height to match the client rect for HWNDs.
+			swapchain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, 0);
+
+			postprocess::initBackBuffer(d3d, swapchain);
+			initDepthAndStencilBuffer(clientSize);
+			initLinearBackBuffer(clientSize);
+
+			initViewport(clientSize);
+		}
 	}
 
 	void cleanD3D()
@@ -145,17 +179,16 @@ namespace renderer
 	void renderFrame(void)
 	{
 		auto deviceContext = d3d.deviceContext;
-
 		
 		if (settings.reverseZ != settingsPrevious.reverseZ) {
 			postprocess::reInitVertexBuffers(d3d, settings.reverseZ);
 		}
 		if (settings.reverseZ != settingsPrevious.reverseZ) {
 			// TODO this leaks d3d objects because reinitialization does not release previous objects!
-			initDepthAndStencilBuffer();
+			initDepthAndStencilBuffer(clientSize);
 		}
 
-		camera::updateCamera(settings.reverseZ);
+		camera::updateCamera(settings.reverseZ, clientSize);
 
 		// set the linear back buffer as rtv
 		deviceContext->OMSetRenderTargets(1, &linearBackBuffer, depthStencilView);
@@ -186,7 +219,7 @@ namespace renderer
 		swapchain->Present(0, 0);
 	}
 
-	void initDeviceAndSwapChain(HWND hWnd)
+	void initDeviceAndSwapChain(HWND hWnd, BufferSize& size)
 	{
 		DXGI_SWAP_CHAIN_DESC swapChainDesc;
 		ZeroMemory(&swapChainDesc, sizeof(DXGI_SWAP_CHAIN_DESC));
@@ -194,8 +227,8 @@ namespace renderer
 		// fill the swap chain description struct
 		swapChainDesc.BufferCount = 1;                                    // one back buffer
 		swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;     // use 32-bit color
-		swapChainDesc.BufferDesc.Width = settings::SCREEN_WIDTH;          // set the back buffer width
-		swapChainDesc.BufferDesc.Height = settings::SCREEN_HEIGHT;        // set the back buffer height
+		swapChainDesc.BufferDesc.Width = size.width;                      // set the back buffer width
+		swapChainDesc.BufferDesc.Height = size.height;                    // set the back buffer height
 		swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;      // how swap chain is to be used
 		swapChainDesc.OutputWindow = hWnd;                                // the window to be used
 		swapChainDesc.SampleDesc.Count = 1;                               // how many multisamples
@@ -225,14 +258,14 @@ namespace renderer
 		}
 	}
 
-	void initDepthAndStencilBuffer()
+	void initDepthAndStencilBuffer(BufferSize& size)
 	{
 		// create depth buffer
 		D3D11_TEXTURE2D_DESC depthStencilDesc;
 		ZeroMemory(&depthStencilDesc, sizeof(D3D11_TEXTURE2D_DESC));
 
-		depthStencilDesc.Width = settings::SCREEN_WIDTH;
-		depthStencilDesc.Height = settings::SCREEN_HEIGHT;
+		depthStencilDesc.Width = size.width;
+		depthStencilDesc.Height = size.height;
 		depthStencilDesc.MipLevels = 1;
 		depthStencilDesc.ArraySize = 1;
 		depthStencilDesc.Format = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
@@ -274,12 +307,12 @@ namespace renderer
 		depthStencilState->Release();
 	}
 
-	void initBackBufferHDR()
+	void initLinearBackBuffer(BufferSize& size)
 	{
 		auto format = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
 		// Create buffer texture
-		D3D11_TEXTURE2D_DESC desc = CD3D11_TEXTURE2D_DESC(format, settings::SCREEN_WIDTH, settings::SCREEN_HEIGHT);
+		D3D11_TEXTURE2D_DESC desc = CD3D11_TEXTURE2D_DESC(format, size.width, size.height);
 		desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
 		desc.MipLevels = 1;
 
