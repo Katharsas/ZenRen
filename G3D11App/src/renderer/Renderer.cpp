@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "D3D11Renderer.h"
+#include "Renderer.h"
 
 // Directx 11 Renderer according to this tutorial:
 // http://www.directxtutorial.com/Lesson.aspx?lessonid=11-4-2
@@ -105,7 +105,7 @@ namespace renderer
 		world::initVertexIndexBuffers(d3d, settings.reverseZ);
 		initRasterizerStates();
 
-		addGui("Renderer", {
+		addSettings("Renderer", {
 			[]() -> void {
 				ImGui::Checkbox("Wireframe Mode", &settings.wireframe);
 				ImGui::Checkbox("Reverse Z", &settings.reverseZ);

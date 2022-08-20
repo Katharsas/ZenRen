@@ -46,7 +46,7 @@
     <ClCompile Include="src\InitApp.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="src\renderer\D3D11Renderer.cpp">
+    <ClCompile Include="src\renderer\Renderer.cpp">
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="src\renderer\Shader.cpp">
@@ -83,7 +83,7 @@
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="resource.h" />
-    <ClInclude Include="src\renderer\D3D11Renderer.h">
+    <ClInclude Include="src\renderer\Renderer.h">
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="src\renderer\Shader.h">

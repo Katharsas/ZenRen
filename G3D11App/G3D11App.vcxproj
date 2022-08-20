@@ -221,7 +221,7 @@
     <ClCompile Include="src\renderer\Gui.cpp" />
     <ClCompile Include="src\game\TimerPrecision.cpp" />
     <ClCompile Include="src\InitApp.cpp" />
-    <ClCompile Include="src\renderer\D3D11Renderer.cpp" />
+    <ClCompile Include="src\renderer\Renderer.cpp" />
     <ClCompile Include="src\renderer\Shader.cpp" />
     <ClCompile Include="src\renderer\ShaderManager.cpp" />
     <ClCompile Include="src\Util.cpp" />
@@ -249,7 +249,7 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="src\renderer\Gui.h" />
     <ClInclude Include="src\InitApp.h" />
-    <ClInclude Include="src\renderer\D3D11Renderer.h" />
+    <ClInclude Include="src\renderer\Renderer.h" />
     <ClInclude Include="src\renderer\Shader.h" />
     <ClInclude Include="src\renderer\ShaderManager.h" />
     <ClInclude Include="src\Settings.h" />

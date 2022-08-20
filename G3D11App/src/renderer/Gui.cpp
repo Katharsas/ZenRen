@@ -11,21 +11,37 @@
 
 namespace renderer {
 
-	std::map<std::string, std::list<GuiComponent>> windowToGuiComponents;
+	std::map<std::string, std::list<GuiComponent>> windowsToGuis;
+	std::map<std::string, std::list<GuiComponent>> settingsGroupToGuis;
 
-	void addGui(std::string windowName, GuiComponent guiComponent) {
-		auto entryIt = windowToGuiComponents.find(windowName);
-		if (entryIt == windowToGuiComponents.end()) {
+	void addWindow(const std::string& windowName, GuiComponent guiComponent)
+	{
+		auto entryIt = windowsToGuis.find(windowName);
+		if (entryIt == windowsToGuis.end()) {
 			std::list<GuiComponent> guiComponents;
 			guiComponents.push_back(guiComponent);
-			windowToGuiComponents.insert(std::make_pair(windowName, guiComponents));
+			windowsToGuis.insert(std::make_pair(windowName, guiComponents));
 		}
 		else {
 			entryIt->second.push_back(guiComponent);
 		}
 	}
 
-	void initGui(HWND hWnd, ID3D11Device* device, ID3D11DeviceContext* deviceContext) {
+	void addSettings(const std::string& groupName, GuiComponent guiComponent)
+	{
+		auto entryIt = settingsGroupToGuis.find(groupName);
+		if (entryIt == settingsGroupToGuis.end()) {
+			std::list<GuiComponent> guiComponents;
+			guiComponents.push_back(guiComponent);
+			settingsGroupToGuis.insert(std::make_pair(groupName, guiComponents));
+		}
+		else {
+			entryIt->second.push_back(guiComponent);
+		}
+	}
+
+	void initGui(HWND hWnd, ID3D11Device* device, ID3D11DeviceContext* deviceContext)
+	{
 		
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
@@ -42,30 +58,37 @@ namespace renderer {
 		io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Consola.ttf", (int)((13 * dpiScale) + 0.5f));
 	}
 
-	void drawGui() {
+	void drawGui()
+	{
 		ImGui_ImplDX11_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
+
 		ImGui::Begin("Settings");
-
-		for (const auto& entry : windowToGuiComponents) {
-			auto windowName = entry.first;
-			auto buildCommands = entry.second;
-
+		for (const auto& [groupName, commands] : settingsGroupToGuis) {
 			ImGui::SameLine();
-			ImGui::BeginGroupPanel(windowName.c_str(), ImVec2(0, 0));
-			for (const auto& command : buildCommands) {
+			ImGui::BeginGroupPanel(groupName.c_str(), ImVec2(0, 0));
+			for (const auto& command : commands) {
 				command.buildGui();
 			}
 			ImGui::EndGroupPanel();
 		}
-
 		ImGui::End();
+
+		for (auto& [windowName, commands] : windowsToGuis) {
+			ImGui::Begin(windowName.c_str());
+			for (const auto& command : commands) {
+				command.buildGui();
+			}
+			ImGui::End();
+		}
+
 		ImGui::Render();
 		ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 	}
 
-	void cleanGui() {
+	void cleanGui()
+	{
 		ImGui_ImplDX11_Shutdown();
 		ImGui_ImplWin32_Shutdown();
 		ImGui::DestroyContext();

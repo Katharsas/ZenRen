@@ -6,7 +6,7 @@
 #include "TimerPrecision.h"
 #include "PerfStats.h"
 #include "renderer/Gui.h"
-#include "renderer/D3D11Renderer.h"
+#include "renderer/Renderer.h"
 #include "renderer/Camera.h"
 #include "imgui/imgui.h"
 
@@ -28,6 +28,9 @@ namespace game
 	// input actions
 	const float cameraMoveSpeed = 0.3f;
 	const float cameraTurnSpeed = 0.05f;
+
+	std::string ACTION_GUI_SEPARATOR = "---";
+	std::vector<std::string> actionsForGui;
 
 	std::map<std::string, InputAction> actions;
 	std::map<std::string, std::string> actionsToKeys;
@@ -63,17 +66,26 @@ namespace game
 		} });
 	}
 
+	void bindActionToKey(const std::string& actionName, const std::string& key = std::string()) {
+		actionsForGui.push_back(actionName);
+		if (actionName != ACTION_GUI_SEPARATOR) {
+			actionsToKeys[actionName] = key;
+		}
+	}
+
 	void setDefaultInputMap() {
-		actionsToKeys["CAMERA_MOVE_FORWARDS"] = "R";
-		actionsToKeys["CAMERA_MOVE_BACKWARDS"] = "F";
-
-		actionsToKeys["CAMERA_MOVE_LEFT"] = "A";
-		actionsToKeys["CAMERA_MOVE_RIGHT"] = "D";
-		actionsToKeys["CAMERA_MOVE_UP"] = "W";
-		actionsToKeys["CAMERA_MOVE_DOWN"] = "S";
-
-		actionsToKeys["CAMERA_TURN_LEFT"] = "Q";
-		actionsToKeys["CAMERA_TURN_RIGHT"] = "E";
+		bindActionToKey(ACTION_GUI_SEPARATOR + "Camera");
+		bindActionToKey(ACTION_GUI_SEPARATOR);
+		bindActionToKey("CAMERA_MOVE_FORWARDS", "R");
+		bindActionToKey("CAMERA_MOVE_BACKWARDS", "F");
+		bindActionToKey(ACTION_GUI_SEPARATOR);
+		bindActionToKey("CAMERA_MOVE_LEFT", "A");
+		bindActionToKey("CAMERA_MOVE_RIGHT", "D");
+		bindActionToKey("CAMERA_MOVE_UP", "W");
+		bindActionToKey("CAMERA_MOVE_DOWN", "S");
+		bindActionToKey(ACTION_GUI_SEPARATOR);
+		bindActionToKey("CAMERA_TURN_LEFT", "Q");
+		bindActionToKey("CAMERA_TURN_RIGHT", "E");
 	}
 
 	void init(HWND hWnd)
@@ -84,7 +96,7 @@ namespace game
 		registerCameraActions();
 		setDefaultInputMap();
 
-		renderer::addGui("Graphics", {
+		renderer::addSettings("Graphics", {
 			[]() -> void {
 				ImGui::Checkbox("Framelimiter", &settings.frameLimiterEnabled);
 				ImGui::PushItemWidth(40);
@@ -93,6 +105,35 @@ namespace game
 					settings.frameLimit = 10;
 				}
 				ImGui::PopItemWidth();
+			}
+		});
+		renderer::addWindow("Keybinds", {
+			[]() -> void {
+				if (ImGui::BeginTable("keybinds", 2, ImGuiTableFlags_SizingFixedFit)) {
+					for (auto& actionname : actionsForGui) {
+						if (actionname == ACTION_GUI_SEPARATOR) {
+							ImGui::TableNextColumn();
+								ImGui::NewLine();
+								ImGui::TableNextColumn();
+						}
+						else if (actionname._Starts_with(ACTION_GUI_SEPARATOR)) {
+							auto separatorName = actionname.substr(ACTION_GUI_SEPARATOR.length(), actionname.length() - ACTION_GUI_SEPARATOR.length());
+								ImGui::TableNextColumn();
+								ImGui::Text(separatorName.c_str());
+								ImGui::TableNextColumn();
+						}
+						else {
+							ImGui::TableNextColumn();
+							ImGui::Indent();
+							auto& keyname = actionsToKeys[actionname];
+							ImGui::Text(actionname.c_str());
+							ImGui::Unindent();
+							ImGui::TableNextColumn();
+							ImGui::Text(keyname.c_str());
+						}
+					}
+					ImGui::EndTable();
+				}
 			}
 		});
 

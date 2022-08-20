@@ -8,7 +8,8 @@ namespace renderer {
 		void (*buildGui)();
 	};
 
-	void addGui(std::string windowName, GuiComponent guiComponent);
+	void addWindow(const std::string& windowName, GuiComponent guiComponent);
+	void addSettings(const std::string& groupName, GuiComponent guiComponent);
 	void initGui(HWND hWnd, ID3D11Device* device, ID3D11DeviceContext* deviceContext);
 	void drawGui();
 	void cleanGui();
