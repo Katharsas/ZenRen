@@ -7,11 +7,6 @@
 
 namespace renderer::postprocess
 {
-	struct QUAD {
-		POS position;
-		UV uvCoordinates;
-	};
-
 	ID3D11RenderTargetView* backBuffer;    // real non-linear backbuffer, 32-bit
 	ID3D11SamplerState* linearSamplerState;// sampler to read linear backbuffer texture
 
@@ -36,7 +31,7 @@ namespace renderer::postprocess
 		d3d.deviceContext->PSSetSamplers(0, 1, &linearSamplerState);
 
 		// select which vertex buffer to display
-		UINT stride = sizeof(QUAD);
+		UINT stride = sizeof(POS_UV);
 		UINT offset = 0;
 		d3d.deviceContext->IASetVertexBuffers(0, 1, &(toneMappingQuad.vertexBuffer), &stride, &offset);
 		//deviceContext->IASetIndexBuffer(toneMappingQuad.indexBuffer, DXGI_FORMAT_R32_UINT, 0);
@@ -67,6 +62,7 @@ namespace renderer::postprocess
 
 	void initLinearSampler(D3d d3d)
 	{
+		// TODO !!! ALLES nachziehen, LODs etc. pp.
 		D3D11_SAMPLER_DESC samplerDesc = CD3D11_SAMPLER_DESC();
 		samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
 		//samplerDesc.Filter = D3D11_FILTER_ANISOTROPIC;
@@ -91,7 +87,7 @@ namespace renderer::postprocess
 	{
 		const float zNear = reverseZ ? 1.0f : 0.0f;
 
-		std::array<QUAD, 6> fullscreenQuadData = { {
+		std::array<POS_UV, 6> fullscreenQuadData = { {
 			{ POS(-1.0f, 1.0f, zNear), UV(0.0f, 0.0f) },
 			{ POS(1.0f, 1.0, zNear), UV(1.0f, 0.0f) },
 			{ POS(1.0, -1.0, zNear), UV(1.0f, 1.0f) },
@@ -107,7 +103,7 @@ namespace renderer::postprocess
 
 			bufferDesc.Usage = D3D11_USAGE_DEFAULT;
 			bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-			bufferDesc.ByteWidth = sizeof(QUAD) * fullscreenQuadData.size();
+			bufferDesc.ByteWidth = sizeof(POS_UV) * fullscreenQuadData.size();
 
 			D3D11_SUBRESOURCE_DATA initialData;
 			initialData.pSysMem = fullscreenQuadData.data();

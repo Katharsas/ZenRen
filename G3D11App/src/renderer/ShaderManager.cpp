@@ -5,9 +5,9 @@
 
 namespace renderer {
 
-	ShaderManager::ShaderManager(ID3D11Device* device)
+	ShaderManager::ShaderManager(D3d d3d)
 	{
-		reloadShaders(device);
+		reloadShaders(d3d);
 	}
 
 
@@ -17,7 +17,7 @@ namespace renderer {
 	}
 
 
-	void ShaderManager::reloadShaders(ID3D11Device* device) {
+	void ShaderManager::reloadShaders(D3d d3d) {
 		LOG(INFO) << "Reloading all shaders.";
 		clearAll();
 		{
@@ -27,7 +27,7 @@ namespace renderer {
 				{ "POSITION", DXGI_FORMAT_R32G32B32_FLOAT },
 				{ "COLOR", DXGI_FORMAT_R32G32B32A32_FLOAT },
 			};
-			shaders[shaderName] = new Shader(filePath(shaderName), layoutDesc, 2, device);
+			shaders[shaderName] = new Shader(filePath(shaderName), layoutDesc, 2, d3d);
 		} {
 			std::string shaderName(u8"toneMapping");
 			Shader::VertexInputLayoutDesc layoutDesc[] =
@@ -35,8 +35,15 @@ namespace renderer {
 				{ "POSITION", DXGI_FORMAT_R32G32B32_FLOAT },
 				{ "TEXCOORD", DXGI_FORMAT_R32G32_FLOAT },
 			};
-
-			shaders[shaderName] = new Shader(filePath(shaderName), layoutDesc, 2, device);
+			shaders[shaderName] = new Shader(filePath(shaderName), layoutDesc, 2, d3d);
+		} {
+			std::string shaderName(u8"flatBasicColorTexShader");
+			Shader::VertexInputLayoutDesc layoutDesc[] =
+			{
+				{ "POSITION", DXGI_FORMAT_R32G32B32_FLOAT },
+				{ "TEXCOORD", DXGI_FORMAT_R32G32_FLOAT },
+			};
+			shaders[shaderName] = new Shader(filePath(shaderName), layoutDesc, 2, d3d);
 		}
 	}
 

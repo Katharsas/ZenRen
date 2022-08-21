@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+#include "dx11.h"
 #include "Shader.h"
 
 namespace renderer {
@@ -7,9 +9,9 @@ namespace renderer {
 	class ShaderManager
 	{
 	public:
-		ShaderManager(ID3D11Device *device);
+		ShaderManager(D3d d3d);
 		~ShaderManager();
-		void reloadShaders(ID3D11Device* device);
+		void reloadShaders(D3d d3d);
 		Shader* getShader(const std::string& shaderName);
 	private:
 		std::unordered_map<std::string, Shader*> shaders;

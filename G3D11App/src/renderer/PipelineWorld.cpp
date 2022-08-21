@@ -2,17 +2,13 @@
 #include "PipelineWorld.h"
 
 #include "Camera.h"
+#include "Texture.h"
 
 namespace renderer::world {
 
 	struct CbPerObject
 	{
 		XMMATRIX worldViewProjection;
-	};
-
-	struct VERTEX {
-		POS position;
-		D3DXCOLOR color;
 	};
 
 	ID3D11Buffer* cbPerObjectBuffer;
@@ -24,6 +20,9 @@ namespace renderer::world {
 	float rot = 0.1f;
 	XMMATRIX cube1World;
 	XMMATRIX cube2World;
+
+	Texture* texture;
+	ID3D11SamplerState* linearSamplerState;
 
 	void updateObjects()
 	{
@@ -43,32 +42,77 @@ namespace renderer::world {
 		cube2World = /*Rotation * */Scale;
 	}
 
+	void initLinearSampler(D3d d3d)
+	{
+		D3D11_SAMPLER_DESC samplerDesc = CD3D11_SAMPLER_DESC();
+		samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+		//samplerDesc.Filter = D3D11_FILTER_ANISOTROPIC;
+		samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+		samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+		samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+		samplerDesc.MipLODBias = 0;
+		samplerDesc.MaxAnisotropy = 16;
+		samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+		samplerDesc.BorderColor[0] = 1.0f;
+		samplerDesc.BorderColor[1] = 1.0f;
+		samplerDesc.BorderColor[2] = 1.0f;
+		samplerDesc.BorderColor[3] = 1.0f;
+		samplerDesc.MinLOD = -3.402823466e+38F; // -FLT_MAX
+		samplerDesc.MaxLOD = 3.402823466e+38F; // FLT_MAX
+
+		d3d.device->CreateSamplerState(&samplerDesc, &linearSamplerState);
+		d3d.deviceContext->PSSetSamplers(0, 1, &linearSamplerState);// TODO why is this not needed?
+	}
+
 	void initVertexIndexBuffers(D3d d3d, bool reverseZ)
 	{
-		std::array<VERTEX, 8> cubeVerts = { {
-			{ POS(-1.0f, -1.0f, -1.0f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
-			{ POS(-1.0f, +1.0f, -1.0f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
-			{ POS(+1.0f, +1.0f, -1.0f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
-			{ POS(+1.0f, -1.0f, -1.0f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
-			{ POS(-1.0f, -1.0f, +1.0f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
-			{ POS(-1.0f, +1.0f, +1.0f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
-			{ POS(+1.0f, +1.0f, +1.0f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
-			{ POS(+1.0f, -1.0f, +1.0f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
+		texture = new Texture(d3d, "BARRIERE.png");
+
+		std::array<POS_UV, 24> cubeVerts = { {
+			{ POS(-1.0f, -1.0f, -1.0f), UV(0.0f, 0.0f) },
+			{ POS(-1.0f, +1.0f, -1.0f), UV(1.0f, 0.0f) },
+			{ POS(+1.0f, +1.0f, -1.0f), UV(1.0f, 1.0f) },
+			{ POS(+1.0f, -1.0f, -1.0f), UV(0.0f, 1.0f) },
+
+			{ POS(-1.0f, -1.0f, +1.0f), UV(0.0f, 0.0f) },
+			{ POS(-1.0f, +1.0f, +1.0f), UV(1.0f, 0.0f) },
+			{ POS(+1.0f, +1.0f, +1.0f), UV(1.0f, 1.0f) },
+			{ POS(+1.0f, -1.0f, +1.0f), UV(0.0f, 1.0f) },
+
+			{ POS(-1.0f, -1.0f, -1.0f), UV(0.0f, 0.0f) },
+			{ POS(-1.0f, -1.0f, +1.0f), UV(1.0f, 0.0f) },
+			{ POS(+1.0f, -1.0f, +1.0f), UV(1.0f, 1.0f) },
+			{ POS(+1.0f, -1.0f, -1.0f), UV(0.0f, 1.0f) },
+
+			{ POS(-1.0f, +1.0f, -1.0f), UV(0.0f, 0.0f) },
+			{ POS(-1.0f, +1.0f, +1.0f), UV(1.0f, 0.0f) },
+			{ POS(+1.0f, +1.0f, +1.0f), UV(1.0f, 1.0f) },
+			{ POS(+1.0f, +1.0f, -1.0f), UV(0.0f, 1.0f) },
+
+			{ POS(-1.0f, -1.0f, -1.0f), UV(0.0f, 0.0f) },
+			{ POS(-1.0f, -1.0f, +1.0f), UV(1.0f, 0.0f) },
+			{ POS(-1.0f, +1.0f, +1.0f), UV(1.0f, 1.0f) },
+			{ POS(-1.0f, +1.0f, -1.0f), UV(0.0f, 1.0f) },
+
+			{ POS(+1.0f, -1.0f, -1.0f), UV(0.0f, 0.0f) },
+			{ POS(+1.0f, -1.0f, +1.0f), UV(1.0f, 0.0f) },
+			{ POS(+1.0f, +1.0f, +1.0f), UV(1.0f, 1.0f) },
+			{ POS(+1.0f, +1.0f, -1.0f), UV(0.0f, 1.0f) },
 		} };
 		// make sure rotation of each triangle is clockwise
 		std::array<DWORD, 36> cubeIndices = { {
 				// front
-				0, 1, 2, 0, 2, 3,
+				 0, 1, 2, 0, 2, 3,
 				// back
-				4, 6, 5, 4, 7, 6,
+				 4, 5, 6, 4, 6, 7,
 				// left
-				4, 5, 1, 4, 1, 0,
+				 8, 9,10, 8,10,11,
 				// right
-				3, 2, 6, 3, 6, 7,
+				12,13,14,12,14,15,
 				// top
-				1, 5, 6, 1, 6, 2,
+				16,17,18,16,18,19,
 				// bottom
-				4, 0, 3, 4, 3, 7
+				20,21,22,20,22,23
 			} };
 
 		/*
@@ -109,7 +153,7 @@ namespace renderer::world {
 
 			bufferDesc.Usage = D3D11_USAGE_DEFAULT;
 			bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-			bufferDesc.ByteWidth = sizeof(VERTEX) * cubeVerts.size();
+			bufferDesc.ByteWidth = sizeof(POS_UV) * cubeVerts.size();
 
 			D3D11_SUBRESOURCE_DATA initialData;
 			initialData.pSysMem = cubeVerts.data();
@@ -132,6 +176,7 @@ namespace renderer::world {
 
 		// select which primtive type we are using
 		d3d.deviceContext->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		initLinearSampler(d3d);
 	}
 
 	void initConstantBufferPerObject(D3d d3d)
@@ -151,13 +196,17 @@ namespace renderer::world {
 	void draw(D3d d3d, ShaderManager* shaders)
 	{
 		// set the shader objects avtive
-		Shader* triangleShader = shaders->getShader("testTriangle");
-		d3d.deviceContext->VSSetShader(triangleShader->getVertexShader(), 0, 0);
-		d3d.deviceContext->IASetInputLayout(triangleShader->getVertexLayout());
-		d3d.deviceContext->PSSetShader(triangleShader->getPixelShader(), 0, 0);
+		Shader* shader = shaders->getShader("flatBasicColorTexShader");
+		d3d.deviceContext->VSSetShader(shader->getVertexShader(), 0, 0);
+		d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
+		d3d.deviceContext->PSSetShader(shader->getPixelShader(), 0, 0);
+
+		auto* resourceView = texture->GetResourceView();
+		d3d.deviceContext->PSSetShaderResources(0, 1, &resourceView);
+		d3d.deviceContext->PSSetSamplers(0, 1, &linearSamplerState);
 
 		// select which vertex / index buffer to display
-		UINT stride = sizeof(VERTEX);
+		UINT stride = sizeof(POS_UV);
 		UINT offset = 0;
 		d3d.deviceContext->IASetVertexBuffers(0, 1, &(cube.vertexBuffer), &stride, &offset);
 		d3d.deviceContext->IASetIndexBuffer(cube.indexBuffer, DXGI_FORMAT_R32_UINT, 0);

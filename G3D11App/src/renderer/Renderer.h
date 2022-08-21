@@ -18,6 +18,15 @@ namespace renderer
 		FLOAT U, V;
 	};
 
+	struct POS_COLOR {
+		POS position;
+		D3DXCOLOR color;
+	};
+	struct POS_UV {
+		POS position;
+		UV color;
+	};
+
 	struct Mesh
 	{
 		ID3D11Buffer* vertexBuffer;

@@ -5,8 +5,7 @@
 
 namespace renderer {
 
-	Shader::Shader(const std::string& sourceFile, const VertexInputLayoutDesc layoutDesc[],
-		const int length, ID3D11Device *device)
+	Shader::Shader(const std::string& sourceFile, const VertexInputLayoutDesc layoutDesc[], const int length, D3d d3d)
 	{
 		LOG(DEBUG) << "Compiling shader from file: " << sourceFile;
 
@@ -24,8 +23,8 @@ namespace renderer {
 		}
 
 		// encapsulate shader blobs into shader objects
-		device->CreateVertexShader(VS->GetBufferPointer(), VS->GetBufferSize(), nullptr, &vertexShader);
-		device->CreatePixelShader(PS->GetBufferPointer(), PS->GetBufferSize(), nullptr, &pixelShader);
+		d3d.device->CreateVertexShader(VS->GetBufferPointer(), VS->GetBufferSize(), nullptr, &vertexShader);
+		d3d.device->CreatePixelShader(PS->GetBufferPointer(), PS->GetBufferSize(), nullptr, &pixelShader);
 
 		// create full layout desc from given partial layout desc
 		D3D11_INPUT_ELEMENT_DESC * d3d11LayoutDesc = new D3D11_INPUT_ELEMENT_DESC[length];
@@ -38,8 +37,7 @@ namespace renderer {
 			d3d11LayoutDesc[i].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
 			d3d11LayoutDesc[i].InstanceDataStepRate = 0;
 		}
-		device->CreateInputLayout(
-			d3d11LayoutDesc, length, VS->GetBufferPointer(), VS->GetBufferSize(), &vertexLayout);
+		d3d.device->CreateInputLayout(d3d11LayoutDesc, length, VS->GetBufferPointer(), VS->GetBufferSize(), &vertexLayout);
 
 		delete[] d3d11LayoutDesc;
 		VS->Release();
@@ -53,17 +51,17 @@ namespace renderer {
 		pixelShader->Release();
 	}
 
-	ID3D11InputLayout * Shader::getVertexLayout()
+	ID3D11InputLayout* Shader::getVertexLayout()
 	{
 		return vertexLayout;
 	}
 
-	ID3D11VertexShader * Shader::getVertexShader()
+	ID3D11VertexShader* Shader::getVertexShader()
 	{
 		return vertexShader;
 	}
 
-	ID3D11PixelShader * Shader::getPixelShader()
+	ID3D11PixelShader* Shader::getPixelShader()
 	{
 		return pixelShader;
 	}

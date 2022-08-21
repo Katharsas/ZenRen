@@ -87,7 +87,7 @@ namespace renderer
 
 		camera::init();
 
-		shaders = new ShaderManager(d3d.device);
+		shaders = new ShaderManager(d3d);
 		postprocess::initLinearSampler(d3d);
 		postprocess::initVertexBuffers(d3d, settings.reverseZ);
 		world::initConstantBufferPerObject(d3d);
@@ -252,6 +252,8 @@ namespace renderer
 		dxgiDevice->GetAdapter(&dxgiAdapter);
 		ComPtr<IDXGIFactory2> dxgiFactory_2;
 		dxgiAdapter->GetParent(__uuidof(IDXGIFactory2), &dxgiFactory_2);
+
+		dxgiDevice.Get()->SetMaximumFrameLatency(1);
 		
 		bool flipPresent = true;
 		ComPtr<IDXGIFactory4> dxgiFactory_4;

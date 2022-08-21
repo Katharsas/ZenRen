@@ -37,6 +37,9 @@
     <None Include="Shaders\testTriangle.hlsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="Shaders\flatBasicColorTexShader.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Util.cpp">
@@ -72,6 +75,7 @@
     <ClCompile Include="src\renderer\PipelinePostProcess.cpp" />
     <ClCompile Include="src\renderer\PipelineWorld.cpp" />
     <ClCompile Include="src\imgui\imgui_custom.cpp" />
+    <ClCompile Include="src\renderer\Texture.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Util.h">
@@ -113,5 +117,6 @@
     <ClInclude Include="src\renderer\PipelineWorld.h" />
     <ClInclude Include="src\imgui\imgui_custom.h" />
     <ClInclude Include="src\renderer\dx11.h" />
+    <ClInclude Include="src\renderer\Texture.h" />
   </ItemGroup>
 </Project>
