@@ -112,5 +112,6 @@
     <ClInclude Include="src\renderer\PipelinePostProcess.h" />
     <ClInclude Include="src\renderer\PipelineWorld.h" />
     <ClInclude Include="src\imgui\imgui_custom.h" />
+    <ClInclude Include="src\renderer\dx11.h" />
   </ItemGroup>
 </Project>

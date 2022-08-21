@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "PipelinePostProcess.h"
 
+#include "Renderer.h"
 #include "Settings.h"
 #include "Shader.h"
 
@@ -48,7 +49,7 @@ namespace renderer::postprocess
 		d3d.deviceContext->PSSetShaderResources(0, 1, &srv);
 	}
 
-	void initBackBuffer(D3d d3d, IDXGISwapChain* swapchain)
+	void initBackBuffer(D3d d3d, IDXGISwapChain1* swapchain)
 	{
 		// get the address of the back buffer
 		ID3D11Texture2D* texture;

@@ -8,9 +8,9 @@
 //
 // Beefed up with whatever code i could find on the internet.
 
-#include <windowsx.h>
-#include <d3dx11.h>
-#include <d3dx10.h>
+#include <wrl/client.h>
+
+using namespace Microsoft::WRL;
 
 #include "Settings.h"
 #include "Camera.h"
@@ -24,11 +24,6 @@
 //#include <vdfs/fileIndex.h>
 //#include <zenload/zenParser.h>
 
-// include the Direct3D Library file
-#pragma comment (lib, "d3d11.lib")
-#pragma comment (lib, "d3dx11.lib")
-#pragma comment (lib, "d3dx10.lib")
-
 #define DEBUG_D3D11
 
 namespace renderer
@@ -41,7 +36,7 @@ namespace renderer
 	// global declarations
 	D3d d3d;
 	
-	IDXGISwapChain* swapchain;
+	IDXGISwapChain1* swapchain;
 	ID3D11RenderTargetView* linearBackBuffer; // 64-bit
 	ID3D11ShaderResourceView* linearBackBufferResource;
 
@@ -86,7 +81,7 @@ namespace renderer
 		initDepthAndStencilBuffer(clientSize);
 		initLinearBackBuffer(clientSize);
 
-		initGui(hWnd, d3d.device, d3d.deviceContext);
+		initGui(hWnd, d3d);
 
 		initViewport(clientSize);
 
@@ -176,7 +171,7 @@ namespace renderer
 		world::updateObjects();
 	}
 
-	void renderFrame(void)
+	void renderFrame()
 	{
 		auto deviceContext = d3d.deviceContext;
 		
@@ -221,41 +216,77 @@ namespace renderer
 
 	void initDeviceAndSwapChain(HWND hWnd, BufferSize& size)
 	{
-		DXGI_SWAP_CHAIN_DESC swapChainDesc;
-		ZeroMemory(&swapChainDesc, sizeof(DXGI_SWAP_CHAIN_DESC));
+		ComPtr<ID3D11Device> device_11_0;
+		ComPtr<ID3D11DeviceContext> deviceContext_11_0;
 
-		// fill the swap chain description struct
-		swapChainDesc.BufferCount = 1;                                    // one back buffer
-		swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;     // use 32-bit color
-		swapChainDesc.BufferDesc.Width = size.width;                      // set the back buffer width
-		swapChainDesc.BufferDesc.Height = size.height;                    // set the back buffer height
-		swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;      // how swap chain is to be used
-		swapChainDesc.OutputWindow = hWnd;                                // the window to be used
-		swapChainDesc.SampleDesc.Count = 1;                               // how many multisamples
-		swapChainDesc.Windowed = TRUE;                                    // windowed/full-screen mode
-		swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;     // allow full-screen switching
+		ComPtr<ID3D11Device1> device_11_1;
+		ComPtr<ID3D11DeviceContext1> deviceContext_11_1;
 
-		const D3D_FEATURE_LEVEL level = D3D_FEATURE_LEVEL_11_0;           // require directx 11.0
+		// all feature levels that will be checked in order, we only care about 11.1
+		const D3D_FEATURE_LEVEL requiredLevels[] = { D3D_FEATURE_LEVEL_11_1 };
 
-		// create a device, device context and swap chain using the information in the scd struct
-		HRESULT hr = D3D11CreateDeviceAndSwapChain(
+		HRESULT hr = D3D11CreateDevice(
 			nullptr,
 			D3D_DRIVER_TYPE_HARDWARE,
-			0,
-			D3D11_CREATE_DEVICE_DEBUG,//TODO this should be disabled for more performance in prod releases
-			&level,
-			1,
-			D3D11_SDK_VERSION,
-			&swapChainDesc,
-			&swapchain,
-			&d3d.device,
 			nullptr,
-			&d3d.deviceContext);
+			D3D11_CREATE_DEVICE_DEBUG,//TODO this should be disabled for more performance in prod releases
+			requiredLevels,
+			_countof(requiredLevels),
+			D3D11_SDK_VERSION,
+			&device_11_0,
+			nullptr,
+			&deviceContext_11_0);
 
-		if (FAILED(hr))
-		{
-			LOG(FATAL) << "Could not create D3D11 device. Make sure your GPU supports DirectX 11.";
+		if (hr == E_INVALIDARG) {
+			LOG(FATAL) << "DirectX 11.1 capable GPU required! If your are on Windows 7, please install KB 2670838.";
 		}
+
+		// Convert the interfaces from the DirectX 11.0 to the DirectX 11.1 
+		device_11_0.As(&device_11_1);
+		deviceContext_11_0.As(&deviceContext_11_1);
+		
+		// Convert to dxgiDevice and get adapter/factory that originally created our device (in "D3D11CreateDevice")
+		ComPtr<IDXGIDevice2> dxgiDevice;
+		device_11_1.As(&dxgiDevice);
+		ComPtr<IDXGIAdapter> dxgiAdapter;
+		dxgiDevice->GetAdapter(&dxgiAdapter);
+		ComPtr<IDXGIFactory2> dxgiFactory_2;
+		dxgiAdapter->GetParent(__uuidof(IDXGIFactory2), &dxgiFactory_2);
+		
+		bool flipPresent = true;
+		ComPtr<IDXGIFactory4> dxgiFactory_4;
+		if (FAILED(dxgiFactory_2.As(&dxgiFactory_4)))
+		{
+			flipPresent = false;
+		}
+
+		// Create windowed swapchain, TODO create fullscreen swapchain and pass both
+		DXGI_SWAP_CHAIN_DESC1 swapChainDesc;
+		ZeroMemory(&swapChainDesc, sizeof(DXGI_SWAP_CHAIN_DESC1));
+
+		// fill the swap chain description struct
+		swapChainDesc.BufferCount = 2;                                    // one back buffer
+		swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;                // use 32-bit color
+		swapChainDesc.Width = size.width;                                 // set the back buffer width
+		swapChainDesc.Height = size.height;                               // set the back buffer height
+		swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;      // how swap chain is to be used
+		swapChainDesc.SampleDesc.Count = 1;                               // how many multisamples
+		swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;     // allow full-screen switching
+		if (flipPresent) {
+			LOG(DEBUG) << "Detected Windows 10 or greater! Using flip model.";
+			swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+		}
+
+		dxgiFactory_2->CreateSwapChainForHwnd(
+			device_11_1.Get(),
+			hWnd,
+			&swapChainDesc,
+			nullptr,
+			nullptr,
+			&swapchain);
+
+		d3d.device = device_11_1.Detach();
+		d3d.deviceContext = deviceContext_11_1.Detach();
 	}
 
 	void initDepthAndStencilBuffer(BufferSize& size)

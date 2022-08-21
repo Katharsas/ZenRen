@@ -19,6 +19,7 @@
 
 
 // TODO: reference additional headers your program requires here
+#include <stdint.h>
 #include <string>
 #include <unordered_map>
 #include <array>

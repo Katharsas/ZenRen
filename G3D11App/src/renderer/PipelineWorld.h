@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Renderer.h"
+#include "dx11.h"
 #include "ShaderManager.h"
 
 namespace renderer::world {

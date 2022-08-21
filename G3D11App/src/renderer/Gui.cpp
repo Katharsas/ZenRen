@@ -2,7 +2,6 @@
 #include "Gui.h"
 
 #include <windowsx.h>
-#include <d3d11.h>
 
 #include "imgui/imgui.h"
 #include "imgui/imgui_custom.h"
@@ -40,7 +39,7 @@ namespace renderer {
 		}
 	}
 
-	void initGui(HWND hWnd, ID3D11Device* device, ID3D11DeviceContext* deviceContext)
+	void initGui(HWND hWnd, D3d d3d)
 	{
 		
 		IMGUI_CHECKVERSION();
@@ -51,7 +50,7 @@ namespace renderer {
 		ImGui::StyleColorsDark();
 
 		ImGui_ImplWin32_Init(hWnd);
-		ImGui_ImplDX11_Init(device, deviceContext);
+		ImGui_ImplDX11_Init(d3d.device, d3d.deviceContext);
 
 		// DPI scaling and font
 		float dpiScale = ImGui_ImplWin32_GetDpiScaleForHwnd(hWnd);

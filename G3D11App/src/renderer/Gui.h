@@ -1,6 +1,6 @@
 #pragma once
 
-#include <d3d11.h>
+#include "dx11.h";
 
 namespace renderer {
 	struct GuiComponent
@@ -10,7 +10,7 @@ namespace renderer {
 
 	void addWindow(const std::string& windowName, GuiComponent guiComponent);
 	void addSettings(const std::string& groupName, GuiComponent guiComponent);
-	void initGui(HWND hWnd, ID3D11Device* device, ID3D11DeviceContext* deviceContext);
+	void initGui(HWND hWnd, D3d d3d);
 	void drawGui();
 	void cleanGui();
 }

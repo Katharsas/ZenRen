@@ -1,6 +1,6 @@
 #pragma once
 
-#include <d3d11.h>
+#include "dx11.h"
 
 namespace renderer
 {
@@ -42,15 +42,10 @@ namespace renderer
 		}
 	};
 
-	struct D3d {
-		ID3D11Device* device;
-		ID3D11DeviceContext* deviceContext;
-	};
-
 	void initD3D(HWND hWnd);
 	void onWindowResize(uint32_t width, uint32_t height);
 	// Clean up DirectX and COM
 	void cleanD3D();
 	void update();
-	void renderFrame(void);
+	void renderFrame();
 }
