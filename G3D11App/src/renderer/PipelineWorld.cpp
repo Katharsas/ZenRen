@@ -14,7 +14,6 @@ namespace renderer::world {
 	ID3D11Buffer* cbPerObjectBuffer;
 
 	MeshIndexed cube;
-	//Mesh triangle;
 
 	// scene state
 	float rot = 0.1f;
@@ -22,7 +21,7 @@ namespace renderer::world {
 	XMMATRIX cube2World;
 
 	Texture* texture;
-	ID3D11SamplerState* linearSamplerState;
+	ID3D11SamplerState* linearSamplerState = nullptr;
 
 	void updateObjects()
 	{
@@ -42,26 +41,30 @@ namespace renderer::world {
 		cube2World = /*Rotation * */Scale;
 	}
 
-	void initLinearSampler(D3d d3d)
+	void initLinearSampler(D3d d3d, RenderSettings settings)
 	{
+		// TODO Mip Maps
+
+		if (linearSamplerState != nullptr) {
+			linearSamplerState->Release();
+		}
 		D3D11_SAMPLER_DESC samplerDesc = CD3D11_SAMPLER_DESC();
-		samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-		//samplerDesc.Filter = D3D11_FILTER_ANISOTROPIC;
-		samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
-		samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
-		samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
-		samplerDesc.MipLODBias = 0;
-		samplerDesc.MaxAnisotropy = 16;
+		ZeroMemory(&samplerDesc, sizeof(samplerDesc));
+
+		if (settings.anisotropicFilter) {
+			samplerDesc.Filter = D3D11_FILTER_ANISOTROPIC;
+		} else {
+			samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+		}
+		samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+		samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+		samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+		samplerDesc.MaxAnisotropy = settings.anisotropicLevel;
 		samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
-		samplerDesc.BorderColor[0] = 1.0f;
-		samplerDesc.BorderColor[1] = 1.0f;
-		samplerDesc.BorderColor[2] = 1.0f;
-		samplerDesc.BorderColor[3] = 1.0f;
-		samplerDesc.MinLOD = -3.402823466e+38F; // -FLT_MAX
-		samplerDesc.MaxLOD = 3.402823466e+38F; // FLT_MAX
+		samplerDesc.MinLOD = 0;
+		samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
 
 		d3d.device->CreateSamplerState(&samplerDesc, &linearSamplerState);
-		d3d.deviceContext->PSSetSamplers(0, 1, &linearSamplerState);// TODO why is this not needed?
 	}
 
 	void initVertexIndexBuffers(D3d d3d, bool reverseZ)
@@ -176,7 +179,6 @@ namespace renderer::world {
 
 		// select which primtive type we are using
 		d3d.deviceContext->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		initLinearSampler(d3d);
 	}
 
 	void initConstantBufferPerObject(D3d d3d)
@@ -230,8 +232,9 @@ namespace renderer::world {
 	void clean()
 	{
 		cbPerObjectBuffer->Release();
+		linearSamplerState->Release();
+		delete texture;
 
 		cube.release();
-		//triangle.release();
 	}
 }

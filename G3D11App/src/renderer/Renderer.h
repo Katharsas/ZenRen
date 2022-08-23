@@ -1,9 +1,19 @@
 #pragma once
 
+#include <stdint.h>
+
 #include "dx11.h"
 
 namespace renderer
 {
+	struct RenderSettings {
+		bool wireframe = false;
+		bool reverseZ = true;
+
+		bool anisotropicFilter = true;
+		uint32_t anisotropicLevel = 16;
+	};
+
 	struct BufferSize {
 		uint32_t width;
 		uint32_t height;

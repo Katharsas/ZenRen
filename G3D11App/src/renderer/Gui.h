@@ -5,7 +5,7 @@
 namespace renderer {
 	struct GuiComponent
 	{
-		void (*buildGui)();
+		const std::function<void()> buildGui;
 	};
 
 	void addWindow(const std::string& windowName, GuiComponent guiComponent);

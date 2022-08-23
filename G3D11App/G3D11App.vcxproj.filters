@@ -76,6 +76,7 @@
     <ClCompile Include="src\renderer\PipelineWorld.cpp" />
     <ClCompile Include="src\imgui\imgui_custom.cpp" />
     <ClCompile Include="src\renderer\Texture.cpp" />
+    <ClCompile Include="src\renderer\RenderSettings.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Util.h">
@@ -118,5 +119,6 @@
     <ClInclude Include="src\imgui\imgui_custom.h" />
     <ClInclude Include="src\renderer\dx11.h" />
     <ClInclude Include="src\renderer\Texture.h" />
+    <ClInclude Include="src\renderer\RenderSettings.h" />
   </ItemGroup>
 </Project>

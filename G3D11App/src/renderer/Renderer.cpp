@@ -13,6 +13,7 @@
 using namespace Microsoft::WRL;
 
 #include "Settings.h"
+#include "RenderSettings.h"
 #include "Camera.h"
 #include "PipelinePostProcess.h"
 #include "PipelineWorld.h"
@@ -20,7 +21,7 @@ using namespace Microsoft::WRL;
 #include "Shader.h"
 #include "../Util.h"
 #include "Gui.h"
-#include "imgui/imgui.h"
+
 //#include <vdfs/fileIndex.h>
 //#include <zenload/zenParser.h>
 
@@ -28,11 +29,6 @@ using namespace Microsoft::WRL;
 
 namespace renderer
 {
-	struct Settings {
-		bool wireframe = false;
-		bool reverseZ = true;// TODO a substantial part of the pipeline needs to be reinitialized for this to be changable at runtime!
-	};
-
 	// global declarations
 	D3d d3d;
 	
@@ -46,8 +42,8 @@ namespace renderer
 
 	ID3D11RasterizerState* wireFrame;
 
-	Settings settingsPrevious;
-	Settings settings;
+	RenderSettings settingsPrevious;
+	RenderSettings settings;
 	BufferSize clientSize;
 
 	// forward definitions
@@ -71,8 +67,8 @@ namespace renderer
 	void initD3D(HWND hWnd)
 	{
 		clientSize = {
-			settings::SCREEN_WIDTH,
-			settings::SCREEN_HEIGHT
+			::settings::SCREEN_WIDTH,
+			::settings::SCREEN_HEIGHT
 		};
 
 		initDeviceAndSwapChain(hWnd, clientSize);
@@ -90,16 +86,12 @@ namespace renderer
 		shaders = new ShaderManager(d3d);
 		postprocess::initLinearSampler(d3d);
 		postprocess::initVertexBuffers(d3d, settings.reverseZ);
+		world::initLinearSampler(d3d, settings);
 		world::initConstantBufferPerObject(d3d);
 		world::initVertexIndexBuffers(d3d, settings.reverseZ);
 		initRasterizerStates();
 
-		addSettings("Renderer", {
-			[]() -> void {
-				ImGui::Checkbox("Wireframe Mode", &settings.wireframe);
-				ImGui::Checkbox("Reverse Z", &settings.reverseZ);
-			}
-		});
+		gui::settings::init(settings);
 	}
 
 	void initViewport(BufferSize& size) {
@@ -181,6 +173,9 @@ namespace renderer
 		if (settings.reverseZ != settingsPrevious.reverseZ) {
 			// TODO this leaks d3d objects because reinitialization does not release previous objects!
 			initDepthAndStencilBuffer(clientSize);
+		}
+		if (settings.anisotropicFilter != settingsPrevious.anisotropicFilter || settings.anisotropicLevel != settingsPrevious.anisotropicFilter) {
+			world::initLinearSampler(d3d, settings);
 		}
 
 		camera::updateCamera(settings.reverseZ, clientSize);

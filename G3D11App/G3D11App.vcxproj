@@ -230,6 +230,7 @@
     <ClCompile Include="src\game\TimerPrecision.cpp" />
     <ClCompile Include="src\InitApp.cpp" />
     <ClCompile Include="src\renderer\Renderer.cpp" />
+    <ClCompile Include="src\renderer\RenderSettings.cpp" />
     <ClCompile Include="src\renderer\Shader.cpp" />
     <ClCompile Include="src\renderer\ShaderManager.cpp" />
     <ClCompile Include="src\Util.cpp" />
@@ -260,6 +261,7 @@
     <ClInclude Include="src\renderer\Gui.h" />
     <ClInclude Include="src\InitApp.h" />
     <ClInclude Include="src\renderer\Renderer.h" />
+    <ClInclude Include="src\renderer\RenderSettings.h" />
     <ClInclude Include="src\renderer\Shader.h" />
     <ClInclude Include="src\renderer\ShaderManager.h" />
     <ClInclude Include="src\Settings.h" />

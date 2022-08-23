@@ -62,25 +62,19 @@ namespace renderer::postprocess
 
 	void initLinearSampler(D3d d3d)
 	{
-		// TODO !!! ALLES nachziehen, LODs etc. pp.
 		D3D11_SAMPLER_DESC samplerDesc = CD3D11_SAMPLER_DESC();
+		ZeroMemory(&samplerDesc, sizeof(samplerDesc));
+
 		samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-		//samplerDesc.Filter = D3D11_FILTER_ANISOTROPIC;
 		samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
 		samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
 		samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
-		samplerDesc.MipLODBias = 0;
-		samplerDesc.MaxAnisotropy = 16;
+		samplerDesc.MaxAnisotropy = 1;// no anisotropy
 		samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
-		samplerDesc.BorderColor[0] = 1.0f;
-		samplerDesc.BorderColor[1] = 1.0f;
-		samplerDesc.BorderColor[2] = 1.0f;
-		samplerDesc.BorderColor[3] = 1.0f;
-		samplerDesc.MinLOD = -3.402823466e+38F; // -FLT_MAX
-		samplerDesc.MaxLOD = 3.402823466e+38F; // FLT_MAX
+		samplerDesc.MinLOD = 0;
+		samplerDesc.MaxLOD = 0;// always use most detailed level
 
 		d3d.device->CreateSamplerState(&samplerDesc, &linearSamplerState);
-		d3d.deviceContext->PSSetSamplers(0, 1, &linearSamplerState);// TODO why is this not needed?
 	}
 
 	void initVertexBuffers(D3d d3d, bool reverseZ)
