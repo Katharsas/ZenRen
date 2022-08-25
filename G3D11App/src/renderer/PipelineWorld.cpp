@@ -9,7 +9,10 @@
 
 namespace renderer::world {
 
-	bool RENDER_FLAT = false;
+	typedef POS_NORMAL_UV VERTEX;
+
+	const bool RENDER_FLAT = true;
+	const bool RENDER_NO_SHADING = false;
 
 	struct CbPerObject
 	{
@@ -24,13 +27,15 @@ namespace renderer::world {
 
 	ID3D11Buffer* cbPerObjectBuffer;
 
+	float rot = 0.1f;
 	World world;
 
 	Texture* texture;
 	ID3D11SamplerState* linearSamplerState = nullptr;
 
 	void loadTestObj(D3d d3d) {
-		std::string inputfile = "cube.obj";
+		std::string inputfile = "monkey.obj";
+		//std::string inputfile = "cube.obj";
 		tinyobj::ObjReaderConfig reader_config;
 		reader_config.triangulate = true;
 
@@ -54,7 +59,7 @@ namespace renderer::world {
 		
 		const float scale = 1.0f;
 
-		std::vector<POS_UV> meshData;
+		std::vector<VERTEX> meshData;
 		meshData.reserve(attrib.vertices.size());
 
 		for (size_t shapeIndex = 0; shapeIndex < shapes.size(); shapeIndex++) {
@@ -62,36 +67,52 @@ namespace renderer::world {
 			size_t indexOffset = 0;
 			for (size_t faceIndex = 0; faceIndex < shapes[shapeIndex].mesh.num_face_vertices.size(); faceIndex++) {
 				size_t vertexCount = size_t(shapes[shapeIndex].mesh.num_face_vertices[faceIndex]);
-
+				if (vertexCount != 3) {
+					LOG(FATAL) << "Only exactly 3 vertices per face are allowed!";
+				}
+				std::array<VERTEX, 3> vertices;
+				bool hasNormals = false;
 				for (size_t vertexIndex = 0; vertexIndex < vertexCount; vertexIndex++) {
 
 					tinyobj::index_t idx = shapes[shapeIndex].mesh.indices[indexOffset + vertexIndex];
-					POS_UV pos_uv;
+					VERTEX vertex;
 
 					tinyobj::real_t vx = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
 					tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
 					tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
-
-					pos_uv.pos = { vx * scale, vy * scale, vz * scale };
+					vertex.pos = { vx * scale, vy * scale, vz *  - scale };// FLIPPED Z -> flip axis
 
 					if (idx.normal_index >= 0) {
 						tinyobj::real_t nx = attrib.normals[3 * size_t(idx.normal_index) + 0];
 						tinyobj::real_t ny = attrib.normals[3 * size_t(idx.normal_index) + 1];
 						tinyobj::real_t nz = attrib.normals[3 * size_t(idx.normal_index) + 2];
+						vertex.normal = { nx, ny, nz };
+						hasNormals = true;
 					}
 
 					if (idx.texcoord_index >= 0) {
 						tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
 						tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
-
-						pos_uv.uv = { tx, ty };
+						vertex.uv = { tx, ty };
 					}
 					else {
-						pos_uv.uv = { 0, 0 };
+						vertex.uv = { 0, 0 };
 					}
 
-					meshData.push_back(pos_uv);
+					vertices.at(2 - vertexIndex) = vertex;// FLIPPED Z -> flip faces
 				}
+				if (!hasNormals) {
+					// calculate face normals
+					XMVECTOR v1 = XMVectorSet(vertices[0].pos.x, vertices[0].pos.y, vertices[0].pos.z, 0);
+					XMVECTOR v2 = XMVectorSet(vertices[1].pos.x, vertices[1].pos.y, vertices[1].pos.z, 0);
+					XMVECTOR v3 = XMVectorSet(vertices[2].pos.x, vertices[2].pos.y, vertices[2].pos.z, 0);
+					XMVECTOR normal = XMVector3Normalize(XMVector3Cross(v2 - v1, v3 - v1));
+					VEC3 normalVec3 = { XMVectorGetX(normal), XMVectorGetY(normal), XMVectorGetZ(normal) };
+					for (size_t vertexIndex = 0; vertexIndex < vertexCount; vertexIndex++) {
+						vertices.at(vertexIndex).normal = normalVec3;
+					}
+				}
+				meshData.insert(meshData.end(), vertices.begin(), vertices.end());
 				indexOffset += vertexCount;
 			}
 		}
@@ -105,7 +126,7 @@ namespace renderer::world {
 
 			bufferDesc.Usage = D3D11_USAGE_DEFAULT;
 			bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-			bufferDesc.ByteWidth = sizeof(POS_UV) * meshData.size();
+			bufferDesc.ByteWidth = sizeof(VERTEX) * meshData.size();
 
 			D3D11_SUBRESOURCE_DATA initialData;
 			initialData.pSysMem = meshData.data();
@@ -115,7 +136,16 @@ namespace renderer::world {
 
 	void updateObjects()
 	{
+		rot += .015f;
+		if (rot > 6.28f) rot = 0.0f;
+
+		float halfPi = 1.57f;
 		world.transform = XMMatrixIdentity();
+		XMVECTOR rotAxis = XMVectorSet(1.0f, 0, 0, 0);
+		XMMATRIX rotation = XMMatrixRotationAxis(rotAxis, rot);
+		XMMATRIX scale = XMMatrixScaling(1, 1, -1);
+		//world.transform = scale;
+		//world.transform = world.transform * rotation;
 	}
 
 	void initLinearSampler(D3d d3d, RenderSettings settings)
@@ -178,7 +208,7 @@ namespace renderer::world {
 		d3d.deviceContext->PSSetShaderResources(0, 1, &resourceView);
 		d3d.deviceContext->PSSetSamplers(0, 1, &linearSamplerState);
 
-		UINT stride = sizeof(POS_UV);
+		UINT stride = sizeof(VERTEX);
 		UINT offset = 0;
 		d3d.deviceContext->IASetVertexBuffers(0, 1, &(world.mesh.vertexBuffer), &stride, &offset);
 

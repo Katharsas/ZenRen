@@ -19,10 +19,10 @@ namespace renderer
 		uint32_t height;
 	};
 
-	struct POS {
+	struct VEC3 {
 		FLOAT x, y, z;
 
-		friend std::ostream& operator <<(std::ostream& os, const POS& that)
+		friend std::ostream& operator <<(std::ostream& os, const VEC3& that)
 		{
 			return os << "[X=" << that.x << " Y=" << that.y << " Z=" << that.z << "]";
 		}
@@ -37,16 +37,26 @@ namespace renderer
 	};
 
 	struct POS_COLOR {
-		POS position;
+		VEC3 position;
 		D3DXCOLOR color;
 	};
 	struct POS_UV {
-		POS pos;
+		VEC3 pos;
 		UV uv;
 
 		friend std::ostream& operator <<(std::ostream& os, const POS_UV& that)
 		{
 			return os << "[POS: " << that.pos << " UV:" << that.uv << "]";
+		}
+	};
+	struct POS_NORMAL_UV {
+		VEC3 pos;
+		VEC3 normal;
+		UV uv;
+
+		friend std::ostream& operator <<(std::ostream& os, const POS_NORMAL_UV& that)
+		{
+			return os << "[POS:" << that.pos << " NOR:" << that.normal << " UV:" << that.uv << "]";
 		}
 	};
 
