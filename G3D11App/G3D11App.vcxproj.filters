@@ -119,6 +119,7 @@
     <ClInclude Include="src\imgui\imgui_custom.h" />
     <ClInclude Include="src\renderer\dx11.h" />
     <ClInclude Include="src\renderer\Texture.h" />
+    <ClInclude Include="lib\tinyobj\tiny_obj_loader.h" />
     <ClInclude Include="src\renderer\RenderSettings.h" />
   </ItemGroup>
 </Project>

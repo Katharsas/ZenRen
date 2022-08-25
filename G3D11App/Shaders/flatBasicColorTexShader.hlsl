@@ -5,6 +5,7 @@
 cbuffer cbPerObject
 {
     float4x4 WVP;
+    float baseColorFactor;
 };
 
 struct VS_IN
@@ -43,5 +44,6 @@ struct PS_IN
 float4 PS_Main(PS_IN input) : SV_TARGET
 {
     float4 textureColor = baseColor.Sample(SampleType, input.uvBaseColor);
-    return textureColor;
+    float4 color = lerp(float4(1.0f, 1.0f, 1.0f, 0.0f), textureColor, baseColorFactor);
+    return color;
 }

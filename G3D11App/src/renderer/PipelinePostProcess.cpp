@@ -82,12 +82,12 @@ namespace renderer::postprocess
 		const float zNear = reverseZ ? 1.0f : 0.0f;
 
 		std::array<POS_UV, 6> fullscreenQuadData = { {
-			{ POS(-1.0f, 1.0f, zNear), UV(0.0f, 0.0f) },
-			{ POS(1.0f, 1.0, zNear), UV(1.0f, 0.0f) },
-			{ POS(1.0, -1.0, zNear), UV(1.0f, 1.0f) },
-			{ POS(-1.0f, 1.0f, zNear), UV(0.0f, 0.0f) },
-			{ POS(1.0, -1.0, zNear), UV(1.0f, 1.0f) },
-			{ POS(-1.0, -1.0, zNear), UV(0.0f, 1.0f) },
+			{ { -1.0f, 1.0f, zNear }, { 0.0f, 0.0f } },
+			{ { 1.0f, 1.0, zNear }, { 1.0f, 0.0f } },
+			{ { 1.0, -1.0, zNear }, { 1.0f, 1.0f } },
+			{ { -1.0f, 1.0f, zNear }, { 0.0f, 0.0f } },
+			{ { 1.0, -1.0, zNear }, { 1.0f, 1.0f } },
+			{ { -1.0, -1.0, zNear }, { 0.0f, 1.0f } },
 		} };
 
 		// create vertex buffer containing fullscreen quad

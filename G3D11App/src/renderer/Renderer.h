@@ -20,12 +20,20 @@ namespace renderer
 	};
 
 	struct POS {
-		POS(FLOAT x, FLOAT y, FLOAT z) { X = x; Y = y; Z = z; }
-		FLOAT X, Y, Z;
+		FLOAT x, y, z;
+
+		friend std::ostream& operator <<(std::ostream& os, const POS& that)
+		{
+			return os << "[X=" << that.x << " Y=" << that.y << " Z=" << that.z << "]";
+		}
 	};
 	struct UV {
-		UV(FLOAT u, FLOAT v) { U = u; V = v; }
-		FLOAT U, V;
+		FLOAT u, v;
+
+		friend std::ostream& operator <<(std::ostream& os, const UV& that)
+		{
+			return os << "[U=" << that.u << " V=" << that.v << "]";
+		}
 	};
 
 	struct POS_COLOR {
@@ -33,8 +41,13 @@ namespace renderer
 		D3DXCOLOR color;
 	};
 	struct POS_UV {
-		POS position;
-		UV color;
+		POS pos;
+		UV uv;
+
+		friend std::ostream& operator <<(std::ostream& os, const POS_UV& that)
+		{
+			return os << "[POS: " << that.pos << " UV:" << that.uv << "]";
+		}
 	};
 
 	struct Mesh

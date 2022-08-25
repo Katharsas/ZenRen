@@ -241,6 +241,7 @@
     <ClCompile Include="src\renderer\Texture.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="lib\tinyobj\tiny_obj_loader.h" />
     <ClInclude Include="src\imgui\imgui_custom.h" />
     <ClInclude Include="src\renderer\dx11.h" />
     <ClInclude Include="src\renderer\PipelineWorld.h" />

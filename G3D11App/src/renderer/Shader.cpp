@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "Shader.h"
 
+#include <d3dcompiler.h>
+
 #include "../Util.h"
 
 namespace renderer {
@@ -12,8 +14,9 @@ namespace renderer {
 		// compile both shaders
 		std::wstring sourceFileW = util::utf8ToWide(sourceFile);
 		ID3D10Blob* VS, *PS, *errVS, *errPS;
-		D3DX11CompileFromFileW(sourceFileW.c_str(), 0, 0, "VS_Main", "vs_4_0", 0, 0, 0, &VS, &errVS, 0);
-		D3DX11CompileFromFileW(sourceFileW.c_str(), 0, 0, "PS_Main", "ps_4_0", 0, 0, 0, &PS, &errPS, 0);
+		UINT flags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+		D3DX11CompileFromFileW(sourceFileW.c_str(), 0, 0, "VS_Main", "vs_4_0", flags, 0, 0, &VS, &errVS, 0);
+		D3DX11CompileFromFileW(sourceFileW.c_str(), 0, 0, "PS_Main", "ps_4_0", flags, 0, 0, &PS, &errPS, 0);
 
 		if (errVS != nullptr) {
 			LOG(WARNING) << std::string((char*)errVS->GetBufferPointer());
