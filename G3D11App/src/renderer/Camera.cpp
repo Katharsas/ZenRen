@@ -22,12 +22,18 @@ namespace renderer::camera {
 	CameraMatrices matrices;
 	CameraLocation location;
 
-	/* Calculates combined World-View-Projection-Matrix for use as constant buffer value
-	 */
-	XMMATRIX calculateWorldViewProjection(const XMMATRIX & objectsWorldMatrix)
+	ObjectMatrices getWorldViewMatrix(const XMMATRIX & objectsWorldMatrix)
 	{
-		const XMMATRIX wvp = objectsWorldMatrix * matrices.view * matrices.projection;
-		return XMMatrixTranspose(wvp);
+		const XMMATRIX worldViewTransposed = objectsWorldMatrix * matrices.view;
+		XMVECTOR __;
+		ObjectMatrices result;
+		result.worldView = XMMatrixTranspose(worldViewTransposed);
+		result.worldViewNormal = XMMatrixInverse(&__, worldViewTransposed);
+		return result;
+	}
+	XMMATRIX getProjectionMatrix()
+	{
+		return XMMatrixTranspose(matrices.projection);
 	}
 
 	void init() {

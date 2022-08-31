@@ -27,7 +27,7 @@ namespace renderer {
 				{ "POSITION", DXGI_FORMAT_R32G32B32_FLOAT },
 				{ "COLOR", DXGI_FORMAT_R32G32B32A32_FLOAT },
 			};
-			shaders[shaderName] = new Shader(filePath(shaderName), layoutDesc, 2, d3d);
+			shaders[shaderName] = new Shader(filePath(shaderName), layoutDesc, std::size(layoutDesc), d3d);
 		} {
 			std::string shaderName(u8"toneMapping");
 			Shader::VertexInputLayoutDesc layoutDesc[] =
@@ -35,15 +35,18 @@ namespace renderer {
 				{ "POSITION", DXGI_FORMAT_R32G32B32_FLOAT },
 				{ "TEXCOORD", DXGI_FORMAT_R32G32_FLOAT },
 			};
-			shaders[shaderName] = new Shader(filePath(shaderName), layoutDesc, 2, d3d);
+			shaders[shaderName] = new Shader(filePath(shaderName), layoutDesc, std::size(layoutDesc), d3d);
 		} {
 			std::string shaderName(u8"flatBasicColorTexShader");
 			Shader::VertexInputLayoutDesc layoutDesc[] =
 			{
 				{ "POSITION", DXGI_FORMAT_R32G32B32_FLOAT },
+				{ "NORMAL", DXGI_FORMAT_R32G32B32_FLOAT },
 				{ "TEXCOORD", DXGI_FORMAT_R32G32_FLOAT },
+				{ "LIGHT_INTENSITY", DXGI_FORMAT_R32_FLOAT },
+				{ "COLOR", DXGI_FORMAT_R32G32B32A32_FLOAT },
 			};
-			shaders[shaderName] = new Shader(filePath(shaderName), layoutDesc, 2, d3d);
+			shaders[shaderName] = new Shader(filePath(shaderName), layoutDesc, std::size(layoutDesc), d3d);
 		}
 	}
 

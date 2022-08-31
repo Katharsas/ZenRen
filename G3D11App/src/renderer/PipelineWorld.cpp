@@ -11,13 +11,26 @@ namespace renderer::world {
 
 	typedef POS_NORMAL_UV VERTEX;
 
-	const bool RENDER_FLAT = true;
-	const bool RENDER_NO_SHADING = false;
+	// Note: smallest type for constant buffer values is 32 bit; cannot use bool or uint_16 without packing
 
-	struct CbPerObject
-	{
-		XMMATRIX worldViewProjection;
-		FLOAT textureColorFactor;
+	enum ShaderOutputDirect : uint32_t {
+		Solid = 0,
+		Diffuse = 1,
+		Normal = 2,
+	};
+
+	__declspec(align(16))
+	struct CbGlobalSettings {
+		float ambientLight;
+		int32_t outputDirectEnabled;
+		ShaderOutputDirect outputDirectType;
+	};
+
+	__declspec(align(16))
+	struct CbPerObject {
+		XMMATRIX worldViewMatrix;
+		XMMATRIX worldViewMatrixInverseTranposed;
+		XMMATRIX projectionMatrix;
 	};
 
 	struct World {
@@ -25,9 +38,12 @@ namespace renderer::world {
 		XMMATRIX transform;
 	};
 
+	ID3D11Buffer* cbGlobalSettingsBuffer;
 	ID3D11Buffer* cbPerObjectBuffer;
 
 	float rot = 0.1f;
+	float scale = 1.0f;
+	float scaleDir = 1.0f;
 	World world;
 
 	Texture* texture;
@@ -86,7 +102,7 @@ namespace renderer::world {
 						tinyobj::real_t nx = attrib.normals[3 * size_t(idx.normal_index) + 0];
 						tinyobj::real_t ny = attrib.normals[3 * size_t(idx.normal_index) + 1];
 						tinyobj::real_t nz = attrib.normals[3 * size_t(idx.normal_index) + 2];
-						vertex.normal = { nx, ny, nz };
+						vertex.normal = { nx, ny, - nz };// FLIPPED Z -> flip axis
 						hasNormals = true;
 					}
 
@@ -139,13 +155,27 @@ namespace renderer::world {
 		rot += .015f;
 		if (rot > 6.28f) rot = 0.0f;
 
+		scale += (scaleDir * 0.01);
+		if (scale > 3.0f) scaleDir = -1.0f;
+		if (scale < 0.6f) scaleDir = 1.0f;
+
 		float halfPi = 1.57f;
 		world.transform = XMMatrixIdentity();
 		XMVECTOR rotAxis = XMVectorSet(1.0f, 0, 0, 0);
 		XMMATRIX rotation = XMMatrixRotationAxis(rotAxis, rot);
-		XMMATRIX scale = XMMatrixScaling(1, 1, -1);
-		//world.transform = scale;
+		XMMATRIX scaleM = XMMatrixScaling(1, scale, 1);
+		world.transform = scaleM;
 		//world.transform = world.transform * rotation;
+	}
+
+	void updateShaderSettings(D3d d3d)
+	{
+		CbGlobalSettings cbGlobalSettings;
+		cbGlobalSettings.ambientLight = 0.02f;
+		cbGlobalSettings.outputDirectEnabled = false;
+		cbGlobalSettings.outputDirectType = ShaderOutputDirect::Solid;
+
+		d3d.deviceContext->UpdateSubresource(cbGlobalSettingsBuffer, 0, nullptr, &cbGlobalSettings, 0, 0);
 	}
 
 	void initLinearSampler(D3d d3d, RenderSettings settings)
@@ -184,16 +214,29 @@ namespace renderer::world {
 
 	void initConstantBufferPerObject(D3d d3d)
 	{
-		D3D11_BUFFER_DESC cbbd;
-		ZeroMemory(&cbbd, sizeof(D3D11_BUFFER_DESC));
+		{
+			// TODO rename or move or something
+			D3D11_BUFFER_DESC bufferDesc;
+			ZeroMemory(&bufferDesc, sizeof(D3D11_BUFFER_DESC));
 
-		cbbd.Usage = D3D11_USAGE_DEFAULT;// TODO this should probably be dynamic, see https://www.gamedev.net/forums/topic/673486-difference-between-d3d11-usage-default-and-d3d11-usage-dynamic/
-		cbbd.ByteWidth = sizeof(CbPerObject);
-		cbbd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-		cbbd.CPUAccessFlags = 0;
-		cbbd.MiscFlags = 0;
+			bufferDesc.Usage = D3D11_USAGE_DEFAULT;// TODO this should probably be dynamic, see https://www.gamedev.net/forums/topic/673486-difference-between-d3d11-usage-default-and-d3d11-usage-dynamic/
+			bufferDesc.ByteWidth = sizeof(CbGlobalSettings);
+			bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+			bufferDesc.CPUAccessFlags = 0;
+			bufferDesc.MiscFlags = 0;
 
-		d3d.device->CreateBuffer(&cbbd, nullptr, &cbPerObjectBuffer);
+			d3d.device->CreateBuffer(&bufferDesc, nullptr, &cbGlobalSettingsBuffer);
+		}
+		D3D11_BUFFER_DESC bufferDesc;
+		ZeroMemory(&bufferDesc, sizeof(D3D11_BUFFER_DESC));
+
+		bufferDesc.Usage = D3D11_USAGE_DEFAULT;// TODO this should probably be dynamic, see https://www.gamedev.net/forums/topic/673486-difference-between-d3d11-usage-default-and-d3d11-usage-dynamic/
+		bufferDesc.ByteWidth = sizeof(CbPerObject);
+		bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+		bufferDesc.CPUAccessFlags = 0;
+		bufferDesc.MiscFlags = 0;
+
+		d3d.device->CreateBuffer(&bufferDesc, nullptr, &cbPerObjectBuffer);
 	}
 
 	void draw(D3d d3d, ShaderManager* shaders)
@@ -212,10 +255,22 @@ namespace renderer::world {
 		UINT offset = 0;
 		d3d.deviceContext->IASetVertexBuffers(0, 1, &(world.mesh.vertexBuffer), &stride, &offset);
 
-		CbPerObject cbPerObject = { camera::calculateWorldViewProjection(world.transform), RENDER_FLAT ? 0 : 1.0f };
+		// constant buffer (settings)
+		updateShaderSettings(d3d);
+		d3d.deviceContext->VSSetConstantBuffers(0, 1, &cbGlobalSettingsBuffer);
+		d3d.deviceContext->PSSetConstantBuffers(0, 1, &cbGlobalSettingsBuffer);
+
+		// constant buffer (object)
+		const auto objectMatrices = camera::getWorldViewMatrix(world.transform);
+		CbPerObject cbPerObject = {
+			objectMatrices.worldView,
+			objectMatrices.worldViewNormal,
+			camera::getProjectionMatrix(),
+			//RENDER_FLAT ? 0 : 1.0f
+		};
 		d3d.deviceContext->UpdateSubresource(cbPerObjectBuffer, 0, nullptr, &cbPerObject, 0, 0);
-		d3d.deviceContext->VSSetConstantBuffers(0, 1, &cbPerObjectBuffer);
-		d3d.deviceContext->PSSetConstantBuffers(0, 1, &cbPerObjectBuffer);
+		d3d.deviceContext->VSSetConstantBuffers(1, 1, &cbPerObjectBuffer);
+		d3d.deviceContext->PSSetConstantBuffers(1, 1, &cbPerObjectBuffer);
 
 		d3d.deviceContext->Draw(world.mesh.vertexCount, 0);
 	}
@@ -223,6 +278,7 @@ namespace renderer::world {
 	void clean()
 	{
 		cbPerObjectBuffer->Release();
+		cbGlobalSettingsBuffer->Release();
 		linearSamplerState->Release();
 		delete texture;
 
