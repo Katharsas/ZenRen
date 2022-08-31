@@ -9,7 +9,6 @@ namespace renderer::postprocess
 	void initBackBuffer(D3d d3d, IDXGISwapChain1* swapchain);
 	void initLinearSampler(D3d d3d);
 	void initVertexBuffers(D3d d3d, bool reverseZ);
-	void reInitVertexBuffers(D3d d3d, bool reverseZ);
 	void clean(bool onlyBackBuffer = false);
 }
 

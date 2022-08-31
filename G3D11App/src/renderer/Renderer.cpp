@@ -38,7 +38,7 @@ namespace renderer
 
 	ShaderManager* shaders;
 
-	ID3D11DepthStencilView* depthStencilView;
+	ID3D11DepthStencilView* depthStencilView = nullptr;
 
 	ID3D11RasterizerState* wireFrame;
 
@@ -92,6 +92,8 @@ namespace renderer
 		initRasterizerStates();
 
 		gui::settings::init(settings);
+
+		world::updateShaderSettings(d3d, settings);
 	}
 
 	void initViewport(BufferSize& size) {
@@ -115,7 +117,6 @@ namespace renderer
 		if (swapchain) {
 			d3d.deviceContext->OMSetRenderTargets(0, 0, 0);
 
-			depthStencilView->Release();
 			linearBackBuffer->Release();
 			linearBackBufferResource->Release();
 			postprocess::clean(true);
@@ -168,14 +169,16 @@ namespace renderer
 		auto deviceContext = d3d.deviceContext;
 		
 		if (settings.reverseZ != settingsPrevious.reverseZ) {
-			postprocess::reInitVertexBuffers(d3d, settings.reverseZ);
+			postprocess::initVertexBuffers(d3d, settings.reverseZ);
 		}
 		if (settings.reverseZ != settingsPrevious.reverseZ) {
-			// TODO this leaks d3d objects because reinitialization does not release previous objects!
 			initDepthAndStencilBuffer(clientSize);
 		}
 		if (settings.anisotropicFilter != settingsPrevious.anisotropicFilter || settings.anisotropicLevel != settingsPrevious.anisotropicFilter) {
 			world::initLinearSampler(d3d, settings);
+		}
+		if (settings.shader.ambientLight != settingsPrevious.shader.ambientLight || settings.shader.mode != settingsPrevious.shader.mode) {
+			world::updateShaderSettings(d3d, settings);
 		}
 
 		camera::updateCamera(settings.reverseZ, clientSize);
@@ -288,6 +291,10 @@ namespace renderer
 
 	void initDepthAndStencilBuffer(BufferSize& size)
 	{
+		if (depthStencilView != nullptr) {
+			depthStencilView->Release();
+		}
+
 		// create depth buffer
 		D3D11_TEXTURE2D_DESC depthStencilDesc;
 		ZeroMemory(&depthStencilDesc, sizeof(D3D11_TEXTURE2D_DESC));

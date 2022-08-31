@@ -79,6 +79,8 @@ namespace renderer::postprocess
 
 	void initVertexBuffers(D3d d3d, bool reverseZ)
 	{
+		toneMappingQuad.release();
+
 		const float zNear = reverseZ ? 1.0f : 0.0f;
 
 		std::array<POS_UV, 6> fullscreenQuadData = { {
@@ -104,12 +106,6 @@ namespace renderer::postprocess
 			d3d.device->CreateBuffer(&bufferDesc, &initialData, &(toneMappingQuad.vertexBuffer));
 			toneMappingQuad.vertexCount = fullscreenQuadData.size();
 		}
-	}
-
-	void reInitVertexBuffers(D3d d3d, bool reverseZ)
-	{
-		toneMappingQuad.release();
-		initVertexBuffers(d3d, reverseZ);
 	}
 
 	void clean(bool onlyBackBuffer)

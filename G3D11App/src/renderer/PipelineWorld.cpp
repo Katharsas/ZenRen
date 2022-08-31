@@ -168,12 +168,21 @@ namespace renderer::world {
 		//world.transform = world.transform * rotation;
 	}
 
-	void updateShaderSettings(D3d d3d)
+	void updateShaderSettings(D3d d3d, RenderSettings settings)
 	{
 		CbGlobalSettings cbGlobalSettings;
-		cbGlobalSettings.ambientLight = 0.02f;
-		cbGlobalSettings.outputDirectEnabled = false;
-		cbGlobalSettings.outputDirectType = ShaderOutputDirect::Solid;
+		cbGlobalSettings.ambientLight = settings.shader.ambientLight;
+		cbGlobalSettings.outputDirectEnabled = settings.shader.mode != ShaderMode::Default;
+		
+		if (settings.shader.mode == ShaderMode::Diffuse) {
+			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Diffuse;
+		}
+		else if (settings.shader.mode == ShaderMode::Normals) {
+			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Normal;
+		}
+		else {
+			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Solid;
+		}
 
 		d3d.deviceContext->UpdateSubresource(cbGlobalSettingsBuffer, 0, nullptr, &cbGlobalSettings, 0, 0);
 	}
@@ -256,7 +265,6 @@ namespace renderer::world {
 		d3d.deviceContext->IASetVertexBuffers(0, 1, &(world.mesh.vertexBuffer), &stride, &offset);
 
 		// constant buffer (settings)
-		updateShaderSettings(d3d);
 		d3d.deviceContext->VSSetConstantBuffers(0, 1, &cbGlobalSettingsBuffer);
 		d3d.deviceContext->PSSetConstantBuffers(0, 1, &cbGlobalSettingsBuffer);
 

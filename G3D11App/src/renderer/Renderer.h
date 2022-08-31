@@ -6,12 +6,29 @@
 
 namespace renderer
 {
+	enum ShaderMode {
+		Default,
+		Solid,
+		Diffuse,
+		Normals,
+	};
+
+	struct ShaderSettings {
+		float ambientLight;
+		ShaderMode mode;
+	};
+
 	struct RenderSettings {
 		bool wireframe = false;
 		bool reverseZ = true;
 
 		bool anisotropicFilter = true;
 		uint32_t anisotropicLevel = 16;
+
+		ShaderSettings shader = {
+			0.02f,
+			ShaderMode::Default,
+		};
 	};
 
 	struct BufferSize {
@@ -62,25 +79,31 @@ namespace renderer
 
 	struct Mesh
 	{
-		ID3D11Buffer* vertexBuffer;
+		ID3D11Buffer* vertexBuffer = nullptr;
 		int32_t vertexCount;
 
 		void release()
 		{
-			vertexBuffer->Release();
+			if (vertexBuffer != nullptr) {
+				vertexBuffer->Release();
+			}
 		}
 	};
 
 	struct MeshIndexed
 	{
-		ID3D11Buffer* vertexBuffer;
-		ID3D11Buffer* indexBuffer;
+		ID3D11Buffer* vertexBuffer = nullptr;
+		ID3D11Buffer* indexBuffer = nullptr;
 		int32_t indexCount;
 
 		void release()
 		{
-			vertexBuffer->Release();
-			indexBuffer->Release();
+			if (vertexBuffer != nullptr) {
+				vertexBuffer->Release();
+			}
+			if (indexBuffer != nullptr) {
+				indexBuffer->Release();
+			}
 		}
 	};
 

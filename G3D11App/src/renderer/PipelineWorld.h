@@ -6,6 +6,7 @@
 
 namespace renderer::world {
 	void updateObjects();
+	void updateShaderSettings(D3d d3d, RenderSettings settings);
 	void initLinearSampler(D3d d3d, RenderSettings settings);
 	void initVertexIndexBuffers(D3d d3d, bool reverseZ);
 	void initConstantBufferPerObject(D3d d3d);
