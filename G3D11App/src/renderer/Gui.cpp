@@ -8,6 +8,8 @@
 #include "imgui/imgui_impl_win32.h"
 #include "imgui/imgui_impl_dx11.h"
 
+#include "../Util.h"
+
 namespace renderer {
 
 	std::map<std::string, std::list<GuiComponent>> windowsToGuis;
@@ -15,28 +17,14 @@ namespace renderer {
 
 	void addWindow(const std::string& windowName, GuiComponent guiComponent)
 	{
-		auto entryIt = windowsToGuis.find(windowName);
-		if (entryIt == windowsToGuis.end()) {
-			std::list<GuiComponent> guiComponents;
-			guiComponents.push_back(guiComponent);
-			windowsToGuis.insert(std::make_pair(windowName, guiComponents));
-		}
-		else {
-			entryIt->second.push_back(guiComponent);
-		}
+		auto components = util::getOrCreate(windowsToGuis, windowName);
+		components.push_back(guiComponent);
 	}
 
 	void addSettings(const std::string& groupName, GuiComponent guiComponent)
 	{
-		auto entryIt = settingsGroupToGuis.find(groupName);
-		if (entryIt == settingsGroupToGuis.end()) {
-			std::list<GuiComponent> guiComponents;
-			guiComponents.push_back(guiComponent);
-			settingsGroupToGuis.insert(std::make_pair(groupName, guiComponents));
-		}
-		else {
-			entryIt->second.push_back(guiComponent);
-		}
+		auto& components = util::getOrCreate(settingsGroupToGuis, groupName);
+		components.push_back(guiComponent);
 	}
 
 	void initGui(HWND hWnd, D3d d3d)

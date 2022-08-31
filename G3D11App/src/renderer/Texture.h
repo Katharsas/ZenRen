@@ -11,7 +11,7 @@ namespace renderer {
 		~Texture();
 		ID3D11ShaderResourceView* GetResourceView();
 	private:
-		ID3D11ShaderResourceView* resourceView;
+		ID3D11ShaderResourceView* resourceView = nullptr;
 	};
 }
 

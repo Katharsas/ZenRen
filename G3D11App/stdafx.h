@@ -24,9 +24,7 @@
 #include <unordered_map>
 #include <array>
 
-#pragma warning(push)
-#pragma warning(disable : 4838)
-#include <xnamath.h>
-#pragma warning(pop)
+#include <DirectXMath.h>
+#include <DirectXPackedVector.h>
 
 #include "g3log/g3log.hpp"

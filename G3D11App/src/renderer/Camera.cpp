@@ -4,6 +4,8 @@
 #include "Settings.h"
 #include "Util.h"
 
+using namespace DirectX;
+
 namespace renderer::camera {
 
 	struct CameraMatrices

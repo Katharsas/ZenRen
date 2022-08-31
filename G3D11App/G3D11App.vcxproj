@@ -175,6 +175,7 @@
     <Image Include="small.ico" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="packages.config" />
     <None Include="Shaders\testTriangle.hlsl">
       <FileType>Document</FileType>
     </None>
@@ -239,6 +240,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\renderer\Texture.cpp" />
+    <ClCompile Include="src\renderer\TextureLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="lib\tinyobj\tiny_obj_loader.h" />
@@ -271,6 +273,7 @@
     <ClInclude Include="targetver.h" />
     <ClInclude Include="src\game\TimerPrecision.h" />
     <ClInclude Include="src\renderer\Texture.h" />
+    <ClInclude Include="src\renderer\TextureLoader.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\g3log\build\g3log.vcxproj">
@@ -288,5 +291,12 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="..\packages\directxtex_desktop_2019.2022.7.30.1\build\native\directxtex_desktop_2019.targets" Condition="Exists('..\packages\directxtex_desktop_2019.2022.7.30.1\build\native\directxtex_desktop_2019.targets')" />
   </ImportGroup>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\directxtex_desktop_2019.2022.7.30.1\build\native\directxtex_desktop_2019.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\directxtex_desktop_2019.2022.7.30.1\build\native\directxtex_desktop_2019.targets'))" />
+  </Target>
 </Project>

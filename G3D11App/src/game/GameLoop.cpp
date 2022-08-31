@@ -26,7 +26,7 @@ namespace game
 	Settings settings;
 
 	// input actions
-	const float cameraMoveSpeed = 0.3f;
+	const float cameraMoveSpeed = 1.0f;
 	const float cameraTurnSpeed = 0.05f;
 
 	std::string ACTION_GUI_SEPARATOR = "---";

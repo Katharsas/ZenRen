@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include "dx11.h"
+#include "Texture.h"
 
 namespace renderer
 {
@@ -82,10 +83,18 @@ namespace renderer
 		ID3D11Buffer* vertexBuffer = nullptr;
 		int32_t vertexCount;
 
+		// Ideally, we could not create one mesh per texture, but instead have a single mesh for whole world.
+		// This would require us to map every texture used for the mesh to an offset into the vertex buffer.
+		// Then we could make one draw per offset and switch texture in between.
+		Texture* baseColor = nullptr;
+
 		void release()
 		{
 			if (vertexBuffer != nullptr) {
 				vertexBuffer->Release();
+			}
+			if (baseColor != nullptr) {
+				delete baseColor;
 			}
 		}
 	};

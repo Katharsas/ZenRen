@@ -40,6 +40,7 @@
     <None Include="Shaders\flatBasicColorTexShader.hlsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Util.cpp">
@@ -77,6 +78,7 @@
     <ClCompile Include="src\imgui\imgui_custom.cpp" />
     <ClCompile Include="src\renderer\Texture.cpp" />
     <ClCompile Include="src\renderer\RenderSettings.cpp" />
+    <ClCompile Include="src\renderer\TextureLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Util.h">
@@ -121,5 +123,6 @@
     <ClInclude Include="src\renderer\Texture.h" />
     <ClInclude Include="lib\tinyobj\tiny_obj_loader.h" />
     <ClInclude Include="src\renderer\RenderSettings.h" />
+    <ClInclude Include="src\renderer\TextureLoader.h" />
   </ItemGroup>
 </Project>

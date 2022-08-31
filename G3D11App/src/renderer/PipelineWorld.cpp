@@ -1,11 +1,17 @@
 #include "stdafx.h"
 #include "PipelineWorld.h"
 
+#include <filesystem>
+
 #include "Camera.h"
 #include "Texture.h"
+#include "../Util.h"
+#include "TextureLoader.h";
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tinyobj/tiny_obj_loader.h"
+
+using namespace DirectX;
 
 namespace renderer::world {
 
@@ -34,7 +40,7 @@ namespace renderer::world {
 	};
 
 	struct World {
-		Mesh mesh;
+		std::vector<Mesh> meshes;
 		XMMATRIX transform;
 	};
 
@@ -44,13 +50,14 @@ namespace renderer::world {
 	float rot = 0.1f;
 	float scale = 1.0f;
 	float scaleDir = 1.0f;
+
 	World world;
 
 	Texture* texture;
 	ID3D11SamplerState* linearSamplerState = nullptr;
 
 	void loadTestObj(D3d d3d) {
-		std::string inputfile = "monkey.obj";
+		std::string inputfile = "world.obj";
 		//std::string inputfile = "cube.obj";
 		tinyobj::ObjReaderConfig reader_config;
 		reader_config.triangulate = true;
@@ -72,11 +79,28 @@ namespace renderer::world {
 
 		auto& attrib = reader.GetAttrib();
 		auto& shapes = reader.GetShapes();
+		auto& materials = reader.GetMaterials();
+		
+		int textureCount = 0;
+		for (size_t matIndex = 0; matIndex < materials.size(); matIndex++) {
+			auto& texname = materials[matIndex].diffuse_texname;
+			if (!texname.empty()) {
+				textureCount++;
+			}
+			auto& path = std::filesystem::path(texname);
+			auto& filename = path.filename().u8string();
+			//LOG(DEBUG) << "  Texture: " << filename;
+		}
+
+		LOG(INFO) << "Number of materials: " << materials.size();
+		LOG(INFO) << "Number of textures: " << textureCount;
+		LOG(INFO) << "Number of shapes: " << shapes.size();
 		
 		const float scale = 1.0f;
 
-		std::vector<VERTEX> meshData;
-		meshData.reserve(attrib.vertices.size());
+		std::unordered_map<std::string, std::vector<VERTEX>> matsToVertices;
+		int32_t faceCount = 0;
+		int32_t faceSkippedCount = 0;
 
 		for (size_t shapeIndex = 0; shapeIndex < shapes.size(); shapeIndex++) {
 			
@@ -128,26 +152,75 @@ namespace renderer::world {
 						vertices.at(vertexIndex).normal = normalVec3;
 					}
 				}
-				meshData.insert(meshData.end(), vertices.begin(), vertices.end());
+
+				// per-face material
+				const uint32_t materialIndex = shapes[shapeIndex].mesh.material_ids[faceIndex];
+
+				auto& texname = materials[materialIndex].diffuse_texname;
+				if (!texname.empty()) {
+					auto& texFilepath = std::filesystem::path(texname);
+					auto& texFilename = texFilepath.filename().u8string();
+					util::asciiToLowercase(texFilename);
+
+					auto& matVertices = util::getOrCreate(matsToVertices, texFilename);
+					matVertices.insert(matVertices.end(), vertices.begin(), vertices.end());
+
+					faceCount++;
+				}
+				else {
+					faceSkippedCount++;
+				}
 				indexOffset += vertexCount;
 			}
 		}
 
-		LOG(DEBUG) << "World vertex count: " << meshData.size();
+		LOG(DEBUG) << "World triangle count: " << faceCount;
+		LOG(DEBUG) << "World triangle skipped count (no texture assigned): " << faceSkippedCount;
 
-		{
-			world.mesh.vertexCount = meshData.size();
-			D3D11_BUFFER_DESC bufferDesc;
-			ZeroMemory(&bufferDesc, sizeof(bufferDesc));
+		std::filesystem::path userDir = util::getUserFolderPath();
+		std::filesystem::path texDir = userDir / "CLOUD/Eigene Projekte/Gothic Reloaded Mod/Textures";
+		//std::filesystem::path texDir = "Level";
+		loader::scanDirForTextures(texDir);
 
-			bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-			bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-			bufferDesc.ByteWidth = sizeof(VERTEX) * meshData.size();
+		int32_t meshCount = 0;
+		int32_t maxMeshCount = 50;
 
-			D3D11_SUBRESOURCE_DATA initialData;
-			initialData.pSysMem = meshData.data();
-			d3d.device->CreateBuffer(&bufferDesc, &initialData, &(world.mesh.vertexBuffer));
+		for (const auto& it : matsToVertices) {
+			if (meshCount >= maxMeshCount) {
+				break;
+			}
+			auto& filename = it.first;
+			auto& vertices = it.second;
+			if (!vertices.empty()) {
+				auto& actualPath = loader::getTexturePathOrDefault(filename);
+				LOG(DEBUG) << "  Texture: " << filename;
+
+				Mesh mesh;
+				{
+					// vertex data
+					mesh.vertexCount = vertices.size();
+					D3D11_BUFFER_DESC bufferDesc;
+					ZeroMemory(&bufferDesc, sizeof(bufferDesc));
+
+					bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+					bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+					bufferDesc.ByteWidth = sizeof(VERTEX) * vertices.size();
+
+					D3D11_SUBRESOURCE_DATA initialData;
+					initialData.pSysMem = vertices.data();
+					d3d.device->CreateBuffer(&bufferDesc, &initialData, &(mesh.vertexBuffer));
+				}
+
+				Texture* texture = new Texture(d3d, actualPath.u8string());
+
+				mesh.baseColor = texture;
+				world.meshes.push_back(mesh);
+
+				meshCount++;
+			}
 		}
+
+		LOG(DEBUG) << "World material/texture count: " << meshCount;
 	}
 
 	void updateObjects()
@@ -155,7 +228,7 @@ namespace renderer::world {
 		rot += .015f;
 		if (rot > 6.28f) rot = 0.0f;
 
-		scale += (scaleDir * 0.01);
+		//scale += (scaleDir * 0.01);
 		if (scale > 3.0f) scaleDir = -1.0f;
 		if (scale < 0.6f) scaleDir = 1.0f;
 
@@ -256,17 +329,7 @@ namespace renderer::world {
 		d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
 		d3d.deviceContext->PSSetShader(shader->getPixelShader(), 0, 0);
 
-		auto* resourceView = texture->GetResourceView();
-		d3d.deviceContext->PSSetShaderResources(0, 1, &resourceView);
 		d3d.deviceContext->PSSetSamplers(0, 1, &linearSamplerState);
-
-		UINT stride = sizeof(VERTEX);
-		UINT offset = 0;
-		d3d.deviceContext->IASetVertexBuffers(0, 1, &(world.mesh.vertexBuffer), &stride, &offset);
-
-		// constant buffer (settings)
-		d3d.deviceContext->VSSetConstantBuffers(0, 1, &cbGlobalSettingsBuffer);
-		d3d.deviceContext->PSSetConstantBuffers(0, 1, &cbGlobalSettingsBuffer);
 
 		// constant buffer (object)
 		const auto objectMatrices = camera::getWorldViewMatrix(world.transform);
@@ -274,13 +337,26 @@ namespace renderer::world {
 			objectMatrices.worldView,
 			objectMatrices.worldViewNormal,
 			camera::getProjectionMatrix(),
-			//RENDER_FLAT ? 0 : 1.0f
 		};
 		d3d.deviceContext->UpdateSubresource(cbPerObjectBuffer, 0, nullptr, &cbPerObject, 0, 0);
 		d3d.deviceContext->VSSetConstantBuffers(1, 1, &cbPerObjectBuffer);
 		d3d.deviceContext->PSSetConstantBuffers(1, 1, &cbPerObjectBuffer);
 
-		d3d.deviceContext->Draw(world.mesh.vertexCount, 0);
+		// constant buffer (settings)
+		d3d.deviceContext->VSSetConstantBuffers(0, 1, &cbGlobalSettingsBuffer);
+		d3d.deviceContext->PSSetConstantBuffers(0, 1, &cbGlobalSettingsBuffer);
+
+		// vertex buffer(s)
+		UINT stride = sizeof(VERTEX);
+		UINT offset = 0;
+
+		for (auto& mesh : world.meshes) {
+			auto* resourceView = mesh.baseColor->GetResourceView();
+			d3d.deviceContext->PSSetShaderResources(0, 1, &resourceView);
+			d3d.deviceContext->IASetVertexBuffers(0, 1, &(mesh.vertexBuffer), &stride, &offset);
+
+			d3d.deviceContext->Draw(mesh.vertexCount, 0);
+		}
 	}
 
 	void clean()
@@ -290,6 +366,8 @@ namespace renderer::world {
 		linearSamplerState->Release();
 		delete texture;
 
-		world.mesh.release();
+		for (auto& mesh : world.meshes) {
+			mesh.release();
+		}
 	}
 }

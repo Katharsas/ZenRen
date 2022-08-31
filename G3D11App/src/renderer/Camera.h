@@ -5,12 +5,12 @@
 namespace renderer::camera {
 
 	struct ObjectMatrices {
-		XMMATRIX worldView;// for transforming vertices into camera space
-		XMMATRIX worldViewNormal;// the inverse + transpose of woldView used for transforming normals into camera space
+		DirectX::XMMATRIX worldView;// for transforming vertices into camera space
+		DirectX::XMMATRIX worldViewNormal;// the inverse + transpose of woldView used for transforming normals into camera space
 	};
 
-	ObjectMatrices getWorldViewMatrix(const XMMATRIX& objectsWorldMatrix);
-	XMMATRIX getProjectionMatrix();
+	ObjectMatrices getWorldViewMatrix(const DirectX::XMMATRIX& objectsWorldMatrix);
+	DirectX::XMMATRIX getProjectionMatrix();
 	void init();
 	void updateCamera(bool reverseZ, BufferSize& viewportSize);
 	void moveCameraDepth(float amount);
