@@ -240,7 +240,8 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\renderer\Texture.cpp" />
-    <ClCompile Include="src\renderer\TextureLoader.cpp" />
+    <ClCompile Include="src\renderer\loader\TextureLoader.cpp" />
+    <ClCompile Include="src\renderer\loader\ZenLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="lib\tinyobj\tiny_obj_loader.h" />
@@ -273,11 +274,18 @@
     <ClInclude Include="targetver.h" />
     <ClInclude Include="src\game\TimerPrecision.h" />
     <ClInclude Include="src\renderer\Texture.h" />
-    <ClInclude Include="src\renderer\TextureLoader.h" />
+    <ClInclude Include="src\renderer\loader\TextureLoader.h" />
+    <ClInclude Include="src\renderer\loader\ZenLoader.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\g3log\build\g3log.vcxproj">
       <Project>{ac9ddd5f-3732-3cf7-b7ff-2c95fdc11a40}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\ZenLib\build\vdfs\vdfs.vcxproj">
+      <Project>{31060f59-c477-3331-a7bd-ab9df7e9b887}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\ZenLib\build\zenload\zenload.vcxproj">
+      <Project>{6ff11c1b-10a7-3967-a36d-6f2de6e6469f}</Project>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

@@ -6,7 +6,8 @@
 #include "Camera.h"
 #include "Texture.h"
 #include "../Util.h"
-#include "TextureLoader.h";
+#include "loader/TextureLoader.h";
+#include "loader/ZenLoader.h";
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tinyobj/tiny_obj_loader.h"
@@ -57,7 +58,7 @@ namespace renderer::world {
 	ID3D11SamplerState* linearSamplerState = nullptr;
 
 	void loadTestObj(D3d d3d) {
-		std::string inputfile = "world.obj";
+		std::string inputfile = "data_g1/world.obj";
 		//std::string inputfile = "cube.obj";
 		tinyobj::ObjReaderConfig reader_config;
 		reader_config.triangulate = true;
@@ -183,7 +184,7 @@ namespace renderer::world {
 		loader::scanDirForTextures(texDir);
 
 		int32_t meshCount = 0;
-		int32_t maxMeshCount = 50;
+		int32_t maxMeshCount = 5000;
 
 		for (const auto& it : matsToVertices) {
 			if (meshCount >= maxMeshCount) {
@@ -286,9 +287,10 @@ namespace renderer::world {
 
 	void initVertexIndexBuffers(D3d d3d, bool reverseZ)
 	{
-		loadTestObj(d3d);
+		//loadTestObj(d3d);
+		loader::loadZen();
 
-		texture = new Texture(d3d, "BARRIERE.png");
+		//texture = new Texture(d3d, "BARRIERE.png");
 
 		// select which primtive type we are using
 		d3d.deviceContext->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -364,7 +366,7 @@ namespace renderer::world {
 		cbPerObjectBuffer->Release();
 		cbGlobalSettingsBuffer->Release();
 		linearSamplerState->Release();
-		delete texture;
+		//delete texture;
 
 		for (auto& mesh : world.meshes) {
 			mesh.release();
