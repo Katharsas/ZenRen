@@ -33,7 +33,9 @@ namespace renderer::loader {
 
 	const std::filesystem::path& getTexturePathOrDefault(const std::string& filename)
 	{
-		auto& it = textureNamesToPaths.find(filename);
+		std::string filenameLower = filename;
+		util::asciiToLowercase(filenameLower);
+		auto& it = textureNamesToPaths.find(filenameLower);
 		if (it != textureNamesToPaths.end()) {
 			return it->second;
 		}

@@ -184,6 +184,8 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\renderer\RenderUtil.cpp" />
+    <ClCompile Include="src\renderer\loader\ObjLoader.cpp" />
     <ClCompile Include="src\imgui\imgui_custom.cpp" />
     <ClCompile Include="src\renderer\PipelineWorld.cpp" />
     <ClCompile Include="src\renderer\PipelinePostProcess.cpp" />
@@ -245,6 +247,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="lib\tinyobj\tiny_obj_loader.h" />
+    <ClInclude Include="src\renderer\RenderUtil.h" />
+    <ClInclude Include="src\renderer\loader\ObjLoader.h" />
     <ClInclude Include="src\imgui\imgui_custom.h" />
     <ClInclude Include="src\renderer\dx11.h" />
     <ClInclude Include="src\renderer\PipelineWorld.h" />

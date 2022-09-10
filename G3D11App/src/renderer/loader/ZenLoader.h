@@ -1,6 +1,8 @@
 #pragma once
 
+#include "../Renderer.h"
+
 namespace renderer::loader {
-    void loadZen();
+    std::unordered_map<std::string, std::vector<POS_NORMAL_UV>> loadZen();
 }
 

@@ -80,6 +80,8 @@
     <ClCompile Include="src\renderer\RenderSettings.cpp" />
     <ClCompile Include="src\renderer\loader\TextureLoader.cpp" />
     <ClCompile Include="src\renderer\loader\ZenLoader.cpp" />
+    <ClCompile Include="src\renderer\loader\ObjLoader.cpp" />
+    <ClCompile Include="src\renderer\RenderUtil.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Util.h">
@@ -126,5 +128,7 @@
     <ClInclude Include="src\renderer\RenderSettings.h" />
     <ClInclude Include="src\renderer\loader\TextureLoader.h" />
     <ClInclude Include="src\renderer\loader\ZenLoader.h" />
+    <ClInclude Include="src\renderer\loader\ObjLoader.h" />
+    <ClInclude Include="src\renderer\RenderUtil.h" />
   </ItemGroup>
 </Project>
