@@ -33,6 +33,19 @@ namespace renderer {
 		}
 	}
 
+	Texture::Texture(D3d d3d, std::vector<uint8_t>& ddsRaw)
+	{
+		DirectX::ScratchImage image;
+		DirectX::TexMetadata metadata;
+		HRESULT result = DirectX::LoadFromDDSMemory(ddsRaw.data(), ddsRaw.size(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, &metadata, image);
+		
+		DirectX::CreateShaderResourceView(d3d.device, image.GetImages(), image.GetImageCount(), metadata, &resourceView);
+		
+		if (FAILED(result)) {
+			LOG(WARNING) << "Failed to load DDS texture from memory!";
+		}
+	}
+
 	Texture::~Texture()
 	{
 		if (resourceView != nullptr) {

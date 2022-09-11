@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "TextureLoader.h"
+#include "TextureFinder.h"
 
 #include "../../Util.h"
 

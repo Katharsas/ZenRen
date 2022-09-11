@@ -242,7 +242,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\renderer\Texture.cpp" />
-    <ClCompile Include="src\renderer\loader\TextureLoader.cpp" />
+    <ClCompile Include="src\renderer\loader\TextureFinder.cpp" />
     <ClCompile Include="src\renderer\loader\ZenLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -278,7 +278,7 @@
     <ClInclude Include="targetver.h" />
     <ClInclude Include="src\game\TimerPrecision.h" />
     <ClInclude Include="src\renderer\Texture.h" />
-    <ClInclude Include="src\renderer\loader\TextureLoader.h" />
+    <ClInclude Include="src\renderer\loader\TextureFinder.h" />
     <ClInclude Include="src\renderer\loader\ZenLoader.h" />
   </ItemGroup>
   <ItemGroup>

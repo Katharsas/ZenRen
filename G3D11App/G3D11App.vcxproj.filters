@@ -78,7 +78,7 @@
     <ClCompile Include="src\imgui\imgui_custom.cpp" />
     <ClCompile Include="src\renderer\Texture.cpp" />
     <ClCompile Include="src\renderer\RenderSettings.cpp" />
-    <ClCompile Include="src\renderer\loader\TextureLoader.cpp" />
+    <ClCompile Include="src\renderer\loader\TextureFinder.cpp" />
     <ClCompile Include="src\renderer\loader\ZenLoader.cpp" />
     <ClCompile Include="src\renderer\loader\ObjLoader.cpp" />
     <ClCompile Include="src\renderer\RenderUtil.cpp" />
@@ -126,7 +126,7 @@
     <ClInclude Include="src\renderer\Texture.h" />
     <ClInclude Include="lib\tinyobj\tiny_obj_loader.h" />
     <ClInclude Include="src\renderer\RenderSettings.h" />
-    <ClInclude Include="src\renderer\loader\TextureLoader.h" />
+    <ClInclude Include="src\renderer\loader\TextureFinder.h" />
     <ClInclude Include="src\renderer\loader\ZenLoader.h" />
     <ClInclude Include="src\renderer\loader\ObjLoader.h" />
     <ClInclude Include="src\renderer\RenderUtil.h" />

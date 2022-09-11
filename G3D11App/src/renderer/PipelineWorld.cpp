@@ -6,9 +6,13 @@
 #include "Camera.h"
 #include "Texture.h"
 #include "../Util.h"
-#include "loader/TextureLoader.h";
+#include "loader/TextureFinder.h";
 #include "loader/ZenLoader.h";
 #include "loader/ObjLoader.h"
+
+// TODO move to RenderDebugGui
+#include "Gui.h"
+#include "imgui/imgui.h"
 
 using namespace DirectX;
 
@@ -52,8 +56,23 @@ namespace renderer::world {
 
 	World world;
 
-	Texture* texture;
 	ID3D11SamplerState* linearSamplerState = nullptr;
+
+	std::vector<Texture*> debugTextures;
+
+	void initGui() {
+		// TODO move to RenderDebugGui
+
+		addWindow("Lightmaps", {
+			[&]()  -> void {
+				float zoom = 1.5f;
+				// TODO make all 42 textures selectable
+				if (debugTextures.size() >= 1) {
+					ImGui::Image(debugTextures.at(0)->GetResourceView(), {256 * zoom, 256 * zoom});
+				}
+			}
+		});
+	}
 
 	void loadTestObj(D3d d3d) {
 		
@@ -66,6 +85,14 @@ namespace renderer::world {
 		}
 		else {
 			matsToVertices = loader::loadZen();
+		}
+
+		{
+			auto& lightmaps = loader::loadZenLightmaps();
+			for (auto& lightmap : lightmaps) {
+				Texture* texture = new Texture(d3d, lightmap.ddsRaw);
+				debugTextures.push_back(texture);
+			}
 		}
 		
 		std::filesystem::path userDir = util::getUserFolderPath();
@@ -84,8 +111,6 @@ namespace renderer::world {
 			auto& vertices = it.second;
 			if (!vertices.empty()) {
 				auto& actualPath = loader::getTexturePathOrDefault(filename);
-				//LOG(DEBUG) << "  Texture name: " << filename;
-				//LOG(DEBUG) << "  Texture path: " << actualPath;
 
 				Mesh mesh;
 				{
@@ -178,9 +203,10 @@ namespace renderer::world {
 
 	void initVertexIndexBuffers(D3d d3d, bool reverseZ)
 	{
+		initGui();
+
 		loadTestObj(d3d);
 
-		//texture = new Texture(d3d, "BARRIERE.png");
 
 		// select which primtive type we are using
 		d3d.deviceContext->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -256,7 +282,6 @@ namespace renderer::world {
 		cbPerObjectBuffer->Release();
 		cbGlobalSettingsBuffer->Release();
 		linearSamplerState->Release();
-		//delete texture;
 
 		for (auto& mesh : world.meshes) {
 			mesh.release();

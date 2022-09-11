@@ -17,7 +17,7 @@ namespace renderer {
 
 	void addWindow(const std::string& windowName, GuiComponent guiComponent)
 	{
-		auto components = util::getOrCreate(windowsToGuis, windowName);
+		auto& components = util::getOrCreate(windowsToGuis, windowName);
 		components.push_back(guiComponent);
 	}
 

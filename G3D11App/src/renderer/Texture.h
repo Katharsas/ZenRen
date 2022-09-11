@@ -8,6 +8,7 @@ namespace renderer {
 	{
 	public:
 		Texture(D3d d3d, const std::string& sourceFile);
+		Texture(D3d d3d, std::vector<uint8_t>& ddsRaw);
 		~Texture();
 		ID3D11ShaderResourceView* GetResourceView();
 	private:
