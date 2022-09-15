@@ -5,6 +5,7 @@
 static const uint FLAG_OUPUT_DIRECT_SOLID = 0;
 static const uint FLAG_OUTPUT_DIRECT_DIFFUSE = 1;
 static const uint FLAG_OUTPUT_DIRECT_NORMAL = 2;
+static const uint FLAG_OUTPUT_DIRECT_LIGHTMAP = 3;
 
 cbuffer cbSettings : register(b0) {
     float ambientLight;
@@ -25,6 +26,7 @@ struct VS_IN
     float4 position : POSITION;
     float4 normal : NORMAL;
     float2 uvBaseColor : TEXCOORD0;
+    float4 lightmapColor : COLOR;
 };
 
 struct VS_OUT
@@ -49,7 +51,7 @@ VS_OUT VS_Main(VS_IN input)
     float4 viewLight = mul(light, worldViewMatrixInverseTranposed);
     float3 viewLight3 = normalize((float3) (viewLight * 1));
 
-    if (!outputDirectEnabled || outputDirectType == FLAG_OUPUT_DIRECT_SOLID) {
+    if (!outputDirectEnabled || outputDirectType == FLAG_OUPUT_DIRECT_SOLID || outputDirectType == FLAG_OUTPUT_DIRECT_LIGHTMAP) {
         float lightNormalDotProduct = dot(viewNormal3, viewLight3); // for normalized input: range of -1 (down) to 1 (up)
         float lightReceivedRatio = max(0, lightNormalDotProduct) + ambientLight;
         output.light = lightReceivedRatio;
@@ -63,6 +65,9 @@ VS_OUT VS_Main(VS_IN input)
    
     if (outputDirectType == FLAG_OUTPUT_DIRECT_NORMAL) {
         output.color = float4((float3) input.normal, 1.0f);
+    }
+    else if (outputDirectType == FLAG_OUTPUT_DIRECT_LIGHTMAP) {
+        output.color = input.lightmapColor;
     }
     else {
         // vertex color not used by PS

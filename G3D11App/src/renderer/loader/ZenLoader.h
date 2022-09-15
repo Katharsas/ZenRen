@@ -10,8 +10,8 @@ namespace renderer::loader {
         std::vector<uint8_t> ddsRaw;
     };
 
-    std::unordered_map<std::string, std::vector<POS_NORMAL_UV>> loadZen();
-    std::vector<ZenLightmapTexture> loadZenLightmaps();
+    std::unordered_map<std::string, std::vector<POS_NORMAL_UV_COL>> loadZen();
+    //std::vector<ZenLightmapTexture> loadZenLightmaps();
     void clean();
 }
 

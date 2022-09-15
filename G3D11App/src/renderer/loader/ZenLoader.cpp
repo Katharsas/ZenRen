@@ -6,6 +6,7 @@
 #include "../../Util.h"
 #include "../RenderUtil.h"
 
+#include "DirectXTex.h"
 #include "vdfs/fileIndex.h"
 #include "zenload/zCMesh.h"
 #include "zenload/zenParser.h"
@@ -13,14 +14,18 @@
 
 namespace renderer::loader {
 
+    using namespace DirectX;
     using namespace ZenLib;
     using ::util::asciiToLowercase;
     using ::util::getOrCreate;
 
-    typedef POS_NORMAL_UV VERTEX;
+    typedef POS_NORMAL_UV_COL VERTEX;
 
     ZenLoad::ZenParser parser;
     ZenLoad::zCMesh* worldMesh;
+
+    std::vector<ZenLightmapTexture> lightmapTextures;
+    std::vector<Image> lightmapTexturesData;
 
     /**
      * Recursive function to list some data about the zen-file
@@ -40,7 +45,34 @@ namespace renderer::loader {
         }
     }
 
-    std::unordered_map<std::string, std::vector<POS_NORMAL_UV>> loadZen() {
+    int32_t wrapModulo(int32_t positiveOrNegative, int32_t modulo) {
+        return ((positiveOrNegative % modulo) + modulo) % modulo;
+    }
+
+    void loadZenLightmaps() {
+        for (auto& lightmap : worldMesh->getLightmapTextures()) {
+            int32_t width;
+            int32_t height;
+            std::vector<uint8_t> ddsRaw;
+            int32_t message = ZenLoad::convertZTEX2DDS(lightmap, ddsRaw, true, &width, &height);
+            if (message != 0) {
+                LOG(WARNING) << "Failed to convert lightmap zTex to DDS: Error code '" << message << "'!";
+            }
+            ZenLightmapTexture tex = { width, height, ddsRaw };
+            lightmapTextures.push_back(tex);
+
+            ScratchImage image;
+            TexMetadata metadata;
+            HRESULT result = DirectX::LoadFromDDSMemory(tex.ddsRaw.data(), tex.ddsRaw.size(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, &metadata, image);
+
+            ScratchImage* bytePerPixelImage = new ScratchImage;// leak
+            result = Convert(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DXGI_FORMAT_R8G8B8A8_UNORM, TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT, *bytePerPixelImage);
+
+            lightmapTexturesData.push_back(*bytePerPixelImage->GetImage(0, 0, 0));
+        }
+    }
+
+    std::unordered_map<std::string, std::vector<VERTEX>> loadZen() {
         const std::string vdfsArchiveToLoad = "data_g1/worlds.VDF";
         const std::string zenFilename = "WORLD.ZEN";
 
@@ -69,6 +101,8 @@ namespace renderer::loader {
 
         worldMesh = parser.getWorldMesh();
 
+        loadZenLightmaps();
+
         ZenLoad::PackedMesh packedWorldMesh;
         parser.getWorldMesh()->packMesh(packedWorldMesh, 0.01f);
 
@@ -79,7 +113,9 @@ namespace renderer::loader {
         for (const auto& zenSubmesh : packedWorldMesh.subMeshes) {
 
             std::vector<VERTEX> faces;
+            std::unordered_map<uint32_t, bool> lightmaps;
 
+            int32_t faceIndex = 0;
             for (int32_t indicesIndex = 0; indicesIndex < zenSubmesh.indices.size(); indicesIndex += 3) {
                 const std::array<uint32_t, 3> faceIndices = {
                     zenSubmesh.indices[indicesIndex],
@@ -91,6 +127,14 @@ namespace renderer::loader {
                     packedWorldMesh.vertices.at(faceIndices[1]),
                     packedWorldMesh.vertices.at(faceIndices[2]),
                 };
+                
+                ZenLoad::Lightmap lightmap;
+                const int16_t faceLightmapIndex = zenSubmesh.triangleLightmapIndices[faceIndex];
+                if (faceLightmapIndex != -1) {
+                    lightmap = worldMesh->getLightmapReferences()[faceLightmapIndex];
+                    //worldMesh->getLightmapTextures
+                    lightmaps.insert({ lightmap.lightmapTextureIndex , true });
+                }
 
                 std::array<VERTEX, 3> vertices;
 
@@ -108,20 +152,61 @@ namespace renderer::loader {
                     } {
                         vertex.uv.u = zenVert.TexCoord.x;
                         vertex.uv.v = zenVert.TexCoord.y;
+                    } {
+                        if (faceLightmapIndex == -1) {
+                            vertex.color = { 1, 1, 1, 1 };
+                        }
+                        else {
+                            XMVECTOR pos = XMVectorSet(vertex.pos.x, vertex.pos.y, vertex.pos.y, 0);
+                            XMVECTOR origin = XMVectorSet(lightmap.origin.x, lightmap.origin.y, lightmap.origin.z, 0);
+                            XMVECTOR normalU = XMVectorSet(lightmap.normals[0].x, lightmap.normals[0].y, lightmap.normals[0].z, 0);
+                            XMVECTOR normalV = XMVectorSet(lightmap.normals[1].x, lightmap.normals[1].y, lightmap.normals[1].z, 0);
+                            XMVECTOR lightmapDir = pos - origin;
+                            float uNorm = XMVectorGetX(XMVector3Dot(lightmapDir, normalU));
+                            float vNorm = XMVectorGetX(XMVector3Dot(lightmapDir, normalV));
+
+                            const auto& lightmapTex = lightmapTextures[lightmap.lightmapTextureIndex];
+                            float uAbs = (lightmapTex.width * uNorm) + 0.5f;
+                            float vAbs = (lightmapTex.height * vNorm) + 0.5f;
+                            uint32_t uPixel = wrapModulo(uAbs, lightmapTex.width);
+                            uint32_t vPixel = wrapModulo(vAbs, lightmapTex.height);
+
+                            const uint32_t pixelSize = 4;
+                            const auto image = lightmapTexturesData[lightmap.lightmapTextureIndex];
+
+                            uint8_t* pixel = image.pixels + (image.rowPitch * vPixel) + (pixelSize * uPixel);
+                            vertex.color.r = (*(pixel + 0)) / 255.0f;
+                            vertex.color.g = (*(pixel + 1)) / 255.0f;
+                            vertex.color.b = (*(pixel + 2)) / 255.0f;
+                            vertex.color.a = (*(pixel + 3)) / 255.0f;
+                        }
                     }
                     vertices.at(2 - vertexIndex) = vertex;// flip faces apparently, but not z ?!
                     vertexIndex++;
+
+                    // lightmap test
+                    /*if (indicesIndex == 0) {
+                        for (auto& vertex : vertices) {
+                            worldMesh->getLightmapReferences()
+                        }
+                    }*/
                 }
                 faces.insert(faces.end(), vertices.begin(), vertices.end());
+                faceIndex++;
             }
+
+            /*LOG(INFO) << "LIGHTMAPS USED: " << lightmaps.size();
+            for (auto& lightmapIt : lightmaps) {
+                LOG(INFO) << "    " << lightmapIt.first;
+            }*/
 
             const auto& texture = zenSubmesh.material.texture;
 
             if (!texture.empty()) {
 
-                if (texture == std::string("OWODWAMOUNTAINFARCLOSE.TGA")) {
+                /*if (texture == std::string("OWODWAMOUNTAINFARCLOSE.TGA")) {
                     LOG(INFO) << "HEY";
-                }
+                }*/
 
                 //LOG(INFO) << "Zen material: " << zenSubmesh.material.matName;
                 //LOG(INFO) << "Zen texture: " << texture;
@@ -161,20 +246,4 @@ namespace renderer::loader {
         Utils::exportPackedMeshToObj(packedWorldMesh, (zenFileName + std::string(".OBJ")));
         */
 	}
-
-    std::vector<ZenLightmapTexture> loadZenLightmaps() {
-        std::vector<ZenLightmapTexture> ddsTextures;
-        for (auto& lightmap : worldMesh->getLightmapTextures()) {
-            int32_t width;
-            int32_t height;
-            std::vector<uint8_t> ddsRaw;
-            int32_t message = ZenLoad::convertZTEX2DDS(lightmap, ddsRaw, true, &width, &height);
-            if (message != 0) {
-                LOG(WARNING) << "Failed to convert lightmap zTex to DDS: Error code '" << message << "'!";
-            }
-            ZenLightmapTexture info = { width, height, ddsRaw };
-            ddsTextures.push_back(info);
-        }
-        return ddsTextures;
-    }
 }

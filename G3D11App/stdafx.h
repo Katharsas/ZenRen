@@ -24,6 +24,8 @@
 #include <unordered_map>
 #include <array>
 
+// TODO disable SSE, measure performance so we know if this is even worth it compared to normal optimization
+//#define _XM_NO_INTRINSICS_ 
 #include <DirectXMath.h>
 #include <DirectXPackedVector.h>
 

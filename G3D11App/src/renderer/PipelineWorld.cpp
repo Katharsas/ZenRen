@@ -2,6 +2,7 @@
 #include "PipelineWorld.h"
 
 #include <filesystem>
+#include <stdexcept>
 
 #include "Camera.h"
 #include "Texture.h"
@@ -18,7 +19,7 @@ using namespace DirectX;
 
 namespace renderer::world {
 
-	typedef POS_NORMAL_UV VERTEX;
+	typedef POS_NORMAL_UV_COL VERTEX;
 
 	// Note: smallest type for constant buffer values is 32 bit; cannot use bool or uint_16 without packing
 
@@ -26,6 +27,7 @@ namespace renderer::world {
 		Solid = 0,
 		Diffuse = 1,
 		Normal = 2,
+		Lightmap = 3,
 	};
 
 	__declspec(align(16))
@@ -88,11 +90,11 @@ namespace renderer::world {
 		}
 
 		{
-			auto& lightmaps = loader::loadZenLightmaps();
+			/*auto& lightmaps = loader::loadZenLightmaps();
 			for (auto& lightmap : lightmaps) {
 				Texture* texture = new Texture(d3d, lightmap.ddsRaw);
 				debugTextures.push_back(texture);
-			}
+			}*/
 		}
 		
 		std::filesystem::path userDir = util::getUserFolderPath();
@@ -170,8 +172,14 @@ namespace renderer::world {
 		else if (settings.shader.mode == ShaderMode::Normals) {
 			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Normal;
 		}
-		else {
+		else if (settings.shader.mode == ShaderMode::Lightmap) {
+			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Lightmap;
+		}
+		else if (settings.shader.mode == ShaderMode::Solid || settings.shader.mode == ShaderMode::Default) {
 			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Solid;
+		}
+		else {
+			throw std::invalid_argument("Unknown ShaderMode!");
 		}
 
 		d3d.deviceContext->UpdateSubresource(cbGlobalSettingsBuffer, 0, nullptr, &cbGlobalSettings, 0, 0);

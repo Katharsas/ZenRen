@@ -12,6 +12,7 @@ namespace renderer
 		Solid,
 		Diffuse,
 		Normals,
+		Lightmap,
 	};
 
 	struct ShaderSettings {
@@ -38,7 +39,7 @@ namespace renderer
 	};
 
 	struct VEC3 {
-		FLOAT x, y, z;
+		float x, y, z;
 
 		friend std::ostream& operator <<(std::ostream& os, const VEC3& that)
 		{
@@ -46,7 +47,7 @@ namespace renderer
 		}
 	};
 	struct UV {
-		FLOAT u, v;
+		float u, v;
 
 		friend std::ostream& operator <<(std::ostream& os, const UV& that)
 		{
@@ -75,6 +76,17 @@ namespace renderer
 		friend std::ostream& operator <<(std::ostream& os, const POS_NORMAL_UV& that)
 		{
 			return os << "[POS:" << that.pos << " NOR:" << that.normal << " UV:" << that.uv << "]";
+		}
+	};
+	struct POS_NORMAL_UV_COL {
+		VEC3 pos;
+		VEC3 normal;
+		UV uv;
+		D3DXCOLOR color;
+
+		friend std::ostream& operator <<(std::ostream& os, const POS_NORMAL_UV_COL& that)
+		{
+			return os << "[POS:" << that.pos << " NOR:" << that.normal << " UV:" << that.uv << " LIGHT:" << that.color << "]";
 		}
 	};
 

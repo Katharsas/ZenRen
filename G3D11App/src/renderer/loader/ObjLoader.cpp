@@ -15,9 +15,9 @@ namespace renderer::loader {
 	using ::util::asciiToLowercase;
 	using ::util::getOrCreate;
 
-	typedef POS_NORMAL_UV VERTEX;
+	typedef POS_NORMAL_UV_COL VERTEX;
 
-	std::unordered_map<std::string, std::vector<POS_NORMAL_UV>> loadObj(const std::string& inputFile) {
+	std::unordered_map<std::string, std::vector<VERTEX>> loadObj(const std::string& inputFile) {
 
 		tinyobj::ObjReaderConfig reader_config;
 		reader_config.triangulate = true;
@@ -99,6 +99,8 @@ namespace renderer::loader {
 						vertex.uv = { 0, 0 };
 					}
 
+					vertex.color = { 1, 1, 1, 1 };
+
 					vertices.at(2 - vertexIndex) = vertex;// FLIPPED Z -> flip faces
 				}
 				if (!hasNormals) {
@@ -136,10 +138,6 @@ namespace renderer::loader {
 
 		LOG(DEBUG) << "World triangle count: " << faceCount;
 		LOG(DEBUG) << "World triangle skipped count (no texture assigned): " << faceSkippedCount;
-
-		//std::string dumpTex = "owodpatrgrassmi.tga";
-		//asciiToLowercase(dumpTex);
-		//util::dumpVerts(dumpTex, matsToVertices.at(dumpTex));
 
 		return matsToVertices;
 	}
