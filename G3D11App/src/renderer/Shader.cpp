@@ -33,7 +33,7 @@ namespace renderer {
 		D3D11_INPUT_ELEMENT_DESC * d3d11LayoutDesc = new D3D11_INPUT_ELEMENT_DESC[length];
 		for (int i = 0; i < length; i = i + 1) {
 			d3d11LayoutDesc[i].SemanticName = layoutDesc[i].SemanticName;
-			d3d11LayoutDesc[i].SemanticIndex = 0;
+			d3d11LayoutDesc[i].SemanticIndex = layoutDesc[i].SemanticIndex;
 			d3d11LayoutDesc[i].Format = layoutDesc[i].Format;
 			d3d11LayoutDesc[i].InputSlot = 0;
 			d3d11LayoutDesc[i].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;

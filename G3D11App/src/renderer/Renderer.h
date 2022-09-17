@@ -54,6 +54,15 @@ namespace renderer
 			return os << "[U=" << that.u << " V=" << that.v << "]";
 		}
 	};
+	struct ARRAY_UV {
+		float u, v;
+		float i;
+
+		friend std::ostream& operator <<(std::ostream& os, const ARRAY_UV& that)
+		{
+			return os << "[U=" << that.u << " V=" << that.v << " I=" << that.i << "]";
+		}
+	};
 
 	struct POS_COLOR {
 		VEC3 position;
@@ -87,6 +96,18 @@ namespace renderer
 		friend std::ostream& operator <<(std::ostream& os, const POS_NORMAL_UV_COL& that)
 		{
 			return os << "[POS:" << that.pos << " NOR:" << that.normal << " UV:" << that.uv << " LIGHT:" << that.color << "]";
+		}
+	};
+	struct WORLD_VERTEX {
+		VEC3 pos;
+		VEC3 normal;
+		UV uvDiffuse;
+		ARRAY_UV uvLightmap;
+		D3DXCOLOR colorLightmap;
+
+		friend std::ostream& operator <<(std::ostream& os, const WORLD_VERTEX& that)
+		{
+			return os << "[POS:" << that.pos << " NOR:" << that.normal << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
 		}
 	};
 

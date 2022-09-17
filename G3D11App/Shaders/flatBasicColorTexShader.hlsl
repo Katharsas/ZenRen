@@ -26,12 +26,14 @@ struct VS_IN
     float4 position : POSITION;
     float4 normal : NORMAL;
     float2 uvBaseColor : TEXCOORD0;
-    float4 lightmapColor : COLOR;
+    float3 uvLightmap : TEXCOORD1;
+    float4 colorLightmap : COLOR;
 };
 
 struct VS_OUT
 {
     float2 uvBaseColor : TEXCOORD0;
+    float3 uvLightmap : TEXCOORD1;
     float4 color : COLOR;
     float light : LIGHT_INTENSITY;
     //float4 normal : NORMAL;
@@ -53,7 +55,7 @@ VS_OUT VS_Main(VS_IN input)
 
     if (!outputDirectEnabled || outputDirectType == FLAG_OUPUT_DIRECT_SOLID || outputDirectType == FLAG_OUTPUT_DIRECT_LIGHTMAP) {
         float lightNormalDotProduct = dot(viewNormal3, viewLight3); // for normalized input: range of -1 (down) to 1 (up)
-        float lightReceivedRatio = max(0, lightNormalDotProduct) + ambientLight;
+        float lightReceivedRatio = max(0, lightNormalDotProduct + 0.3f) + ambientLight;
         output.light = lightReceivedRatio;
     }
     else {
@@ -62,12 +64,10 @@ VS_OUT VS_Main(VS_IN input)
 
     output.position = mul(viewPosition, projectionMatrix);
     output.uvBaseColor = input.uvBaseColor;
+    output.uvLightmap = input.uvLightmap;
    
     if (outputDirectType == FLAG_OUTPUT_DIRECT_NORMAL) {
         output.color = float4((float3) input.normal, 1.0f);
-    }
-    else if (outputDirectType == FLAG_OUTPUT_DIRECT_LIGHTMAP) {
-        output.color = input.lightmapColor;
     }
     else {
         // vertex color not used by PS
@@ -81,13 +81,16 @@ VS_OUT VS_Main(VS_IN input)
 //--------------------------------------------------------------------------------------
 
 Texture2D baseColor : register(s0);
+Texture2DArray lightmaps : register(s1);
 SamplerState SampleType : register(s0);
 
 struct PS_IN
 {
     float2 uvBaseColor : TEXCOORD0;
+    float3 uvLightmap : TEXCOORD1;
     float4 color : COLOR;
     float light : LIGHT_INTENSITY;
+    //int indexLightmap : INDEX_LIGHTMAP;
     //float4 normal : NORMAL;
 };
 
@@ -96,6 +99,15 @@ float4 PS_Main(PS_IN input) : SV_TARGET
     float4 albedoColor;
     if (!outputDirectEnabled || outputDirectType == FLAG_OUTPUT_DIRECT_DIFFUSE) {
         albedoColor = baseColor.Sample(SampleType, input.uvBaseColor);
+    }
+    else if (outputDirectEnabled && outputDirectType == FLAG_OUTPUT_DIRECT_LIGHTMAP) {
+        // this splits pixels into per face groups based on lightmap or not, which is not great (?)
+        if (input.uvLightmap.z >= 0) {
+            albedoColor = lightmaps.Sample(SampleType, input.uvLightmap);
+        }
+        else {
+            albedoColor = float4(1, 1, 1, 1);
+        }
     }
     else {
         albedoColor = input.color;

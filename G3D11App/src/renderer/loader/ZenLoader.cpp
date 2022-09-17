@@ -19,7 +19,7 @@ namespace renderer::loader {
     using ::util::asciiToLowercase;
     using ::util::getOrCreate;
 
-    typedef POS_NORMAL_UV_COL VERTEX;
+    typedef WORLD_VERTEX VERTEX;
 
     ZenLoad::ZenParser parser;
     ZenLoad::zCMesh* worldMesh;
@@ -70,6 +70,10 @@ namespace renderer::loader {
 
             lightmapTexturesData.push_back(*bytePerPixelImage->GetImage(0, 0, 0));
         }
+    }
+
+    std::vector<ZenLightmapTexture>& getLightmapTextures() {
+        return lightmapTextures;
     }
 
     std::unordered_map<std::string, std::vector<VERTEX>> loadZen() {
@@ -150,24 +154,29 @@ namespace renderer::loader {
                         vertex.normal.y = zenVert.Normal.y;
                         vertex.normal.z = zenVert.Normal.z;
                     } {
-                        vertex.uv.u = zenVert.TexCoord.x;
-                        vertex.uv.v = zenVert.TexCoord.y;
+                        vertex.uvDiffuse.u = zenVert.TexCoord.x;
+                        vertex.uvDiffuse.v = zenVert.TexCoord.y;
                     } {
                         if (faceLightmapIndex == -1) {
-                            vertex.color = { 1, 1, 1, 1 };
+                            vertex.uvLightmap = { 0, 0, -1 };
+                            vertex.colorLightmap = { 1, 1, 1, 1 };
                         }
                         else {
-                            XMVECTOR pos = XMVectorSet(vertex.pos.x, vertex.pos.y, vertex.pos.y, 0);
+                            float unscale = 100;
+                            XMVECTOR pos = XMVectorSet(vertex.pos.x * unscale, vertex.pos.y * unscale, vertex.pos.z * unscale, 0);
                             XMVECTOR origin = XMVectorSet(lightmap.origin.x, lightmap.origin.y, lightmap.origin.z, 0);
                             XMVECTOR normalU = XMVectorSet(lightmap.normals[0].x, lightmap.normals[0].y, lightmap.normals[0].z, 0);
                             XMVECTOR normalV = XMVectorSet(lightmap.normals[1].x, lightmap.normals[1].y, lightmap.normals[1].z, 0);
                             XMVECTOR lightmapDir = pos - origin;
-                            float uNorm = XMVectorGetX(XMVector3Dot(lightmapDir, normalU));
-                            float vNorm = XMVectorGetX(XMVector3Dot(lightmapDir, normalV));
+                            vertex.uvLightmap.u = XMVectorGetX(XMVector3Dot(lightmapDir, normalU));
+                            vertex.uvLightmap.v = XMVectorGetX(XMVector3Dot(lightmapDir, normalV));
+                            vertex.uvLightmap.i = lightmap.lightmapTextureIndex;
 
+                            // CPU per vertex sampling because the lightmaps are so low resolution that per pixel sampling is just overkill
+                            // GPU per vertex sampling might be easier, however this is probably faster during rendering.
                             const auto& lightmapTex = lightmapTextures[lightmap.lightmapTextureIndex];
-                            float uAbs = (lightmapTex.width * uNorm) + 0.5f;
-                            float vAbs = (lightmapTex.height * vNorm) + 0.5f;
+                            float uAbs = (lightmapTex.width * vertex.uvLightmap.u) + 0.5f;
+                            float vAbs = (lightmapTex.height * vertex.uvLightmap.v) + 0.5f;
                             uint32_t uPixel = wrapModulo(uAbs, lightmapTex.width);
                             uint32_t vPixel = wrapModulo(vAbs, lightmapTex.height);
 
@@ -175,10 +184,10 @@ namespace renderer::loader {
                             const auto image = lightmapTexturesData[lightmap.lightmapTextureIndex];
 
                             uint8_t* pixel = image.pixels + (image.rowPitch * vPixel) + (pixelSize * uPixel);
-                            vertex.color.r = (*(pixel + 0)) / 255.0f;
-                            vertex.color.g = (*(pixel + 1)) / 255.0f;
-                            vertex.color.b = (*(pixel + 2)) / 255.0f;
-                            vertex.color.a = (*(pixel + 3)) / 255.0f;
+                            vertex.colorLightmap.r = (*(pixel + 0)) / 255.0f;
+                            vertex.colorLightmap.g = (*(pixel + 1)) / 255.0f;
+                            vertex.colorLightmap.b = (*(pixel + 2)) / 255.0f;
+                            vertex.colorLightmap.a = (*(pixel + 3)) / 255.0f;
                         }
                     }
                     vertices.at(2 - vertexIndex) = vertex;// flip faces apparently, but not z ?!

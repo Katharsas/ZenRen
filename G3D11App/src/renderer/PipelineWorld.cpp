@@ -19,7 +19,7 @@ using namespace DirectX;
 
 namespace renderer::world {
 
-	typedef POS_NORMAL_UV_COL VERTEX;
+	typedef WORLD_VERTEX VERTEX;
 
 	// Note: smallest type for constant buffer values is 32 bit; cannot use bool or uint_16 without packing
 
@@ -59,11 +59,21 @@ namespace renderer::world {
 	World world;
 
 	ID3D11SamplerState* linearSamplerState = nullptr;
+	ID3D11ShaderResourceView* lightmapTexArray = nullptr;
 
 	std::vector<Texture*> debugTextures;
 
 	void initGui() {
 		// TODO move to RenderDebugGui
+
+		
+		addWindow("Debug World", {
+			[&]()  -> void {
+				// TODO restrict world rendering to subset of submeshes to only show mesh data with distinctive lightmap (like church in oldcamp)
+				// then display the relevant lightmaps and try to figure out how they are meant to be mapped. 
+				// Alternatively figure out how to disable lightmaps in Gothic 1 and make a image diff on/off of that church.
+			}
+		});
 
 		addWindow("Lightmaps", {
 			[&]()  -> void {
@@ -83,18 +93,22 @@ namespace renderer::world {
 
 		if (loadObj) {
 			std::string inputFile = "data_g1/world.obj";
-			matsToVertices = loader::loadObj(inputFile);
+			//matsToVertices = loader::loadObj(inputFile);
 		}
 		else {
 			matsToVertices = loader::loadZen();
 		}
 
 		{
-			/*auto& lightmaps = loader::loadZenLightmaps();
+			auto& lightmaps = loader::getLightmapTextures();
 			for (auto& lightmap : lightmaps) {
+				std::vector<std::vector<uint8_t>> ddsRaws;
+				ddsRaws.push_back(lightmap.ddsRaw);
+				lightmapTexArray = createShaderTexArray(d3d, ddsRaws, 256, 256);
+
 				Texture* texture = new Texture(d3d, lightmap.ddsRaw);
 				debugTextures.push_back(texture);
-			}*/
+			}
 		}
 		
 		std::filesystem::path userDir = util::getUserFolderPath();
@@ -272,6 +286,9 @@ namespace renderer::world {
 		d3d.deviceContext->VSSetConstantBuffers(0, 1, &cbGlobalSettingsBuffer);
 		d3d.deviceContext->PSSetConstantBuffers(0, 1, &cbGlobalSettingsBuffer);
 
+		// lightmaps
+		d3d.deviceContext->PSSetShaderResources(1, 1, &lightmapTexArray);
+
 		// vertex buffer(s)
 		UINT stride = sizeof(VERTEX);
 		UINT offset = 0;
@@ -289,8 +306,12 @@ namespace renderer::world {
 	{
 		cbPerObjectBuffer->Release();
 		cbGlobalSettingsBuffer->Release();
+		lightmapTexArray->Release();
 		linearSamplerState->Release();
 
+		for (auto& tex : debugTextures) {
+			delete tex;
+		}
 		for (auto& mesh : world.meshes) {
 			mesh.release();
 		}

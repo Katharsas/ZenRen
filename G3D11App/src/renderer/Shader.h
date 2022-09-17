@@ -10,6 +10,7 @@ namespace renderer {
 	public:
 		struct VertexInputLayoutDesc {
 			LPCSTR SemanticName;
+			UINT SemanticIndex = 0;
 			DXGI_FORMAT Format;
 		};
 
