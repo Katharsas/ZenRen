@@ -5,6 +5,7 @@
 
 #include "../../Util.h"
 #include "../RenderUtil.h"
+#include "TextureFinder.h"
 
 #include "DirectXTex.h"
 #include "vdfs/fileIndex.h"
@@ -76,7 +77,7 @@ namespace renderer::loader {
         return lightmapTextures;
     }
 
-    std::unordered_map<std::string, std::vector<VERTEX>> loadZen() {
+    std::unordered_map<Material, std::vector<VERTEX>> loadZen() {
         const std::string vdfsArchiveToLoad = "data_g1/worlds.VDF";
         const std::string zenFilename = "WORLD.ZEN";
 
@@ -112,8 +113,10 @@ namespace renderer::loader {
 
         LOG(INFO) << "Zen loaded!";
 
-        std::unordered_map<std::string, std::vector<VERTEX>> matsToVertices;
+        std::unordered_map<Material, std::vector<VERTEX>> matsToVertices;
 
+        int32_t submeshIndex = 0;
+        int32_t faceCount = 0;
         for (const auto& zenSubmesh : packedWorldMesh.subMeshes) {
 
             std::vector<VERTEX> faces;
@@ -121,6 +124,7 @@ namespace renderer::loader {
 
             int32_t faceIndex = 0;
             for (int32_t indicesIndex = 0; indicesIndex < zenSubmesh.indices.size(); indicesIndex += 3) {
+
                 const std::array<uint32_t, 3> faceIndices = {
                     zenSubmesh.indices[indicesIndex],
                     zenSubmesh.indices[indicesIndex + 1],
@@ -134,10 +138,11 @@ namespace renderer::loader {
                 
                 ZenLoad::Lightmap lightmap;
                 const int16_t faceLightmapIndex = zenSubmesh.triangleLightmapIndices[faceIndex];
+                int32_t debugTexNumber = -1;
                 if (faceLightmapIndex != -1) {
                     lightmap = worldMesh->getLightmapReferences()[faceLightmapIndex];
-                    //worldMesh->getLightmapTextures
                     lightmaps.insert({ lightmap.lightmapTextureIndex , true });
+                    debugTexNumber = lightmap.lightmapTextureIndex;
                 }
 
                 std::array<VERTEX, 3> vertices;
@@ -202,6 +207,50 @@ namespace renderer::loader {
                 }
                 faces.insert(faces.end(), vertices.begin(), vertices.end());
                 faceIndex++;
+                faceCount++;
+
+                //if (false) {
+                //    auto texFilename = getNumberTexName(debugTexNumber);
+
+                //    Material material = { 0, texFilename };
+                //    auto& matVertices = getOrCreate(matsToVertices, material);
+                //    matVertices.insert(matVertices.end(), faces.begin(), faces.end());
+                //}
+
+                //if (false) {
+                //    int32_t faceCountHundreds = (faceCount + 50) / 100;
+
+                //    auto texFilename = getNumberTexName(faceCountHundreds);
+
+                //    Material material = { 0, texFilename };
+                //    auto& matVertices = getOrCreate(matsToVertices, material);
+                //    matVertices.insert(matVertices.end(), faces.begin(), faces.end());
+                //}
+
+                //if (true) {
+                //    int32_t faceCountHundreds = (faceCount + 50) / 100;
+
+                //    // only insert 935
+                //    if (faceCountHundreds == 941) {
+                //        int32_t faceNumber = (faceCount + 50) % 94100;
+                //        if (faceNumber == 93) {
+                //            LOG(INFO) << "HEY";
+                //            faceNumber = -1;
+                //        }
+                //        auto texFilename = getNumberTexName(faceNumber);
+
+                //        Material material = { 0, texFilename };
+                //        auto& matVertices = getOrCreate(matsToVertices, material);
+                //        matVertices.insert(matVertices.end(), faces.begin(), faces.end());
+                //    }
+                //    else {
+                //        auto texFilename = getNumberTexName(-1);
+
+                //        Material material = { 0, texFilename };
+                //        auto& matVertices = getOrCreate(matsToVertices, material);
+                //        matVertices.insert(matVertices.end(), faces.begin(), faces.end());
+                //    }
+                //}
             }
 
             /*LOG(INFO) << "LIGHTMAPS USED: " << lightmaps.size();
@@ -226,10 +275,11 @@ namespace renderer::loader {
                 auto& texFilename = texFilepath.filename().u8string();
                 asciiToLowercase(texFilename);
 
-                matsToVertices.insert({ texFilename, faces });
-                //auto& matVertices = getOrCreate(matsToVertices, texFilename);
-                //matVertices.insert(matVertices.end(), faces.begin(), faces.end());
+                Material material = { submeshIndex, texFilename };
+                auto& matVertices = getOrCreate(matsToVertices, material);
+                matVertices.insert(matVertices.end(), faces.begin(), faces.end());
             }
+            submeshIndex++;
         }
 
         //std::string dumpTex = "owodpatrgrassmi.tga";

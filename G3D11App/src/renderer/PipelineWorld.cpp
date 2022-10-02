@@ -62,6 +62,7 @@ namespace renderer::world {
 	ID3D11ShaderResourceView* lightmapTexArray = nullptr;
 
 	std::vector<Texture*> debugTextures;
+	int32_t selectedDebugTexture = 0;
 
 	void initGui() {
 		// TODO move to RenderDebugGui
@@ -77,10 +78,15 @@ namespace renderer::world {
 
 		addWindow("Lightmaps", {
 			[&]()  -> void {
-				float zoom = 1.5f;
-				// TODO make all 42 textures selectable
+				ImGui::PushItemWidth(60);
+				ImGui::InputInt("Lightmap Index", &selectedDebugTexture, 0);
+				ImGui::PopItemWidth();
+
+				float zoom = 2.0f;
 				if (debugTextures.size() >= 1) {
-					ImGui::Image(debugTextures.at(0)->GetResourceView(), {256 * zoom, 256 * zoom});
+					if (selectedDebugTexture >= 0 && selectedDebugTexture < debugTextures.size()) {
+						ImGui::Image(debugTextures.at(selectedDebugTexture)->GetResourceView(), { 256 * zoom, 256 * zoom });
+					}
 				}
 			}
 		});
@@ -88,7 +94,7 @@ namespace renderer::world {
 
 	void loadTestObj(D3d d3d) {
 		
-		std::unordered_map<std::string, std::vector<VERTEX>> matsToVertices;
+		std::unordered_map<Material, std::vector<VERTEX>> matsToVertices;
 		bool loadObj = false;
 
 		if (loadObj) {
@@ -101,14 +107,14 @@ namespace renderer::world {
 
 		{
 			auto& lightmaps = loader::getLightmapTextures();
+			std::vector<std::vector<uint8_t>> ddsRaws;
 			for (auto& lightmap : lightmaps) {
-				std::vector<std::vector<uint8_t>> ddsRaws;
 				ddsRaws.push_back(lightmap.ddsRaw);
-				lightmapTexArray = createShaderTexArray(d3d, ddsRaws, 256, 256);
 
 				Texture* texture = new Texture(d3d, lightmap.ddsRaw);
 				debugTextures.push_back(texture);
 			}
+			lightmapTexArray = createShaderTexArray(d3d, ddsRaws, 256, 256);
 		}
 		
 		std::filesystem::path userDir = util::getUserFolderPath();
@@ -116,17 +122,26 @@ namespace renderer::world {
 		//std::filesystem::path texDir = "Level";
 		loader::scanDirForTextures(texDir);
 
-		int32_t meshCount = 0;
-		int32_t maxMeshCount = 5000;
+		int32_t loadedCount = 0;
+		const int32_t meshStart = -1;
+		const int32_t meshEnd = -1;
 
 		for (const auto& it : matsToVertices) {
-			if (meshCount >= maxMeshCount) {
-				break;
-			}
-			auto& filename = it.first;
+			
+			auto& material = it.first;
 			auto& vertices = it.second;
+
+			int32_t meshIndex = material.submeshIndex;
+			if (meshStart >= 0 && meshIndex < meshStart) {
+				continue;
+			}
+			if (meshEnd >= 0 && meshIndex > meshEnd) {
+				continue;
+			}
+			LOG(INFO) << meshIndex;
+
 			if (!vertices.empty()) {
-				auto& actualPath = loader::getTexturePathOrDefault(filename);
+				auto& actualPath = loader::getTexturePathOrDefault(material.texBaseColor);
 
 				Mesh mesh;
 				{
@@ -149,11 +164,11 @@ namespace renderer::world {
 				mesh.baseColor = texture;
 				world.meshes.push_back(mesh);
 
-				meshCount++;
+				loadedCount++;
 			}
 		}
 
-		LOG(DEBUG) << "World material/texture count: " << meshCount;
+		LOG(DEBUG) << "World material/texture count: " << loadedCount;
 	}
 
 	void updateObjects()
@@ -174,7 +189,7 @@ namespace renderer::world {
 		//world.transform = world.transform * rotation;
 	}
 
-	void updateShaderSettings(D3d d3d, RenderSettings settings)
+	void updateShaderSettings(D3d d3d, RenderSettings& settings)
 	{
 		CbGlobalSettings cbGlobalSettings;
 		cbGlobalSettings.ambientLight = settings.shader.ambientLight;
@@ -199,7 +214,7 @@ namespace renderer::world {
 		d3d.deviceContext->UpdateSubresource(cbGlobalSettingsBuffer, 0, nullptr, &cbGlobalSettings, 0, 0);
 	}
 
-	void initLinearSampler(D3d d3d, RenderSettings settings)
+	void initLinearSampler(D3d d3d, RenderSettings& settings)
 	{
 		if (linearSamplerState != nullptr) {
 			linearSamplerState->Release();

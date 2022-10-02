@@ -111,6 +111,17 @@ namespace renderer
 		}
 	};
 
+	struct Material {
+		int32_t submeshIndex;
+		std::string texBaseColor;
+
+		bool operator==(const Material& other) const
+		{
+			return (submeshIndex == other.submeshIndex
+				&& texBaseColor == other.texBaseColor);
+		}
+	};
+
 	struct Mesh
 	{
 		ID3D11Buffer* vertexBuffer = nullptr;
@@ -155,4 +166,20 @@ namespace renderer
 	void cleanD3D();
 	void update();
 	void renderFrame();
+}
+
+namespace std
+{
+	using namespace renderer;
+	template <>
+	struct hash<Material>
+	{
+		size_t operator()(const Material& key) const
+		{
+			size_t res = 17;
+			res = res * 31 + key.submeshIndex;
+			res = res * 31 + hash<string>()(key.texBaseColor);
+			return res;
+		}
+	};
 }

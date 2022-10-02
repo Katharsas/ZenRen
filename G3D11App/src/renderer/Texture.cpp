@@ -46,13 +46,22 @@ namespace renderer {
 
 	Texture::Texture(D3d d3d, const std::string& sourceFile)
 	{
-		std::wstring sourceFileW = util::utf8ToWide(sourceFile);
+		auto name = sourceFile;
+		util::asciiToLowercase(name);
+		std::wstring sourceFileW = util::utf8ToWide(name);
 		HRESULT result;
 
-		if (util::endsWith(sourceFile, ".tga") || util::endsWith(sourceFile, ".TGA")) {
+		if (util::endsWith(name, ".tga")) {
 			DirectX::ScratchImage image;
 			DirectX::TexMetadata metadata;
 			result = DirectX::LoadFromTGAFile(sourceFileW.c_str(), &metadata, image);
+
+			DirectX::CreateShaderResourceView(d3d.device, image.GetImages(), image.GetImageCount(), metadata, &resourceView);
+		}
+		else if (util::endsWith(name, ".png")) {
+			DirectX::ScratchImage image;
+			DirectX::TexMetadata metadata;
+			result = DirectX::LoadFromWICFile(sourceFileW.c_str(), DirectX::WIC_FLAGS_NONE, &metadata, image);
 
 			DirectX::CreateShaderResourceView(d3d.device, image.GetImages(), image.GetImageCount(), metadata, &resourceView);
 		}
