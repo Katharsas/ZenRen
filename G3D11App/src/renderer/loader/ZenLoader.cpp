@@ -170,11 +170,11 @@ namespace renderer::loader {
                             float unscale = 100;
                             XMVECTOR pos = XMVectorSet(vertex.pos.x * unscale, vertex.pos.y * unscale, vertex.pos.z * unscale, 0);
                             XMVECTOR origin = XMVectorSet(lightmap.origin.x, lightmap.origin.y, lightmap.origin.z, 0);
-                            XMVECTOR normalU = XMVectorSet(lightmap.normals[0].x, lightmap.normals[0].y, lightmap.normals[0].z, 0);
-                            XMVECTOR normalV = XMVectorSet(lightmap.normals[1].x, lightmap.normals[1].y, lightmap.normals[1].z, 0);
+                            XMVECTOR normalUp = XMVectorSet(lightmap.normalUp.x, lightmap.normalUp.y, lightmap.normalUp.z, 0);
+                            XMVECTOR normalRight = XMVectorSet(lightmap.normalRight.x, lightmap.normalRight.y, lightmap.normalRight.z, 0);
                             XMVECTOR lightmapDir = pos - origin;
-                            vertex.uvLightmap.u = XMVectorGetX(XMVector3Dot(lightmapDir, normalU));
-                            vertex.uvLightmap.v = XMVectorGetX(XMVector3Dot(lightmapDir, normalV));
+                            vertex.uvLightmap.u = XMVectorGetX(XMVector3Dot(lightmapDir, normalRight));
+                            vertex.uvLightmap.v = XMVectorGetX(XMVector3Dot(lightmapDir, normalUp));
                             vertex.uvLightmap.i = lightmap.lightmapTextureIndex;
 
                             // CPU per vertex sampling because the lightmaps are so low resolution that per pixel sampling is just overkill

@@ -138,7 +138,6 @@ namespace renderer::world {
 			if (meshEnd >= 0 && meshIndex > meshEnd) {
 				continue;
 			}
-			LOG(INFO) << meshIndex;
 
 			if (!vertices.empty()) {
 				auto& actualPath = loader::getTexturePathOrDefault(material.texBaseColor);
