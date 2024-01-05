@@ -6,8 +6,41 @@ namespace game::input {
 
     std::map<const std::string, bool> keyState;
 
-    bool isKeyUsed(const std::string& keyname) {
-        return keyState[keyname];
+    struct MousePos {
+        uint16_t x = 0;
+        uint16_t y = 0;
+    };
+    MousePos mousePosCurrent;
+    MousePos mousePosLast;
+
+    const UINT mouseButtonDownMessages[] = { WM_LBUTTONDOWN, WM_RBUTTONDOWN, WM_MBUTTONDOWN, WM_XBUTTONDOWN };
+    /*const UINT mouseButtonUpMessages[] = {WM_LBUTTONUP, WM_RBUTTONUP, WM_MBUTTONUP, WM_XBUTTONUP};*/
+
+    const std::map<const WPARAM, const std::string> mouseButtonNames = {
+        { WM_LBUTTONDOWN, "Mouse Left" },
+        { WM_RBUTTONDOWN, "Mouse Right" },
+        { WM_MBUTTONDOWN, "Mouse Middle" },
+    };
+    const std::map<const WORD, const std::string> mouseExtraButtonNames = {
+        { XBUTTON1, "Mouse 4" },
+        { XBUTTON2, "Mouse 5" },
+    };
+
+    bool isKeyUsed(const InputId& keyId) {
+        return keyState[keyId.name];
+    }
+
+    int16_t getAxisDelta(const std::string& axisname) {
+        if (axisname == "Mouse X-Axis") {
+            int16_t delta = mousePosCurrent.x - mousePosLast.x;
+            mousePosLast.x = mousePosCurrent.x;
+            return delta;
+        }
+        if (axisname == "Mouse Y-Axis") {
+            int16_t delta = mousePosCurrent.y - mousePosLast.y;
+            mousePosLast.y = mousePosCurrent.y;
+            return delta;
+        }
     }
 
     std::string getKeyname(LPARAM extendedParameters) {
@@ -31,6 +64,60 @@ namespace game::input {
 
             keyState[keyname] = true;
             return true;
+        }
+
+        {
+            auto it = std::find(std::begin(mouseButtonDownMessages), std::end(mouseButtonDownMessages), message);
+            if (it != std::end(mouseButtonDownMessages)) {
+
+                std::string keyname;
+                if (message != WM_XBUTTONDOWN) {
+                    keyname = mouseButtonNames.at(message);
+                }
+                else {
+                    // parse high-order word of keycode to get actual button as documented by WM_XBUTTONDOWN
+                    WORD upper_word = (uint16_t)(keycode >> 16);
+                    keyname = mouseExtraButtonNames.at(upper_word);
+                }
+                //LOG(DEBUG) << "Button pressed: " << keyname;
+
+                keyState[keyname] = true;
+                return true;
+            }
+        }
+        {
+            /* this is pretty hacky: we use the DOWN code as mouse button key, because the UP code is always DOWN + 1 */
+            auto messageDown = message - 1;
+            auto it = std::find(std::begin(mouseButtonDownMessages), std::end(mouseButtonDownMessages), messageDown);
+            if (it != std::end(mouseButtonDownMessages)) {
+
+                std::string keyname;
+                if (message != WM_XBUTTONUP) {
+                    keyname = mouseButtonNames.at(messageDown);
+                }
+                else {
+                    // parse high-order word of keycode to get actual button as documented by WM_XBUTTONUP
+                    WORD upperWord = (uint16_t)(keycode >> 16);
+                    keyname = mouseExtraButtonNames.at(upperWord);
+                }
+                //LOG(DEBUG) << "Button released: " << keyname;
+
+                keyState[keyname] = false;
+                return true;
+            }
+
+            // TODO there is a bug with pressin multiple mouse buttons and then releasing them
+        }
+        {
+            if (message == WM_MOUSEMOVE) {
+                WORD lowerWordX = (uint16_t)extendedParameters;
+                WORD upperWordY = (uint16_t)(extendedParameters >> 16);
+
+                //LOG(DEBUG) << "Mouse moved - X: " << lowerWordX << ", Y: " << upperWordY;
+                mousePosCurrent.x = lowerWordX;
+                mousePosCurrent.y = upperWordY;
+                return true;
+            }
         }
         return false;
     }

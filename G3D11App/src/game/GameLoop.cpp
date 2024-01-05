@@ -12,9 +12,22 @@
 
 namespace game
 {
+	struct InputState {
+		int16_t axisDelta = 0;
+	};
+	struct ActionDigital {
+		const std::string actionId;
+		void (*onInputActive)();
+	};
+	struct ActionAnalog {
+		const std::string actionId;
+		void (*onInputActive)(InputState inputState);
+		InputState inputState;
+	};
+
 	struct InputAction
 	{
-		void (*onInputActive)();
+		void (*onInputActive)(InputState inputState);
 	};
 
 	struct Settings {
@@ -23,69 +36,110 @@ namespace game
 		int32_t frameLimit = 40;
 	};
 
+	InputState inputState;
 	Settings settings;
 
 	// input actions
-	const float cameraMoveSpeed = 1.0f;
+	const float cameraMoveSpeed = 0.34f;
+	const float cameraMoveSpeedFast = cameraMoveSpeed * 8;
+
 	const float cameraTurnSpeed = 0.05f;
+	const float cameraSensitivity = 0.01f;
 
 	std::string ACTION_GUI_SEPARATOR = "---";
 	std::vector<std::string> actionsForGui;
 
-	std::map<std::string, InputAction> actions;
-	std::map<std::string, std::string> actionsToKeys;
+	std::map<const std::string, const game::input::InputId> actionsToDigitalInput;
+	std::map<const std::string, const game::input::InputId> actionsToAnalogInput;
 
-	void registerDigitalAction(std::string& actionName, InputAction inputAction) {
-		actions[actionName] = inputAction;
+	bool isActive(const std::string& actionId) {
+		auto& turnEnabledKey = actionsToDigitalInput.at(actionId);
+		return game::input::isKeyUsed(turnEnabledKey);
 	}
 
-	void registerCameraActions() {
-		registerDigitalAction(std::string("CAMERA_MOVE_FORWARDS"), { []() -> void {
-			renderer::camera::moveCameraDepth(cameraMoveSpeed);
-		} });
-		registerDigitalAction(std::string("CAMERA_MOVE_BACKWARDS"), { []() -> void {
-			renderer::camera::moveCameraDepth(cameraMoveSpeed * -1);
-		} });
-		registerDigitalAction(std::string("CAMERA_MOVE_LEFT"), { []() -> void {
-			renderer::camera::moveCameraHorizontal(cameraMoveSpeed * -1);
-		} });
-		registerDigitalAction(std::string("CAMERA_MOVE_RIGHT"), { []() -> void {
-			renderer::camera::moveCameraHorizontal(cameraMoveSpeed);
-		} });
-		registerDigitalAction(std::string("CAMERA_MOVE_UP"), { []() -> void {
-			renderer::camera::moveCameraVertical(cameraMoveSpeed);
-		} });
-		registerDigitalAction(std::string("CAMERA_MOVE_DOWN"), { []() -> void {
-			renderer::camera::moveCameraVertical(cameraMoveSpeed * -1);
-		} });
-		registerDigitalAction(std::string("CAMERA_TURN_LEFT"), { []() -> void {
+	float getCameraMoveSpeed() {
+		if (isActive("CAMERA_MOVE_FAST")) {
+			return cameraMoveSpeedFast;
+		}
+		else {
+			return cameraMoveSpeed;
+		}
+	}
+
+	std::array actionsDigital{
+		ActionDigital { "CAMERA_MOVE_FORWARDS", []() -> void {
+			renderer::camera::moveCameraDepth(getCameraMoveSpeed());
+		} },
+		ActionDigital { "CAMERA_MOVE_BACKWARDS", []() -> void {
+			renderer::camera::moveCameraDepth(getCameraMoveSpeed() * -1);
+		} },
+		ActionDigital { "CAMERA_MOVE_LEFT", []() -> void {
+			renderer::camera::moveCameraHorizontal(getCameraMoveSpeed() * -1);
+		} },
+		ActionDigital { "CAMERA_MOVE_RIGHT", []() -> void {
+			renderer::camera::moveCameraHorizontal(getCameraMoveSpeed());
+		} },
+		ActionDigital { "CAMERA_MOVE_UP", []() -> void {
+			renderer::camera::moveCameraVertical(getCameraMoveSpeed());
+		} },
+		ActionDigital { "CAMERA_MOVE_DOWN", []() -> void {
+			renderer::camera::moveCameraVertical(getCameraMoveSpeed() * -1);
+		} },
+		ActionDigital { "CAMERA_TURN_LEFT", []() -> void {
 			renderer::camera::turnCameraHorizontal(cameraTurnSpeed * -1);
-		} });
-		registerDigitalAction(std::string("CAMERA_TURN_RIGHT"), { []() -> void {
+		} },
+		ActionDigital { "CAMERA_TURN_RIGHT", []() -> void {
 			renderer::camera::turnCameraHorizontal(cameraTurnSpeed);
-		} });
-	}
+		} },
+	};
+	std::array actionsAnalog {
+		ActionAnalog {
+			"CAMERA_TURN_AXIS_X", ([](InputState state) -> void {
+				if (isActive("CAMERA_TURN_ANALOG")) {
+					renderer::camera::turnCameraHorizontal(cameraSensitivity * state.axisDelta);
+				}
+			})
+		},
+		ActionAnalog {
+			"CAMERA_TURN_AXIS_Y", ([](InputState state) -> void {
+				if (isActive("CAMERA_TURN_ANALOG")) {
+					renderer::camera::turnCameraVertical(cameraSensitivity * state.axisDelta);
+				}
+			})
+		},
+	};
 
 	void bindActionToKey(const std::string& actionName, const std::string& key = std::string()) {
 		actionsForGui.push_back(actionName);
-		if (actionName != ACTION_GUI_SEPARATOR) {
-			actionsToKeys[actionName] = key;
+		if (!key.empty()) {
+			actionsToDigitalInput.insert({ actionName, { input::InputDevice::KEYBOARD, key } });
+		}
+	}
+	void bindActionToAxis(const std::string& actionName, const std::string& key = std::string()) {
+		actionsForGui.push_back(actionName);
+		if (!key.empty()) {
+			actionsToAnalogInput.insert({ actionName, { input::InputDevice::MOUSE, key } });
 		}
 	}
 
 	void setDefaultInputMap() {
 		bindActionToKey(ACTION_GUI_SEPARATOR + "Camera");
 		bindActionToKey(ACTION_GUI_SEPARATOR);
-		bindActionToKey("CAMERA_MOVE_FORWARDS", "R");
-		bindActionToKey("CAMERA_MOVE_BACKWARDS", "F");
-		bindActionToKey(ACTION_GUI_SEPARATOR);
+		bindActionToKey("CAMERA_MOVE_FORWARDS", "W");
+		bindActionToKey("CAMERA_MOVE_BACKWARDS", "S");
 		bindActionToKey("CAMERA_MOVE_LEFT", "A");
 		bindActionToKey("CAMERA_MOVE_RIGHT", "D");
-		bindActionToKey("CAMERA_MOVE_UP", "W");
-		bindActionToKey("CAMERA_MOVE_DOWN", "S");
+		bindActionToKey("CAMERA_MOVE_UP", "E");
+		bindActionToKey("CAMERA_MOVE_DOWN", "C");
 		bindActionToKey(ACTION_GUI_SEPARATOR);
-		bindActionToKey("CAMERA_TURN_LEFT", "Q");
-		bindActionToKey("CAMERA_TURN_RIGHT", "E");
+		bindActionToKey("CAMERA_MOVE_FAST", "SHIFT");
+		//bindActionToKey(ACTION_GUI_SEPARATOR);
+		//bindActionToKey("CAMERA_TURN_LEFT", "Q");
+		//bindActionToKey("CAMERA_TURN_RIGHT", "E");
+		bindActionToKey(ACTION_GUI_SEPARATOR);
+		bindActionToKey("CAMERA_TURN_ANALOG", "CTRL");
+		bindActionToAxis("CAMERA_TURN_AXIS_X", "Mouse X-Axis");
+		bindActionToAxis("CAMERA_TURN_AXIS_Y", "Mouse Y-Axis");
 	}
 
 	void init(HWND hWnd)
@@ -93,7 +147,7 @@ namespace game
 		enablePreciseTimerResolution();
 		initMicrosleep();
 
-		registerCameraActions();
+		//registerCameraActions();
 		setDefaultInputMap();
 
 		renderer::addSettings("Graphics", {
@@ -123,13 +177,20 @@ namespace game
 								ImGui::TableNextColumn();
 						}
 						else {
+							auto it = actionsToDigitalInput.find(actionname);
+							if (it == actionsToDigitalInput.end()) {
+								it = actionsToAnalogInput.find(actionname);
+								if (it == actionsToAnalogInput.end()) {
+									break;
+								}
+							}
 							ImGui::TableNextColumn();
 							ImGui::Indent();
-							auto& keyname = actionsToKeys[actionname];
 							ImGui::Text(actionname.c_str());
 							ImGui::Unindent();
 							ImGui::TableNextColumn();
-							ImGui::Text(keyname.c_str());
+							auto& inputId = it->second;
+							ImGui::Text(inputId.name.c_str());
 						}
 					}
 					ImGui::EndTable();
@@ -147,16 +208,24 @@ namespace game
 		stats::FrameSample frameTime;
 		frameTime.renderStart();
 
-		for (auto& [actionname, keyname] : actionsToKeys) {
-			// if key is pressed
-			bool isPressed = game::input::isKeyUsed(keyname);
-			if (isPressed) {
-				// if action exists
-				auto actionIt = actions.find(actionname);
-				if (actionIt != actions.end()) {
-					auto action = actionIt->second;
+		// check if input is mapped to a button and activate if pressed
+		for (auto& action : actionsDigital) {
+			auto inputIt = actionsToDigitalInput.find(action.actionId);
+			if (inputIt != actionsToDigitalInput.end()) {
+				auto& inputId = inputIt->second;
+				bool isPressed = game::input::isKeyUsed(inputId);
+				if (isPressed) {
 					action.onInputActive();
 				}
+			}
+		}
+		// analog inputs are always evaluated if mapped
+		for (auto& action : actionsAnalog) {
+			auto inputIt = actionsToAnalogInput.find(action.actionId);
+			if (inputIt != actionsToAnalogInput.end()) {
+				auto& inputId = inputIt->second;
+				action.inputState.axisDelta = game::input::getAxisDelta(inputId.name);
+				action.onInputActive(action.inputState);
 			}
 		}
 

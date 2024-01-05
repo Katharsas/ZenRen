@@ -17,5 +17,6 @@ namespace renderer::camera {
 	void moveCameraHorizontal(float amount);
 	void moveCameraVertical(float amount);
 	void turnCameraHorizontal(float amount);
+	void turnCameraVertical(float amount);
 }
 

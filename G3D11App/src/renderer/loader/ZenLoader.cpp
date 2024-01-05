@@ -253,11 +253,6 @@ namespace renderer::loader {
                 //}
             }
 
-            /*LOG(INFO) << "LIGHTMAPS USED: " << lightmaps.size();
-            for (auto& lightmapIt : lightmaps) {
-                LOG(INFO) << "    " << lightmapIt.first;
-            }*/
-
             const auto& texture = zenSubmesh.material.texture;
 
             if (!texture.empty()) {

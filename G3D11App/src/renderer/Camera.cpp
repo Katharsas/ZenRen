@@ -84,4 +84,12 @@ namespace renderer::camera {
 		auto targetRelNew = XMVector4Transform(targetRel, transf);
 		location.target = location.position + targetRelNew;
 	}
+
+	void turnCameraVertical(float amount) {
+		auto targetRel = location.target - location.position;
+		auto axis = XMVector3Cross(location.up, targetRel);
+		auto transf = XMMatrixRotationAxis(axis, amount);
+		auto targetRelNew = XMVector4Transform(targetRel, transf);
+		location.target = location.position + targetRelNew;
+	}
 }

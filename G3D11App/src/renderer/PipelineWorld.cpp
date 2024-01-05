@@ -66,15 +66,11 @@ namespace renderer::world {
 
 	void initGui() {
 		// TODO move to RenderDebugGui
-
 		
-		addWindow("Debug World", {
-			[&]()  -> void {
-				// TODO restrict world rendering to subset of submeshes to only show mesh data with distinctive lightmap (like church in oldcamp)
-				// then display the relevant lightmaps and try to figure out how they are meant to be mapped. 
-				// Alternatively figure out how to disable lightmaps in Gothic 1 and make a image diff on/off of that church.
-			}
-		});
+		//addWindow("Debug World", {
+		//	[&]()  -> void {
+		//	}
+		//});
 
 		addWindow("Lightmaps", {
 			[&]()  -> void {
@@ -99,7 +95,7 @@ namespace renderer::world {
 
 		if (loadObj) {
 			std::string inputFile = "data_g1/world.obj";
-			//matsToVertices = loader::loadObj(inputFile);
+			matsToVertices = loader::loadObj(inputFile);
 		}
 		else {
 			matsToVertices = loader::loadZen();
@@ -119,7 +115,6 @@ namespace renderer::world {
 		
 		std::filesystem::path userDir = util::getUserFolderPath();
 		std::filesystem::path texDir = userDir / "CLOUD/Eigene Projekte/Gothic Reloaded Mod/Textures";
-		//std::filesystem::path texDir = "Level";
 		loader::scanDirForTextures(texDir);
 
 		int32_t loadedCount = 0;

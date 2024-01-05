@@ -82,7 +82,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	MSG msg;
 
 	while (TRUE) {
-		if (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
+		while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
 			DispatchMessageW(&msg);
 			if (msg.message == WM_QUIT) {
@@ -219,14 +219,14 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 			info->ptMinTrackSize.y = 200;
 		}
 		break;
-	case WM_PAINT:
-		{
+	//case WM_PAINT:
+	//	{
 			//PAINTSTRUCT ps;
 			//HDC hdc = BeginPaint(hWnd, &ps);
 			//// TODO: Add any drawing code that uses hdc here...
 			//EndPaint(hWnd, &ps);
-		}
-		break;
+	//	}
+	//	break;
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		break;

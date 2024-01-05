@@ -15,9 +15,9 @@ namespace renderer::loader {
 	using ::util::asciiToLowercase;
 	using ::util::getOrCreate;
 
-	typedef POS_NORMAL_UV_COL VERTEX;
+	typedef WORLD_VERTEX VERTEX;
 
-	std::unordered_map<std::string, std::vector<VERTEX>> loadObj(const std::string& inputFile) {
+	std::unordered_map<Material, std::vector<VERTEX>> loadObj(const std::string& inputFile) {
 
 		tinyobj::ObjReaderConfig reader_config;
 		reader_config.triangulate = true;
@@ -58,7 +58,7 @@ namespace renderer::loader {
 
 		const float scale = 1.0f;
 
-		std::unordered_map<std::string, std::vector<VERTEX>> matsToVertices;
+		std::unordered_map<Material, std::vector<WORLD_VERTEX>> matsToVertices;
 		int32_t faceCount = 0;
 		int32_t faceSkippedCount = 0;
 
@@ -93,13 +93,14 @@ namespace renderer::loader {
 					if (idx.texcoord_index >= 0) {
 						tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
 						tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
-						vertex.uv = { tx, ty };
+						vertex.uvDiffuse = { tx, ty };
 					}
 					else {
-						vertex.uv = { 0, 0 };
+						vertex.uvDiffuse = { 0, 0 };
 					}
 
-					vertex.color = { 1, 1, 1, 1 };
+					vertex.colorLightmap = { 1, 1, 1, 1 };
+					vertex.uvLightmap = { 0, 0 };
 
 					vertices.at(2 - vertexIndex) = vertex;// FLIPPED Z -> flip faces
 				}
@@ -124,7 +125,7 @@ namespace renderer::loader {
 					auto texFilename = texFilepath.filename().u8string();
 					asciiToLowercase(texFilename);
 
-					auto& matVertices = getOrCreate(matsToVertices, texFilename);
+					auto& matVertices = getOrCreate(matsToVertices, { (int32_t) materialIndex, texFilename });
 					matVertices.insert(matVertices.end(), vertices.begin(), vertices.end());
 
 					faceCount++;
