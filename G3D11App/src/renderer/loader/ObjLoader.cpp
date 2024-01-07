@@ -125,7 +125,7 @@ namespace renderer::loader {
 					auto texFilename = texFilepath.filename().u8string();
 					asciiToLowercase(texFilename);
 
-					auto& matVertices = getOrCreate(matsToVertices, { (int32_t) materialIndex, texFilename });
+					auto& matVertices = getOrCreate(matsToVertices, { texFilename });
 					matVertices.insert(matVertices.end(), vertices.begin(), vertices.end());
 
 					faceCount++;

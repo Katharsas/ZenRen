@@ -20,8 +20,6 @@ namespace renderer::loader {
     using ::util::asciiToLowercase;
     using ::util::getOrCreate;
 
-    typedef WORLD_VERTEX VERTEX;
-
     ZenLoad::ZenParser parser;
     ZenLoad::zCMesh* worldMesh;
 
@@ -77,49 +75,16 @@ namespace renderer::loader {
         return lightmapTextures;
     }
 
-    std::unordered_map<Material, std::vector<VERTEX>> loadZen() {
-        const std::string vdfsArchiveToLoad = "data_g1/worlds.VDF";
-        const std::string zenFilename = "WORLD.ZEN";
-
-        VDFS::FileIndex::initVDFS("Foo");
-        VDFS::FileIndex vdf;
-        vdf.loadVDF(vdfsArchiveToLoad);
-        vdf.finalizeLoad();
-
-        parser = ZenLoad::ZenParser(zenFilename, vdf);
-        if (parser.getFileSize() == 0)
-        {
-            LOG(FATAL) << "ZEN-File either not found or empty!";
-        }
-
-        // Since this is a usual level-zen, read the file header
-        // You will most likely allways need to do that
-        parser.readHeader();
-
-        // Do something with the header, if you want.
-        LOG(INFO) << "Zen author: " << parser.getZenHeader().user;
-        LOG(INFO) << "Zen date: " << parser.getZenHeader().date;
-        LOG(INFO) << "Zen object count: " << parser.getZenHeader().objectCount;
-
-        ZenLoad::oCWorldData world;
-        parser.readWorld(world);
-
-        worldMesh = parser.getWorldMesh();
-
-        loadZenLightmaps();
-
+    std::unordered_map<Material, std::vector<WORLD_VERTEX>> loadWorldMesh() {
         ZenLoad::PackedMesh packedWorldMesh;
         parser.getWorldMesh()->packMesh(packedWorldMesh, 0.01f);
 
-        LOG(INFO) << "Zen loaded!";
+        std::unordered_map<Material, std::vector<WORLD_VERTEX>> matsToVertices;
 
-        std::unordered_map<Material, std::vector<VERTEX>> matsToVertices;
-
-        int32_t submeshIndex = 0;
         int32_t faceCount = 0;
         for (const auto& zenSubmesh : packedWorldMesh.subMeshes) {
 
-            std::vector<VERTEX> faces;
+            std::vector<WORLD_VERTEX> faces;
             std::unordered_map<uint32_t, bool> lightmaps;
 
             int32_t faceIndex = 0;
@@ -135,7 +100,7 @@ namespace renderer::loader {
                     packedWorldMesh.vertices.at(faceIndices[1]),
                     packedWorldMesh.vertices.at(faceIndices[2]),
                 };
-                
+
                 ZenLoad::Lightmap lightmap;
                 const int16_t faceLightmapIndex = zenSubmesh.triangleLightmapIndices[faceIndex];
                 int32_t debugTexNumber = -1;
@@ -145,11 +110,11 @@ namespace renderer::loader {
                     debugTexNumber = lightmap.lightmapTextureIndex;
                 }
 
-                std::array<VERTEX, 3> vertices;
+                std::array<WORLD_VERTEX, 3> vertices;
 
                 uint32_t vertexIndex = 0;
                 for (const auto& zenVert : face) {
-                    VERTEX vertex;
+                    WORLD_VERTEX vertex;
                     {
                         vertex.pos.x = zenVert.Position.x;
                         vertex.pos.y = zenVert.Position.y;
@@ -208,49 +173,6 @@ namespace renderer::loader {
                 faces.insert(faces.end(), vertices.begin(), vertices.end());
                 faceIndex++;
                 faceCount++;
-
-                //if (false) {
-                //    auto texFilename = getNumberTexName(debugTexNumber);
-
-                //    Material material = { 0, texFilename };
-                //    auto& matVertices = getOrCreate(matsToVertices, material);
-                //    matVertices.insert(matVertices.end(), faces.begin(), faces.end());
-                //}
-
-                //if (false) {
-                //    int32_t faceCountHundreds = (faceCount + 50) / 100;
-
-                //    auto texFilename = getNumberTexName(faceCountHundreds);
-
-                //    Material material = { 0, texFilename };
-                //    auto& matVertices = getOrCreate(matsToVertices, material);
-                //    matVertices.insert(matVertices.end(), faces.begin(), faces.end());
-                //}
-
-                //if (true) {
-                //    int32_t faceCountHundreds = (faceCount + 50) / 100;
-
-                //    // only insert 935
-                //    if (faceCountHundreds == 941) {
-                //        int32_t faceNumber = (faceCount + 50) % 94100;
-                //        if (faceNumber == 93) {
-                //            LOG(INFO) << "HEY";
-                //            faceNumber = -1;
-                //        }
-                //        auto texFilename = getNumberTexName(faceNumber);
-
-                //        Material material = { 0, texFilename };
-                //        auto& matVertices = getOrCreate(matsToVertices, material);
-                //        matVertices.insert(matVertices.end(), faces.begin(), faces.end());
-                //    }
-                //    else {
-                //        auto texFilename = getNumberTexName(-1);
-
-                //        Material material = { 0, texFilename };
-                //        auto& matVertices = getOrCreate(matsToVertices, material);
-                //        matVertices.insert(matVertices.end(), faces.begin(), faces.end());
-                //    }
-                //}
             }
 
             const auto& texture = zenSubmesh.material.texture;
@@ -270,11 +192,10 @@ namespace renderer::loader {
                 auto& texFilename = texFilepath.filename().u8string();
                 asciiToLowercase(texFilename);
 
-                Material material = { submeshIndex, texFilename };
+                Material material = { texFilename };
                 auto& matVertices = getOrCreate(matsToVertices, material);
                 matVertices.insert(matVertices.end(), faces.begin(), faces.end());
             }
-            submeshIndex++;
         }
 
         //std::string dumpTex = "owodpatrgrassmi.tga";
@@ -287,17 +208,43 @@ namespace renderer::loader {
         return matsToVertices;
 
         // Print some sample-data for vobs which got a visual
-        /*
-        
+    }
 
-        std::cout << "Listing waypoints..." << std::endl;
-        for (const ZenLoad::zCWaypointData& v : world.waynet.waypoints)
+    std::unordered_map<Material, std::vector<WORLD_VERTEX>> loadZen() {
+        const std::string vdfsArchiveToLoad = "data_g1/worlds.VDF";
+        const std::string zenFilename = "WORLD.ZEN";
+
+        VDFS::FileIndex::initVDFS("Foo");
+        VDFS::FileIndex vdf;
+        vdf.loadVDF(vdfsArchiveToLoad);
+        vdf.finalizeLoad();
+
+        parser = ZenLoad::ZenParser(zenFilename, vdf);
+        if (parser.getFileSize() == 0)
         {
-            std::cout << "Waypoint [" << v.wpName << "] at " << v.position.toString() << std::endl;
+            LOG(FATAL) << "ZEN-File either not found or empty!";
         }
 
-        std::cout << "Exporting obj..." << std::endl;
-        Utils::exportPackedMeshToObj(packedWorldMesh, (zenFileName + std::string(".OBJ")));
-        */
+        // Since this is a usual level-zen, read the file header
+        // You will most likely allways need to do that
+        parser.readHeader();
+
+        // Do something with the header, if you want.
+        LOG(INFO) << "Zen author: " << parser.getZenHeader().user;
+        LOG(INFO) << "Zen date: " << parser.getZenHeader().date;
+        LOG(INFO) << "Zen object count: " << parser.getZenHeader().objectCount;
+
+        ZenLoad::oCWorldData world;
+        parser.readWorld(world);
+        
+        worldMesh = parser.getWorldMesh();
+
+        loadZenLightmaps();
+        auto matsToVertices = loadWorldMesh();
+        //loadVobs(world.rootVobs);
+
+        LOG(INFO) << "Zen loaded!";
+
+        return matsToVertices;
 	}
 }

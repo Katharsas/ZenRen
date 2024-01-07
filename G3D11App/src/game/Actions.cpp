@@ -5,6 +5,7 @@
 #include "Input.h"
 #include "renderer/Camera.h"
 #include "renderer/Gui.h"
+#include "../Util.h"
 #include "imgui/imgui.h"
 
 namespace game {
@@ -144,7 +145,7 @@ namespace game {
 								ImGui::NewLine();
 								ImGui::TableNextColumn();
 						}
-						else if (actionname._Starts_with(ACTION_GUI_SEPARATOR)) {
+						else if (util::startsWith(actionname, ACTION_GUI_SEPARATOR)) {
 							auto separatorName = actionname.substr(ACTION_GUI_SEPARATOR.length(), actionname.length() - ACTION_GUI_SEPARATOR.length());
 								ImGui::TableNextColumn();
 								ImGui::Text(separatorName.c_str());

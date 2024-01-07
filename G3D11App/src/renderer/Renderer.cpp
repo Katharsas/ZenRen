@@ -7,6 +7,7 @@
 // https://www.braynzarsoft.net/viewtutorial/q16390-braynzar-soft-directx-11-tutorials
 //
 // Beefed up with whatever code i could find on the internet.
+// The renderer can optionally use some DX 12 functionality like flip model and VRAM stats.
 
 #include <wrl/client.h>
 
@@ -19,8 +20,10 @@ using namespace Microsoft::WRL;
 #include "PipelineWorld.h"
 #include "ShaderManager.h"
 #include "Shader.h"
+#include "RenderUtil.h"
 #include "../Util.h"
 #include "Gui.h"
+#include "imgui/imgui.h"
 
 //#include <vdfs/fileIndex.h>
 //#include <zenload/zenParser.h>
@@ -30,7 +33,13 @@ using namespace Microsoft::WRL;
 namespace renderer
 {
 	// global declarations
+	struct Dx12 {
+		bool isAvailable = false;// true if DXGI 1.4 (IDXGIFactory4) is available
+		IDXGIAdapter3* adapter = nullptr;// we need this for VRAM usage queries
+	};
+
 	D3d d3d;
+	Dx12 dx12;
 	
 	IDXGISwapChain1* swapchain;
 	ID3D11RenderTargetView* linearBackBuffer; // 64-bit
@@ -53,6 +62,8 @@ namespace renderer
 	void initViewport(BufferSize& size);
 	void initRasterizerStates();
 
+
+
 	void initWorld()
 	{
 		//VDFS::FileIndex vdf;
@@ -70,6 +81,13 @@ namespace renderer
 			::settings::SCREEN_WIDTH,
 			::settings::SCREEN_HEIGHT
 		};
+
+		renderer::addWindow("Info", {
+			[]() -> void {
+				const std::string line = renderer::util::getVramUsage(dx12.adapter);
+				ImGui::Text(line.c_str());
+			}
+		});
 
 		initDeviceAndSwapChain(hWnd, clientSize);
 
@@ -142,6 +160,10 @@ namespace renderer
 		cleanGui();
 
 		// close and release all existing COM objects
+		if (dx12.isAvailable) {
+			dx12.adapter->Release();
+		}
+
 		delete shaders;
 
 		world::clean();
@@ -253,11 +275,13 @@ namespace renderer
 
 		dxgiDevice.Get()->SetMaximumFrameLatency(1);
 		
-		bool flipPresent = true;
 		ComPtr<IDXGIFactory4> dxgiFactory_4;
-		if (FAILED(dxgiFactory_2.As(&dxgiFactory_4)))
-		{
-			flipPresent = false;
+		if (FAILED(dxgiFactory_2.As(&dxgiFactory_4))) {
+			dx12.isAvailable = false;
+		}
+		else {
+			dx12.isAvailable = true;
+			dxgiFactory_4->EnumAdapters(0, reinterpret_cast<IDXGIAdapter**>(&dx12.adapter));
 		}
 
 		// Create windowed swapchain, TODO create fullscreen swapchain and pass both
@@ -272,8 +296,8 @@ namespace renderer
 		swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;      // how swap chain is to be used
 		swapChainDesc.SampleDesc.Count = 1;                               // how many multisamples
 		swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;     // allow full-screen switching
-		if (flipPresent) {
-			LOG(DEBUG) << "Detected Windows 10 or greater! Using flip model.";
+		if (dx12.isAvailable) {
+			LOG(DEBUG) << "Detected Windows 10 or greater! Using flip present model.";
 			swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 		}
 

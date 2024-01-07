@@ -118,21 +118,11 @@ namespace renderer::world {
 		loader::scanDirForTextures(texDir);
 
 		int32_t loadedCount = 0;
-		const int32_t meshStart = -1;
-		const int32_t meshEnd = -1;
 
 		for (const auto& it : matsToVertices) {
 			
 			auto& material = it.first;
 			auto& vertices = it.second;
-
-			int32_t meshIndex = material.submeshIndex;
-			if (meshStart >= 0 && meshIndex < meshStart) {
-				continue;
-			}
-			if (meshEnd >= 0 && meshIndex > meshEnd) {
-				continue;
-			}
 
 			if (!vertices.empty()) {
 				auto& actualPath = loader::getTexturePathOrDefault(material.texBaseColor);

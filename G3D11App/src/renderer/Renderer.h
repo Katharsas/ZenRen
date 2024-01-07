@@ -112,13 +112,11 @@ namespace renderer
 	};
 
 	struct Material {
-		int32_t submeshIndex;
 		std::string texBaseColor;
 
 		bool operator==(const Material& other) const
 		{
-			return (submeshIndex == other.submeshIndex
-				&& texBaseColor == other.texBaseColor);
+			return (texBaseColor == other.texBaseColor);
 		}
 	};
 
@@ -177,7 +175,6 @@ namespace std
 		size_t operator()(const Material& key) const
 		{
 			size_t res = 17;
-			res = res * 31 + key.submeshIndex;
 			res = res * 31 + hash<string>()(key.texBaseColor);
 			return res;
 		}
