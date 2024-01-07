@@ -82,6 +82,7 @@
     <ClCompile Include="src\renderer\loader\ZenLoader.cpp" />
     <ClCompile Include="src\renderer\loader\ObjLoader.cpp" />
     <ClCompile Include="src\renderer\RenderUtil.cpp" />
+    <ClCompile Include="src\game\Actions.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Util.h">
@@ -130,5 +131,6 @@
     <ClInclude Include="src\renderer\loader\ZenLoader.h" />
     <ClInclude Include="src\renderer\loader\ObjLoader.h" />
     <ClInclude Include="src\renderer\RenderUtil.h" />
+    <ClInclude Include="src\game\Actions.h" />
   </ItemGroup>
 </Project>

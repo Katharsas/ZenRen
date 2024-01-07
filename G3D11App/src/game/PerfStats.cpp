@@ -22,6 +22,7 @@ namespace game::stats {
 	const int32_t sampleSize = 500; // number of frames until statistics are averaged and logged
 
 	int32_t sampleIndex = 0;
+	std::array<int32_t, sampleSize> updateTimeSamples;
 	std::array<int32_t, sampleSize> renderTimeSamples;
 	std::array<int32_t, sampleSize> sleepTimeSamples;
 
@@ -45,6 +46,7 @@ namespace game::stats {
 	void logStats(int32_t frameTimeTarget)
 	{
 		// log fps and frame times
+		const int32_t averageUpdateTime = average(updateTimeSamples);
 		const int32_t averageRenderTime = average(renderTimeSamples);
 		const int32_t averageSleepTime = average(sleepTimeSamples);
 		const int32_t fps = 1000000 / (averageRenderTime + averageSleepTime);
@@ -86,7 +88,9 @@ namespace game::stats {
 		const std::string splitter = " | ";
 		std::stringstream log;
 		if (settings.fps)					log << "FPS: " << fps << splitter;
-		if (settings.renderTime)			log << "renderTime: " << averageRenderTime << splitter;
+		if (settings.renderTime)			log << "frameTime (update + render): " << (averageUpdateTime + averageRenderTime)
+			<< " (" << averageUpdateTime << " + " << averageRenderTime << ") " << splitter;
+
 		if (frameLimiterEnabled) {
 			if (settings.sleepTime)				log << "sleepTime: " << averageSleepTime << splitter;
 			if (settings.offsetTime)			log << "offsetTime: " << offAverage << splitter;
@@ -107,6 +111,7 @@ namespace game::stats {
 	}
 
 	void addFrameSample(FrameSample sample, int32_t frameTimeTarget) {
+		updateTimeSamples[sampleIndex] = sample.updateTimeMicros;
 		renderTimeSamples[sampleIndex] = sample.renderTimeMicros;
 		sleepTimeSamples[sampleIndex] = sample.sleepTimeMicros;
 

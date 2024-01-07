@@ -4,8 +4,11 @@ namespace game::stats {
 
 	struct FrameSample
 	{
-		std::chrono::steady_clock::time_point temp;
+		bool firstFrame = true;
+		std::chrono::steady_clock::time_point start;
+		std::chrono::steady_clock::time_point last;
 
+		int32_t updateTimeMicros;
 		int32_t renderTimeMicros;
 		int32_t sleepTimeMicros;
 
@@ -14,21 +17,41 @@ namespace game::stats {
 			return static_cast<int32_t> (duration / std::chrono::microseconds(1));
 		}
 
-		void renderStart() {
-			temp = std::chrono::high_resolution_clock::now();
+		int32_t updateStart() {
+			const auto now = std::chrono::high_resolution_clock::now();
+			int32_t deltaTime;
+			if (firstFrame) {
+				deltaTime = 0;
+			}
+			else {
+				// time between last start and current start
+				deltaTime = toDurationMicros(start, now);
+			}
+			start = now;
+			last = now;
+			return deltaTime;
+		}
+
+		int32_t updateEndRenderStart() {
+			const auto now = std::chrono::high_resolution_clock::now();
+			updateTimeMicros = toDurationMicros(last, now);
+			last = now;
+			return updateTimeMicros;
 		}
 
 		int32_t renderEndSleepStart() {
-			const auto end = std::chrono::high_resolution_clock::now();
-			renderTimeMicros = toDurationMicros(temp, end);
-			temp = end;
+			const auto now = std::chrono::high_resolution_clock::now();
+			renderTimeMicros = toDurationMicros(last, now);
+			last = now;
 			return sleepTimeMicros;
 		}
 
 		int32_t sleepEnd() {
-			const auto end = std::chrono::high_resolution_clock::now();
-			sleepTimeMicros = toDurationMicros(temp, end);
-			//temp = 
+			firstFrame = false;
+
+			const auto now = std::chrono::high_resolution_clock::now();
+			sleepTimeMicros = toDurationMicros(last, now);
+			last = now;
 			return sleepTimeMicros;
 		}
 	};
