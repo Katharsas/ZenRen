@@ -80,11 +80,11 @@ namespace renderer
 	struct POS_NORMAL_UV {
 		VEC3 pos;
 		VEC3 normal;
-		UV uv;
+		UV uvDiffuse;
 
 		friend std::ostream& operator <<(std::ostream& os, const POS_NORMAL_UV& that)
 		{
-			return os << "[POS:" << that.pos << " NOR:" << that.normal << " UV:" << that.uv << "]";
+			return os << "[POS:" << that.pos << " NOR:" << that.normal << " UV_DIFF:" << that.uvDiffuse << "]";
 		}
 	};
 	struct POS_NORMAL_UV_COL {

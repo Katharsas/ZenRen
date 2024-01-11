@@ -184,6 +184,7 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\renderer\loader\MeshFromVdfLoader.cpp" />
     <ClCompile Include="src\game\Actions.cpp" />
     <ClCompile Include="src\renderer\RenderUtil.cpp" />
     <ClCompile Include="src\renderer\loader\ObjLoader.cpp" />
@@ -248,6 +249,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="lib\tinyobj\tiny_obj_loader.h" />
+    <ClInclude Include="src\renderer\loader\MeshFromVdfLoader.h" />
     <ClInclude Include="src\game\Actions.h" />
     <ClInclude Include="src\renderer\RenderUtil.h" />
     <ClInclude Include="src\renderer\loader\ObjLoader.h" />

@@ -2,34 +2,48 @@
 #include "ZenLoader.h"
 
 #include <filesystem>
+#include <queue>
+#include <stdexcept>
+#include <filesystem>
 
 #include "../../Util.h"
 #include "../RenderUtil.h"
 #include "TextureFinder.h"
+#include "MeshFromVdfLoader.h"
 
 #include "DirectXTex.h"
 #include "vdfs/fileIndex.h"
 #include "zenload/zCMesh.h"
 #include "zenload/zenParser.h"
 #include "zenload/ztex2dds.h"
+#include "zenload/zCProgMeshProto.h"
 
 namespace renderer::loader {
 
     using namespace DirectX;
     using namespace ZenLib;
-    using ::util::asciiToLowercase;
-    using ::util::getOrCreate;
+    using ::std::string;
+    using ::std::array;
+    using ::std::vector;
+    using ::std::unordered_map;
+    //using ::util::asciiToLowercase;
+    //using ::util::getOrCreate;
 
     ZenLoad::ZenParser parser;
     ZenLoad::zCMesh* worldMesh;
 
-    std::vector<ZenLightmapTexture> lightmapTextures;
-    std::vector<Image> lightmapTexturesData;
+    vector<ZenLightmapTexture> lightmapTextures;
+    vector<Image> lightmapTexturesData;
+
+    struct StaticInstance {
+        std::string visual;
+        XMMATRIX transform;
+    };
 
     /**
      * Recursive function to list some data about the zen-file
      */
-    void listVobInformation(const std::vector<ZenLoad::zCVobData>& vobs)
+    void listVobInformation(const vector<ZenLoad::zCVobData>& vobs)
     {
         for (const ZenLoad::zCVobData& v : vobs)
         {
@@ -44,15 +58,13 @@ namespace renderer::loader {
         }
     }
 
-    int32_t wrapModulo(int32_t positiveOrNegative, int32_t modulo) {
-        return ((positiveOrNegative % modulo) + modulo) % modulo;
-    }
+
 
     void loadZenLightmaps() {
         for (auto& lightmap : worldMesh->getLightmapTextures()) {
             int32_t width;
             int32_t height;
-            std::vector<uint8_t> ddsRaw;
+            vector<uint8_t> ddsRaw;
             int32_t message = ZenLoad::convertZTEX2DDS(lightmap, ddsRaw, true, &width, &height);
             if (message != 0) {
                 LOG(WARNING) << "Failed to convert lightmap zTex to DDS: Error code '" << message << "'!";
@@ -71,153 +83,112 @@ namespace renderer::loader {
         }
     }
 
-    std::vector<ZenLightmapTexture>& getLightmapTextures() {
+    vector<ZenLightmapTexture>& getLightmapTextures() {
         return lightmapTextures;
     }
 
-    std::unordered_map<Material, std::vector<WORLD_VERTEX>> loadWorldMesh() {
-        ZenLoad::PackedMesh packedWorldMesh;
-        parser.getWorldMesh()->packMesh(packedWorldMesh, 0.01f);
+    unordered_map<Material, vector<WORLD_VERTEX>> loadWorldMesh()
+    {
+        unordered_map<Material, vector<WORLD_VERTEX>> matsToVertices;
 
-        std::unordered_map<Material, std::vector<WORLD_VERTEX>> matsToVertices;
-
-        int32_t faceCount = 0;
-        for (const auto& zenSubmesh : packedWorldMesh.subMeshes) {
-
-            std::vector<WORLD_VERTEX> faces;
-            std::unordered_map<uint32_t, bool> lightmaps;
-
-            int32_t faceIndex = 0;
-            for (int32_t indicesIndex = 0; indicesIndex < zenSubmesh.indices.size(); indicesIndex += 3) {
-
-                const std::array<uint32_t, 3> faceIndices = {
-                    zenSubmesh.indices[indicesIndex],
-                    zenSubmesh.indices[indicesIndex + 1],
-                    zenSubmesh.indices[indicesIndex + 2]
-                };
-                const auto face = {
-                    packedWorldMesh.vertices.at(faceIndices[0]),
-                    packedWorldMesh.vertices.at(faceIndices[1]),
-                    packedWorldMesh.vertices.at(faceIndices[2]),
-                };
-
-                ZenLoad::Lightmap lightmap;
-                const int16_t faceLightmapIndex = zenSubmesh.triangleLightmapIndices[faceIndex];
-                int32_t debugTexNumber = -1;
-                if (faceLightmapIndex != -1) {
-                    lightmap = worldMesh->getLightmapReferences()[faceLightmapIndex];
-                    lightmaps.insert({ lightmap.lightmapTextureIndex , true });
-                    debugTexNumber = lightmap.lightmapTextureIndex;
-                }
-
-                std::array<WORLD_VERTEX, 3> vertices;
-
-                uint32_t vertexIndex = 0;
-                for (const auto& zenVert : face) {
-                    WORLD_VERTEX vertex;
-                    {
-                        vertex.pos.x = zenVert.Position.x;
-                        vertex.pos.y = zenVert.Position.y;
-                        vertex.pos.z = zenVert.Position.z;
-                    } {
-                        vertex.normal.x = zenVert.Normal.x;
-                        vertex.normal.y = zenVert.Normal.y;
-                        vertex.normal.z = zenVert.Normal.z;
-                    } {
-                        vertex.uvDiffuse.u = zenVert.TexCoord.x;
-                        vertex.uvDiffuse.v = zenVert.TexCoord.y;
-                    } {
-                        if (faceLightmapIndex == -1) {
-                            vertex.uvLightmap = { 0, 0, -1 };
-                            vertex.colorLightmap = { 1, 1, 1, 1 };
-                        }
-                        else {
-                            float unscale = 100;
-                            XMVECTOR pos = XMVectorSet(vertex.pos.x * unscale, vertex.pos.y * unscale, vertex.pos.z * unscale, 0);
-                            XMVECTOR origin = XMVectorSet(lightmap.origin.x, lightmap.origin.y, lightmap.origin.z, 0);
-                            XMVECTOR normalUp = XMVectorSet(lightmap.normalUp.x, lightmap.normalUp.y, lightmap.normalUp.z, 0);
-                            XMVECTOR normalRight = XMVectorSet(lightmap.normalRight.x, lightmap.normalRight.y, lightmap.normalRight.z, 0);
-                            XMVECTOR lightmapDir = pos - origin;
-                            vertex.uvLightmap.u = XMVectorGetX(XMVector3Dot(lightmapDir, normalRight));
-                            vertex.uvLightmap.v = XMVectorGetX(XMVector3Dot(lightmapDir, normalUp));
-                            vertex.uvLightmap.i = lightmap.lightmapTextureIndex;
-
-                            // CPU per vertex sampling because the lightmaps are so low resolution that per pixel sampling is just overkill
-                            // GPU per vertex sampling might be easier, however this is probably faster during rendering.
-                            const auto& lightmapTex = lightmapTextures[lightmap.lightmapTextureIndex];
-                            float uAbs = (lightmapTex.width * vertex.uvLightmap.u) + 0.5f;
-                            float vAbs = (lightmapTex.height * vertex.uvLightmap.v) + 0.5f;
-                            uint32_t uPixel = wrapModulo(uAbs, lightmapTex.width);
-                            uint32_t vPixel = wrapModulo(vAbs, lightmapTex.height);
-
-                            const uint32_t pixelSize = 4;
-                            const auto image = lightmapTexturesData[lightmap.lightmapTextureIndex];
-
-                            uint8_t* pixel = image.pixels + (image.rowPitch * vPixel) + (pixelSize * uPixel);
-                            vertex.colorLightmap.r = (*(pixel + 0)) / 255.0f;
-                            vertex.colorLightmap.g = (*(pixel + 1)) / 255.0f;
-                            vertex.colorLightmap.b = (*(pixel + 2)) / 255.0f;
-                            vertex.colorLightmap.a = (*(pixel + 3)) / 255.0f;
-                        }
-                    }
-                    vertices.at(2 - vertexIndex) = vertex;// flip faces apparently, but not z ?!
-                    vertexIndex++;
-
-                    // lightmap test
-                    /*if (indicesIndex == 0) {
-                        for (auto& vertex : vertices) {
-                            worldMesh->getLightmapReferences()
-                        }
-                    }*/
-                }
-                faces.insert(faces.end(), vertices.begin(), vertices.end());
-                faceIndex++;
-                faceCount++;
-            }
-
-            const auto& texture = zenSubmesh.material.texture;
-
-            if (!texture.empty()) {
-
-                /*if (texture == std::string("OWODWAMOUNTAINFARCLOSE.TGA")) {
-                    LOG(INFO) << "HEY";
-                }*/
-
-                //LOG(INFO) << "Zen material: " << zenSubmesh.material.matName;
-                //LOG(INFO) << "Zen texture: " << texture;
-                //LOG(INFO) << "Zen vertices: " << faces.size();
-                //LOG(INFO) << "";
-
-                auto& texFilepath = std::filesystem::path(texture);
-                auto& texFilename = texFilepath.filename().u8string();
-                asciiToLowercase(texFilename);
-
-                Material material = { texFilename };
-                auto& matVertices = getOrCreate(matsToVertices, material);
-                matVertices.insert(matVertices.end(), faces.begin(), faces.end());
-            }
+        vector<SoftwareLightmapTexture> softwareTextures;
+        for (int i = 0; i < lightmapTextures.size(); i++) {
+            softwareTextures.push_back({
+                lightmapTextures[i].width,
+                lightmapTextures[i].height,
+                &lightmapTexturesData[i],
+            });
         }
 
-        //std::string dumpTex = "owodpatrgrassmi.tga";
-        //asciiToLowercase(dumpTex);
-        //util::dumpVerts(dumpTex, matsToVertices.at(dumpTex));
-
-        //LOG(INFO) << "Listing vobs...";
-        //listVobInformation(world.rootVobs);
-
+        loadWorldMesh(matsToVertices, *parser.getWorldMesh(), softwareTextures);
         return matsToVertices;
-
-        // Print some sample-data for vobs which got a visual
     }
 
-    std::unordered_map<Material, std::vector<WORLD_VERTEX>> loadZen() {
-        const std::string vdfsArchiveToLoad = "data_g1/worlds.VDF";
-        const std::string zenFilename = "WORLD.ZEN";
+    bool existsInstanceMesh(string& visualname, VDFS::FileIndex& vdf)
+    {
+        // .mrm does not exist for worldmesh parts
+        string filename = visualname + ".MRM";
+        return vdf.hasFile(filename);
+    }
+
+    bool loadInstanceMesh(unordered_map<Material, vector<POS_NORMAL_UV>> target, string& visualname, VDFS::FileIndex& vdf)
+    {
+        string filename = visualname + ".MRM";
+        if (!vdf.hasFile(filename)) {
+            return false;
+        }
+
+        ZenLoad::zCProgMeshProto rawMesh(filename, vdf);
+
+        loadInstanceMesh(target, rawMesh);
+        return true;
+    }
+
+    void flattenVobTree(vector<ZenLoad::zCVobData>& vobs, vector<ZenLoad::zCVobData*>& target)
+    {
+        for (ZenLoad::zCVobData& vob : vobs) {
+            if (!vob.visual.empty() && vob.visual.find(".3DS") != string::npos) {
+                target.push_back(&vob);
+            }
+            flattenVobTree(vob.childVobs, target);
+        }
+    }
+
+    std::vector<StaticInstance> loadVobs(std::vector<ZenLoad::zCVobData>& rootVobs) {
+        vector<StaticInstance> statics;
+        vector<ZenLoad::zCVobData*> vobs;
+        flattenVobTree(rootVobs, vobs);
+        
+        for (auto vobPtr : vobs) {
+            ZenLoad::zCVobData vob = *vobPtr;
+
+            bool isVisible = !vob.visual.empty() && (vob.visual.find(".3DS") != string::npos);
+            if (isVisible) {
+                StaticInstance instance;
+                auto visualname = vob.visual.substr(0, vob.visual.find_last_of('.'));
+                instance.visual = visualname;
+                auto& transform = vob.worldMatrix;
+
+                instance.transform = XMMatrixIdentity();
+                if (sizeof(instance.transform) != sizeof(transform)) {
+                    throw std::logic_error("Failed to convert ZenLib::ZMath::Matrix to DirectX::XMMATRIX");
+                }
+                memcpy(&transform, &instance.transform, sizeof(instance.transform));
+
+                statics.push_back(instance);
+            }
+        }
+        return statics;
+    }
+
+    unordered_map<Material, std::vector<WORLD_VERTEX>> loadZen() {
+        const string vdfsArchives = "data_g1";
+        const string zenFilename = "WORLD.ZEN";
 
         VDFS::FileIndex::initVDFS("Foo");
         VDFS::FileIndex vdf;
-        vdf.loadVDF(vdfsArchiveToLoad);
+
+        for (const auto& entry : std::filesystem::directory_iterator(vdfsArchives)) {
+            vdf.loadVDF(entry.path().string());
+        }
+        //std::cout << entry.path() << std::endl;
+
+        
+        //vdf.loadVDF("data_g1/anims.VDF");
         vdf.finalizeLoad();
+
+        /*
+        LOG(INFO) << "--------------------------";
+        auto files = vdf.getKnownFiles();
+        for (auto file : files) {
+            if (::util::startsWith(file, "OW_O_BIGBRIDGEMIDDLE")) {
+                LOG(INFO) << file;
+            }
+            if (::util::endsWith(file, "MRM")) {
+                LOG(INFO) << file;
+            }
+        }
+        */
 
         parser = ZenLoad::ZenParser(zenFilename, vdf);
         if (parser.getFileSize() == 0)
@@ -241,7 +212,23 @@ namespace renderer::loader {
 
         loadZenLightmaps();
         auto matsToVertices = loadWorldMesh();
-        //loadVobs(world.rootVobs);
+        auto vobs = loadVobs(world.rootVobs);
+
+        unordered_map<string, unordered_map<Material, vector<POS_NORMAL_UV>>> meshes;
+        for (auto& vob : vobs) {
+            auto visualname = vob.visual;
+
+            // if we have not extracted visual for this vob yet
+            auto it = meshes.find(visualname);
+            if (it == meshes.end())
+            {
+                unordered_map<Material, vector<POS_NORMAL_UV>> meshData;
+                bool loaded = loadInstanceMesh(meshData, visualname, vdf);
+                if (loaded && !meshData.empty()) {
+                    meshes.insert({ visualname, meshData });
+                }
+            }
+        }
 
         LOG(INFO) << "Zen loaded!";
 

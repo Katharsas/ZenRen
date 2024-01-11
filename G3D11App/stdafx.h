@@ -23,6 +23,7 @@
 #include <string>
 #include <unordered_map>
 #include <array>
+#include <optional>
 
 // TODO disable SSE, measure performance so we know if this is even worth it compared to normal optimization
 //#define _XM_NO_INTRINSICS_ 

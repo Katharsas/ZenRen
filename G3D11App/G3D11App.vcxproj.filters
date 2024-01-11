@@ -83,6 +83,7 @@
     <ClCompile Include="src\renderer\loader\ObjLoader.cpp" />
     <ClCompile Include="src\renderer\RenderUtil.cpp" />
     <ClCompile Include="src\game\Actions.cpp" />
+    <ClCompile Include="src\renderer\loader\MeshFromVdfLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Util.h">
@@ -132,5 +133,6 @@
     <ClInclude Include="src\renderer\loader\ObjLoader.h" />
     <ClInclude Include="src\renderer\RenderUtil.h" />
     <ClInclude Include="src\game\Actions.h" />
+    <ClInclude Include="src\renderer\loader\MeshFromVdfLoader.h" />
   </ItemGroup>
 </Project>
