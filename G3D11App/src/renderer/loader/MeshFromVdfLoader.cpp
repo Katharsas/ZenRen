@@ -20,6 +20,11 @@ namespace renderer::loader {
         return ((positiveOrNegative % modulo) + modulo) % modulo;
     }
 
+    XMMATRIX inversedTransposed(const XMMATRIX& source) {
+        const XMMATRIX transposed = XMMatrixTranspose(source);
+        return XMMatrixInverse(nullptr, source);
+    }
+
     UV from(const ZenLib::ZMath::float2& source)
     {
         return UV { source.x, source.y };
@@ -28,6 +33,16 @@ namespace renderer::loader {
     VEC3 from(const ZenLib::ZMath::float3& source)
     {
         return VEC3 { source.x, source.y, source.z };
+    }
+
+    VEC3 from(const ZenLib::ZMath::float3& source, const XMMATRIX& transform, const bool normalize)
+    {
+        XMVECTOR pos = XMVectorSet(source.x, source.y, source.z, 1.0f);
+        pos = XMVector4Transform(pos, transform);
+        if (normalize) {
+            pos = XMVector4Normalize(pos);
+        }
+        return VEC3{ XMVectorGetX(pos), XMVectorGetY(pos), XMVectorGetZ(pos) };
     }
 
     const array<ZenLoad::WorldVertex, 3> getFaceVerts(
@@ -73,7 +88,7 @@ namespace renderer::loader {
     void loadWorldMesh(
         unordered_map<Material, vector<WORLD_VERTEX>>& target,
         ZenLoad::zCMesh& worldMesh,
-        vector<SoftwareLightmapTexture>& lightmapTextures)
+        const vector<SoftwareLightmapTexture>& lightmapTextures)
     {
         ZenLoad::PackedMesh packedMesh;
         worldMesh.packMesh(packedMesh, 0.01f);
@@ -112,7 +127,7 @@ namespace renderer::loader {
 
                     if (faceLightmapIndex == -1) {
                         vertex.uvLightmap = { 0, 0, -1 };
-                        vertex.colorLightmap = { 1, 1, 1, 1 };
+                        //vertex.colorLightmap = { 1, 1, 1, 1 };
                     }
                     else {
                         float unscale = 100;
@@ -124,10 +139,10 @@ namespace renderer::loader {
                         vertex.uvLightmap.u = XMVectorGetX(XMVector3Dot(lightmapDir, normalRight));
                         vertex.uvLightmap.v = XMVectorGetX(XMVector3Dot(lightmapDir, normalUp));
                         vertex.uvLightmap.i = lightmap.lightmapTextureIndex;
-                        // TODO does renderer even need lightmap index? we already sample it below!
-
-                        const auto& lightmapTex = lightmapTextures[lightmap.lightmapTextureIndex];
-                        vertex.colorLightmap = sampleLightmap(vertex.pos, vertex.uvLightmap, lightmapTex);
+                        
+                        // TODO should we consider software sampling going forward?
+                        //const auto& lightmapTex = lightmapTextures[lightmap.lightmapTextureIndex];
+                        //vertex.colorLightmap = sampleLightmap(vertex.pos, vertex.uvLightmap, lightmapTex);
                     }
                     face.at(2 - vertexIndex) = vertex;// flip faces apparently, but not z ?!
                     vertexIndex++;
@@ -145,10 +160,15 @@ namespace renderer::loader {
         }
     }
 
-	void loadInstanceMesh(unordered_map<Material, vector<POS_NORMAL_UV>>& target, ZenLoad::zCProgMeshProto& mesh)
+	void loadInstanceMesh(
+        unordered_map<Material, vector<POS_NORMAL_UV>>& target,
+        const ZenLoad::zCProgMeshProto& mesh,
+        const XMMATRIX& transform)
     {
         ZenLoad::PackedMesh packedMesh;
         mesh.packMesh(packedMesh, 0.01f);
+
+        XMMATRIX normalTransform = inversedTransposed(transform);
 
         for (const auto& submesh : packedMesh.subMeshes) {
             if (submesh.indices.empty()) {
@@ -167,9 +187,10 @@ namespace renderer::loader {
                 uint32_t vertexIndex = 0;
                 for (const auto& zenVert : zenFace) {
                     POS_NORMAL_UV vertex;
-                    vertex.pos = from(zenVert.Position);
-                    vertex.normal = from(zenVert.Normal);
+                    vertex.pos = from(zenVert.Position, transform, false);
+                    vertex.normal = from(zenVert.Normal, normalTransform, true);
                     vertex.uvDiffuse = from(zenVert.TexCoord);
+                    vertex.uvLightmap = { 0, 0 };
 
                     face.at(2 - vertexIndex) = vertex;// flip faces apparently, but not z ?!
                     vertexIndex++;

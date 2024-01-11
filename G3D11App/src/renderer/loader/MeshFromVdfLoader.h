@@ -20,10 +20,11 @@ namespace renderer::loader {
     void loadWorldMesh(
         std::unordered_map<Material, std::vector<WORLD_VERTEX>>& target,
         ZenLib::ZenLoad::zCMesh& worldMesh,
-        std::vector<SoftwareLightmapTexture>& lightmapTextures);
+        const std::vector<SoftwareLightmapTexture>& lightmapTextures);
     
     void loadInstanceMesh(
         std::unordered_map<Material, std::vector<POS_NORMAL_UV>>& target,
-        ZenLib::ZenLoad::zCProgMeshProto& mesh);
+        const ZenLib::ZenLoad::zCProgMeshProto& mesh,
+        const DirectX::XMMATRIX& transform);
 }
 

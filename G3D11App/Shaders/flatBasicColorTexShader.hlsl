@@ -27,7 +27,7 @@ struct VS_IN
     float4 normal : NORMAL;
     float2 uvBaseColor : TEXCOORD0;
     float3 uvLightmap : TEXCOORD1;
-    float4 colorLightmap : COLOR;
+    //float4 colorLightmap : COLOR;
 };
 
 struct VS_OUT

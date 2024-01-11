@@ -12,7 +12,7 @@ namespace renderer::loader {
 
     std::vector<ZenLightmapTexture>& getLightmapTextures();
 
-    std::unordered_map<Material, std::vector<WORLD_VERTEX>> loadZen();
+    RenderData loadVdfs();
     //std::vector<ZenLightmapTexture> loadZenLightmaps();
     void clean();
 }

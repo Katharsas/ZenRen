@@ -99,7 +99,7 @@ namespace renderer::loader {
 						vertex.uvDiffuse = { 0, 0 };
 					}
 
-					vertex.colorLightmap = { 1, 1, 1, 1 };
+					//vertex.colorLightmap = { 1, 1, 1, 1 };
 					vertex.uvLightmap = { 0, 0 };
 
 					vertices.at(2 - vertexIndex) = vertex;// FLIPPED Z -> flip faces

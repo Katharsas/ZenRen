@@ -27,18 +27,13 @@ namespace renderer::loader {
     using ::std::vector;
     using ::std::unordered_map;
     //using ::util::asciiToLowercase;
-    //using ::util::getOrCreate;
+    using ::util::getOrCreate;
 
     ZenLoad::ZenParser parser;
     ZenLoad::zCMesh* worldMesh;
 
     vector<ZenLightmapTexture> lightmapTextures;
     vector<Image> lightmapTexturesData;
-
-    struct StaticInstance {
-        std::string visual;
-        XMMATRIX transform;
-    };
 
     /**
      * Recursive function to list some data about the zen-file
@@ -57,8 +52,6 @@ namespace renderer::loader {
             //listVobInformation(v.childVobs);
         }
     }
-
-
 
     void loadZenLightmaps() {
         for (auto& lightmap : worldMesh->getLightmapTextures()) {
@@ -111,7 +104,7 @@ namespace renderer::loader {
         return vdf.hasFile(filename);
     }
 
-    bool loadInstanceMesh(unordered_map<Material, vector<POS_NORMAL_UV>> target, string& visualname, VDFS::FileIndex& vdf)
+    bool loadInstanceMesh(unordered_map<Material, vector<POS_NORMAL_UV>>& target, string& visualname, VDFS::FileIndex& vdf, XMMATRIX& transform)
     {
         string filename = visualname + ".MRM";
         if (!vdf.hasFile(filename)) {
@@ -120,7 +113,7 @@ namespace renderer::loader {
 
         ZenLoad::zCProgMeshProto rawMesh(filename, vdf);
 
-        loadInstanceMesh(target, rawMesh);
+        loadInstanceMesh(target, rawMesh, transform);
         return true;
     }
 
@@ -144,16 +137,15 @@ namespace renderer::loader {
 
             bool isVisible = !vob.visual.empty() && (vob.visual.find(".3DS") != string::npos);
             if (isVisible) {
-                StaticInstance instance;
                 auto visualname = vob.visual.substr(0, vob.visual.find_last_of('.'));
-                instance.visual = visualname;
-                auto& transform = vob.worldMatrix;
+                StaticInstance instance;
+                instance.meshName = visualname;
 
-                instance.transform = XMMatrixIdentity();
-                if (sizeof(instance.transform) != sizeof(transform)) {
-                    throw std::logic_error("Failed to convert ZenLib::ZMath::Matrix to DirectX::XMMATRIX");
-                }
-                memcpy(&transform, &instance.transform, sizeof(instance.transform));
+                XMVECTOR pos = XMVectorSet(vob.position.x, vob.position.y, vob.position.z, 100.0f);
+                pos = pos / 100;
+                XMMATRIX rotate = XMMATRIX(vob.rotationMatrix.mv);
+                XMMATRIX translate = XMMatrixTranslationFromVector(pos);
+                instance.transform = rotate * translate;
 
                 statics.push_back(instance);
             }
@@ -161,35 +153,19 @@ namespace renderer::loader {
         return statics;
     }
 
-    unordered_map<Material, std::vector<WORLD_VERTEX>> loadZen() {
+    RenderData loadVdfs() {
         const string vdfsArchives = "data_g1";
-        const string zenFilename = "WORLD.ZEN";
 
         VDFS::FileIndex::initVDFS("Foo");
         VDFS::FileIndex vdf;
 
         for (const auto& entry : std::filesystem::directory_iterator(vdfsArchives)) {
+            LOG(DEBUG) << "Loading VDF: " << entry.path().filename();
             vdf.loadVDF(entry.path().string());
         }
-        //std::cout << entry.path() << std::endl;
-
-        
-        //vdf.loadVDF("data_g1/anims.VDF");
         vdf.finalizeLoad();
 
-        /*
-        LOG(INFO) << "--------------------------";
-        auto files = vdf.getKnownFiles();
-        for (auto file : files) {
-            if (::util::startsWith(file, "OW_O_BIGBRIDGEMIDDLE")) {
-                LOG(INFO) << file;
-            }
-            if (::util::endsWith(file, "MRM")) {
-                LOG(INFO) << file;
-            }
-        }
-        */
-
+        const string zenFilename = "WORLD.ZEN";
         parser = ZenLoad::ZenParser(zenFilename, vdf);
         if (parser.getFileSize() == 0)
         {
@@ -211,27 +187,29 @@ namespace renderer::loader {
         worldMesh = parser.getWorldMesh();
 
         loadZenLightmaps();
-        auto matsToVertices = loadWorldMesh();
+        auto worldMesh = loadWorldMesh();
+
         auto vobs = loadVobs(world.rootVobs);
-
-        unordered_map<string, unordered_map<Material, vector<POS_NORMAL_UV>>> meshes;
-        for (auto& vob : vobs) {
-            auto visualname = vob.visual;
-
-            // if we have not extracted visual for this vob yet
-            auto it = meshes.find(visualname);
-            if (it == meshes.end())
-            {
-                unordered_map<Material, vector<POS_NORMAL_UV>> meshData;
-                bool loaded = loadInstanceMesh(meshData, visualname, vdf);
-                if (loaded && !meshData.empty()) {
-                    meshes.insert({ visualname, meshData });
-                }
-            }
-        }
 
         LOG(INFO) << "Zen loaded!";
 
-        return matsToVertices;
+        unordered_map<Material, vector<POS_NORMAL_UV>> staticMeshes;
+        for (auto& vob : vobs) {
+            auto& visualname = vob.meshName;
+
+            if (existsInstanceMesh(visualname, vdf)) {
+                bool loaded = loadInstanceMesh(staticMeshes, visualname, vdf, vob.transform);
+            }
+            else {
+                LOG(DEBUG) << "Skipping VOB " << visualname << " (visual not found)";
+            }
+        }
+
+        LOG(INFO) << "Meshes loaded!";
+
+        return {
+            worldMesh,
+            staticMeshes,
+        };
 	}
 }

@@ -134,5 +134,6 @@
     <ClInclude Include="src\renderer\RenderUtil.h" />
     <ClInclude Include="src\game\Actions.h" />
     <ClInclude Include="src\renderer\loader\MeshFromVdfLoader.h" />
+    <ClInclude Include="src\renderer\RendererCommon.h" />
   </ItemGroup>
 </Project>

@@ -90,16 +90,18 @@ namespace renderer::world {
 
 	void loadTestObj(D3d d3d) {
 		
-		std::unordered_map<Material, std::vector<VERTEX>> matsToVertices;
+		RenderData data;
+		
 		bool loadObj = false;
-
 		if (loadObj) {
 			std::string inputFile = "data_g1/world.obj";
-			matsToVertices = loader::loadObj(inputFile);
+			data = { loader::loadObj(inputFile) };
 		}
 		else {
-			matsToVertices = loader::loadZen();
+			data = loader::loadVdfs();
 		}
+
+		auto& matsToVerts = data.worldMesh;
 
 		{
 			auto& lightmaps = loader::getLightmapTextures();
@@ -119,10 +121,9 @@ namespace renderer::world {
 
 		int32_t loadedCount = 0;
 
-		for (const auto& it : matsToVertices) {
-			
-			auto& material = it.first;
-			auto& vertices = it.second;
+		for (const auto& pair : matsToVerts) {
+			auto& material = pair.first;
+			auto& vertices = pair.second;
 
 			if (!vertices.empty()) {
 				auto& actualPath = loader::getTexturePathOrDefault(material.texBaseColor);
@@ -153,6 +154,43 @@ namespace renderer::world {
 		}
 
 		LOG(DEBUG) << "World material/texture count: " << loadedCount;
+
+		loadedCount = 0;
+
+		for (const auto& pair : data.staticMeshes) {
+
+			auto& material = pair.first;
+			auto& vertices = pair.second;
+
+			if (!vertices.empty()) {
+				auto& actualPath = loader::getTexturePathOrDefault(material.texBaseColor);
+
+				Mesh mesh;
+				{
+					// vertex data
+					mesh.vertexCount = vertices.size();
+					D3D11_BUFFER_DESC bufferDesc;
+					ZeroMemory(&bufferDesc, sizeof(bufferDesc));
+
+					bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+					bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+					bufferDesc.ByteWidth = sizeof(POS_NORMAL_UV) * vertices.size();
+
+					D3D11_SUBRESOURCE_DATA initialData;
+					initialData.pSysMem = vertices.data();
+					d3d.device->CreateBuffer(&bufferDesc, &initialData, &(mesh.vertexBuffer));
+				}
+
+				Texture* texture = new Texture(d3d, actualPath.u8string());
+
+				mesh.baseColor = texture;
+				world.meshes.push_back(mesh);
+
+				loadedCount++;
+			}
+		}
+
+		LOG(DEBUG) << "StaticInstances material/texture count: " << loadedCount;
 	}
 
 	void updateObjects()

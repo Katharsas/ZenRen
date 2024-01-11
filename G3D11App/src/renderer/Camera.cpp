@@ -27,10 +27,9 @@ namespace renderer::camera {
 	ObjectMatrices getWorldViewMatrix(const XMMATRIX & objectsWorldMatrix)
 	{
 		const XMMATRIX worldViewTransposed = objectsWorldMatrix * matrices.view;
-		XMVECTOR __;
 		ObjectMatrices result;
 		result.worldView = XMMatrixTranspose(worldViewTransposed);
-		result.worldViewNormal = XMMatrixInverse(&__, worldViewTransposed);
+		result.worldViewNormal = XMMatrixInverse(nullptr, worldViewTransposed);
 		return result;
 	}
 	XMMATRIX getProjectionMatrix()
