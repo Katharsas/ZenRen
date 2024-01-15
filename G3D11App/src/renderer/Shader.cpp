@@ -24,6 +24,7 @@ namespace renderer {
 		if (errPS != nullptr) {
 			LOG(WARNING) << std::string((char*)errPS->GetBufferPointer());
 		}
+		// TODO if shader compilation fails, debugger might stop on exception before errors are flushed to log
 
 		// encapsulate shader blobs into shader objects
 		d3d.device->CreateVertexShader(VS->GetBufferPointer(), VS->GetBufferSize(), nullptr, &vertexShader);

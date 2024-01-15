@@ -99,6 +99,8 @@ float4 PS_Main(PS_IN input) : SV_TARGET
     float4 albedoColor;
     if (!outputDirectEnabled || outputDirectType == FLAG_OUTPUT_DIRECT_DIFFUSE) {
         albedoColor = baseColor.Sample(SampleType, input.uvBaseColor);
+
+        clip(albedoColor[3] < 0.6f ? -1 : 1);
     }
     else if (outputDirectEnabled && outputDirectType == FLAG_OUTPUT_DIRECT_LIGHTMAP) {
         // this splits pixels into per face groups based on lightmap or not, which is not great (?)
