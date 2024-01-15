@@ -84,6 +84,7 @@
     <ClCompile Include="src\renderer\RenderUtil.cpp" />
     <ClCompile Include="src\game\Actions.cpp" />
     <ClCompile Include="src\renderer\loader\MeshFromVdfLoader.cpp" />
+    <ClCompile Include="src\renderer\RendererCommon.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Util.h">

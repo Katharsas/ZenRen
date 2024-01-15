@@ -42,8 +42,10 @@ namespace renderer
 	Dx12 dx12;
 	
 	IDXGISwapChain1* swapchain;
-	ID3D11RenderTargetView* linearBackBuffer; // 64-bit
-	ID3D11ShaderResourceView* linearBackBufferResource;
+
+	ID3D11RenderTargetView* linearBackBuffer = nullptr; // 64-bit
+	ID3D11ShaderResourceView* linearBackBufferResource = nullptr;
+	D3D11_VIEWPORT linearBackBufferViewport;
 
 	ShaderManager* shaders;
 
@@ -53,13 +55,14 @@ namespace renderer
 
 	RenderSettings settingsPrevious;
 	RenderSettings settings;
+
 	BufferSize clientSize;
+	BufferSize renderSize;
 
 	// forward definitions
-	void initDeviceAndSwapChain(HWND hWnd, BufferSize& size);
+	void initDeviceAndSwapChain(HWND hWnd);
 	void initDepthAndStencilBuffer(BufferSize& size);
 	void initLinearBackBuffer(BufferSize& size);
-	void initViewport(BufferSize& size);
 	void initRasterizerStates();
 
 
@@ -75,12 +78,27 @@ namespace renderer
 		//ZenLoad::zCMesh* mesh = parser.getWorldMesh();
 	}
 
+	void initDepthAndRenderTargets() {
+		// Preserve the existing buffer count and format.
+		// Automatically choose the width and height to match the client rect for HWNDs.
+		swapchain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, 0);
+
+		initDepthAndStencilBuffer(renderSize);
+
+		initLinearBackBuffer(renderSize);
+		initViewport(renderSize, &linearBackBufferViewport);
+
+		postprocess::initBackBuffer(d3d, swapchain);
+		postprocess::initViewport(clientSize);
+	}
+
 	void initD3D(HWND hWnd)
 	{
 		clientSize = {
 			::settings::SCREEN_WIDTH,
-			::settings::SCREEN_HEIGHT
+			::settings::SCREEN_HEIGHT,
 		};
+		renderSize = clientSize * settings.resolutionScaling;
 
 		renderer::addWindow("Info", {
 			[]() -> void {
@@ -89,15 +107,10 @@ namespace renderer
 			}
 		});
 
-		initDeviceAndSwapChain(hWnd, clientSize);
-
-		postprocess::initBackBuffer(d3d, swapchain);
-		initDepthAndStencilBuffer(clientSize);
-		initLinearBackBuffer(clientSize);
+		initDeviceAndSwapChain(hWnd);
+		initDepthAndRenderTargets();
 
 		initGui(hWnd, d3d);
-
-		initViewport(clientSize);
 
 		camera::init();
 
@@ -114,42 +127,16 @@ namespace renderer
 		world::updateShaderSettings(d3d, settings);
 	}
 
-	void initViewport(BufferSize& size) {
-		D3D11_VIEWPORT viewport;
-		ZeroMemory(&viewport, sizeof(D3D11_VIEWPORT));
-
-		viewport.TopLeftX = 0;
-		viewport.TopLeftY = 0;
-		viewport.Width = size.width;
-		viewport.Height = size.height;
-		viewport.MinDepth = 0.0f;
-		viewport.MaxDepth = 1.0f;
-
-		d3d.deviceContext->RSSetViewports(1, &viewport);
-	}
-
 	void onWindowResize(uint32_t width, uint32_t height) {
 		clientSize = { width, height };
+		renderSize = clientSize * settings.resolutionScaling;
 
 		// see https://docs.microsoft.com/en-us/windows/win32/direct3ddxgi/d3d10-graphics-programming-guide-dxgi#handling-window-resizing
 		if (swapchain) {
 			d3d.deviceContext->OMSetRenderTargets(0, 0, 0);
+			//d3d.deviceContext->Flush();
 
-			linearBackBuffer->Release();
-			linearBackBufferResource->Release();
-			postprocess::clean(true);
-
-			d3d.deviceContext->Flush();
-
-			// Preserve the existing buffer count and format.
-			// Automatically choose the width and height to match the client rect for HWNDs.
-			swapchain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, 0);
-
-			postprocess::initBackBuffer(d3d, swapchain);
-			initDepthAndStencilBuffer(clientSize);
-			initLinearBackBuffer(clientSize);
-
-			initViewport(clientSize);
+			initDepthAndRenderTargets();
 		}
 	}
 
@@ -190,11 +177,15 @@ namespace renderer
 	{
 		auto deviceContext = d3d.deviceContext;
 		
+		if (settings.resolutionScaling != settingsPrevious.resolutionScaling) {
+			renderSize = clientSize * settings.resolutionScaling;
+			initDepthAndRenderTargets();
+		}
 		if (settings.reverseZ != settingsPrevious.reverseZ) {
 			postprocess::initVertexBuffers(d3d, settings.reverseZ);
 		}
 		if (settings.reverseZ != settingsPrevious.reverseZ) {
-			initDepthAndStencilBuffer(clientSize);
+			initDepthAndStencilBuffer(renderSize);
 		}
 		if (settings.anisotropicFilter != settingsPrevious.anisotropicFilter || settings.anisotropicLevel != settingsPrevious.anisotropicFilter) {
 			world::initLinearSampler(d3d, settings);
@@ -203,10 +194,11 @@ namespace renderer
 			world::updateShaderSettings(d3d, settings);
 		}
 
-		camera::updateCamera(settings.reverseZ, clientSize);
+		camera::updateCamera(settings.reverseZ, renderSize);
 
 		// set the linear back buffer as rtv
 		deviceContext->OMSetRenderTargets(1, &linearBackBuffer, depthStencilView);
+		deviceContext->RSSetViewports(1, &linearBackBufferViewport);
 
 		// clear the back buffer to a deep blue
 		deviceContext->ClearRenderTargetView(linearBackBuffer, D3DXCOLOR(0.0f, 0.2f, 0.4f, 1.0f));
@@ -234,7 +226,7 @@ namespace renderer
 		swapchain->Present(0, 0);
 	}
 
-	void initDeviceAndSwapChain(HWND hWnd, BufferSize& size)
+	void initDeviceAndSwapChain(HWND hWnd)
 	{
 		ComPtr<ID3D11Device> device_11_0;
 		ComPtr<ID3D11DeviceContext> deviceContext_11_0;
@@ -291,8 +283,8 @@ namespace renderer
 		// fill the swap chain description struct
 		swapChainDesc.BufferCount = 2;                                    // one back buffer
 		swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;                // use 32-bit color
-		swapChainDesc.Width = size.width;                                 // set the back buffer width
-		swapChainDesc.Height = size.height;                               // set the back buffer height
+		swapChainDesc.Width = 0;										  // back buffer width and height are set later
+		swapChainDesc.Height = 0;
 		swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;      // how swap chain is to be used
 		swapChainDesc.SampleDesc.Count = 1;                               // how many multisamples
 		swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;     // allow full-screen switching
@@ -368,6 +360,13 @@ namespace renderer
 
 	void initLinearBackBuffer(BufferSize& size)
 	{
+		if (linearBackBuffer != nullptr) {
+			linearBackBuffer->Release();
+		}
+		if (linearBackBufferResource != nullptr) {
+			linearBackBufferResource->Release();
+		}
+
 		auto format = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
 		// Create buffer texture

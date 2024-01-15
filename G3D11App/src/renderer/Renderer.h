@@ -31,11 +31,8 @@ namespace renderer
 			0.02f,
 			ShaderMode::Default,
 		};
-	};
 
-	struct BufferSize {
-		uint32_t width;
-		uint32_t height;
+		float resolutionScaling = 1.0f;
 	};
 
 	struct StaticInstance {

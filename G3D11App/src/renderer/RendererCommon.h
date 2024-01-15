@@ -89,6 +89,17 @@ namespace renderer
 			return (texBaseColor == other.texBaseColor);
 		}
 	};
+
+	struct BufferSize {
+		uint32_t width;
+		uint32_t height;
+
+		BufferSize operator*(const float scalar) const {
+			return { (uint32_t)((width * scalar) + 0.5f), (uint32_t)((height * scalar) + 0.5f) };
+		}
+	};
+
+	void initViewport(BufferSize& size, D3D11_VIEWPORT* viewport);
 }
 
 namespace std

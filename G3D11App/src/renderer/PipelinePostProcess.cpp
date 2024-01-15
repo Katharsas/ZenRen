@@ -7,8 +7,10 @@
 
 namespace renderer::postprocess
 {
-	ID3D11RenderTargetView* backBuffer;    // real non-linear backbuffer, 32-bit
 	ID3D11SamplerState* linearSamplerState;// sampler to read linear backbuffer texture
+
+	ID3D11RenderTargetView* backBuffer = nullptr;    // real non-linear native resolution backbuffer, 32-bit
+	D3D11_VIEWPORT viewport;
 
 	Mesh toneMappingQuad;
 
@@ -21,6 +23,7 @@ namespace renderer::postprocess
 
 		// set real back buffer as rtv
 		d3d.deviceContext->OMSetRenderTargets(1, &backBuffer, nullptr);
+		d3d.deviceContext->RSSetViewports(1, &viewport);
 
 		// set shaders and linear backbuffer as texture
 		Shader* toneMappingShader = shaders->getShader("toneMapping");
@@ -46,6 +49,10 @@ namespace renderer::postprocess
 
 	void initBackBuffer(D3d d3d, IDXGISwapChain1* swapchain)
 	{
+		if (backBuffer != nullptr) {
+			backBuffer->Release();
+		}
+
 		// get the address of the back buffer
 		ID3D11Texture2D* texture;
 		swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&texture);
@@ -60,12 +67,19 @@ namespace renderer::postprocess
 		texture->Release();
 	}
 
+	void initViewport(BufferSize& size) {
+		initViewport(size, &viewport);
+	}
+
 	void initLinearSampler(D3d d3d)
 	{
 		D3D11_SAMPLER_DESC samplerDesc = CD3D11_SAMPLER_DESC();
 		ZeroMemory(&samplerDesc, sizeof(samplerDesc));
 
-		samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+		//samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+		samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;// point samping does not interpolate when upscaling, so we can more easily see pixel aliasing
+		// TODO make this a render setting
+		
 		samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
 		samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
 		samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
@@ -108,12 +122,10 @@ namespace renderer::postprocess
 		}
 	}
 
-	void clean(bool onlyBackBuffer)
+	void clean()
 	{
 		backBuffer->Release();
-		if (!onlyBackBuffer) {
-			toneMappingQuad.release();
-			linearSamplerState->Release();
-		}
+		toneMappingQuad.release();
+		linearSamplerState->Release();
 	}
 }

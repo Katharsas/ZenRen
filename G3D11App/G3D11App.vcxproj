@@ -100,7 +100,7 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
       <ImportLibrary>
       </ImportLibrary>
       <AdditionalDependencies>ntdll.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -117,7 +117,7 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
       <AdditionalDependencies>ntdll.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Windows</SubSystem>
     </Link>
@@ -186,6 +186,7 @@
   <ItemGroup>
     <ClCompile Include="src\renderer\loader\MeshFromVdfLoader.cpp" />
     <ClCompile Include="src\game\Actions.cpp" />
+    <ClCompile Include="src\renderer\RendererCommon.cpp" />
     <ClCompile Include="src\renderer\RenderUtil.cpp" />
     <ClCompile Include="src\renderer\loader\ObjLoader.cpp" />
     <ClCompile Include="src\imgui\imgui_custom.cpp" />
