@@ -54,7 +54,7 @@ float3 Uncharted2Tonemap(float3 x) {
 	return ((x*(A*x + C*B) + D*E) / (x*(A*x + B) + D*F)) - E / F; 
 }
 
-float4 PS_Main(PS_INPUT input) : SV_TARGET
+float4 PS_Main(PS_INPUT input, uint sampleIndex : SV_SAMPLEINDEX) : SV_TARGET
 {
 	float brightness = 0.0f; // [-1, 1], default = 0, additive
 	float contrast = 1.0f; // [0, 100], default = 1, multiplicative

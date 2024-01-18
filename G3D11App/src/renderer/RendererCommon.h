@@ -99,6 +99,8 @@ namespace renderer
 		}
 	};
 
+	void release(IUnknown* dx11object);
+
 	void initViewport(BufferSize& size, D3D11_VIEWPORT* viewport);
 }
 

@@ -260,7 +260,7 @@ namespace renderer::world {
 		d3d.device->CreateSamplerState(&samplerDesc, &linearSamplerState);
 	}
 
-	void initVertexIndexBuffers(D3d d3d, bool reverseZ)
+	void initVertexIndexBuffers(D3d d3d)
 	{
 		initGui();
 

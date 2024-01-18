@@ -37,6 +37,14 @@ namespace renderer {
 			};
 			shaders[shaderName] = new Shader(filePath(shaderName), layoutDesc, std::size(layoutDesc), d3d);
 		} {
+			std::string shaderName(u8"renderToTexture");
+			Shader::VertexInputLayoutDesc layoutDesc[] =
+			{
+				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT },
+				{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT },
+			};
+			shaders[shaderName] = new Shader(filePath(shaderName), layoutDesc, std::size(layoutDesc), d3d);
+		} {
 			std::string shaderName(u8"flatBasicColorTexShader");
 			Shader::VertexInputLayoutDesc layoutDesc[] =
 			{

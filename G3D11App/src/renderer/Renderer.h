@@ -33,6 +33,8 @@ namespace renderer
 		};
 
 		float resolutionScaling = 1.0f;
+		bool resolutionUpscaleSmooth = true;
+		bool downsampling = false;// does not work currently
 	};
 
 	struct StaticInstance {

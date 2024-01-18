@@ -53,6 +53,16 @@ namespace renderer::gui::settings {
 			}
 		});
 
+		addSettings("Resolution", {
+			[&]()  -> void {
+				ImGui::PushItemWidth(120);
+				ImGui::InputFloat("Resolution Scaling", &settings.resolutionScaling, 0);
+				ImGui::Checkbox("Smooth Scaling", &settings.resolutionUpscaleSmooth);
+				ImGui::Checkbox("Downsampling", &settings.downsampling);
+				ImGui::PopItemWidth();
+			}
+		});
+
 		addSettings("Textures", {
 			[&]() -> void {
 				const auto& items = filterSettingsItems;

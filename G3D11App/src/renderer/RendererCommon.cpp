@@ -3,6 +3,12 @@
 
 namespace renderer {
 
+	void release(IUnknown* dx11object) {
+		if (dx11object != nullptr) {
+			dx11object->Release();
+		}
+	}
+
 	void initViewport(BufferSize& size, D3D11_VIEWPORT* viewport) {
 		ZeroMemory(viewport, sizeof(D3D11_VIEWPORT));
 

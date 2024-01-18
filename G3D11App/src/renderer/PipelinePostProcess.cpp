@@ -7,55 +7,173 @@
 
 namespace renderer::postprocess
 {
-	ID3D11SamplerState* linearSamplerState;// sampler to read linear backbuffer texture
+	ID3D11SamplerState* samplerState = nullptr; // sampler to read linear backbuffer texture
 
-	ID3D11RenderTargetView* backBuffer = nullptr;    // real non-linear native resolution backbuffer, 32-bit
+	ID3D11Texture2D* multisampleTex = nullptr;
+	ID3D11RenderTargetView* multisampleRtv = nullptr; // linear color, 64-bit, native resolution, multisampled
 	D3D11_VIEWPORT viewport;
+
+	ID3D11Texture2D* resolvedTex = nullptr;
+	ID3D11ShaderResourceView* resolvedSrv = nullptr; // linear color, 64-bit, native resolution
+
+	ID3D11Texture2D* backBufferTex = nullptr;
+	ID3D11RenderTargetView* backBufferRtv = nullptr; // non-linear color (sRGB), 32-bit, native resolution backbuffer
+	
+	ID3D11DepthStencilView* multisampleDepthView = nullptr;
+	ID3D11DepthStencilState* depthStateNone = nullptr;
+	ID3D11RasterizerState* rasterizer;
+
+	uint32_t downsamplingSamples = 8;
 
 	Mesh toneMappingQuad;
 
-	void draw(D3d d3d, ID3D11ShaderResourceView* linearBackBuffer, ShaderManager* shaders)
-	{
-		// draw HDR back buffer to real back buffer via tone mapping
-
-		// set rasterizer state back to default (disables wireframe mode etc.)
-		d3d.deviceContext->RSSetState(nullptr);
-
-		// set real back buffer as rtv
-		d3d.deviceContext->OMSetRenderTargets(1, &backBuffer, nullptr);
+	void renderToTexure(D3d d3d, Shader* shader, ID3D11ShaderResourceView* srv, ID3D11RenderTargetView* rtv, ID3D11DepthStencilView* depth) {
+		d3d.deviceContext->OMSetRenderTargets(1, &rtv, depth);
 		d3d.deviceContext->RSSetViewports(1, &viewport);
 
-		// set shaders and linear backbuffer as texture
-		Shader* toneMappingShader = shaders->getShader("toneMapping");
-		d3d.deviceContext->VSSetShader(toneMappingShader->getVertexShader(), 0, 0);
-		d3d.deviceContext->IASetInputLayout(toneMappingShader->getVertexLayout());
-		d3d.deviceContext->PSSetShader(toneMappingShader->getPixelShader(), 0, 0);
-		d3d.deviceContext->PSSetShaderResources(0, 1, &linearBackBuffer);
-		d3d.deviceContext->PSSetSamplers(0, 1, &linearSamplerState);
+		d3d.deviceContext->VSSetShader(shader->getVertexShader(), 0, 0);
+		d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
+		d3d.deviceContext->PSSetShader(shader->getPixelShader(), 0, 0);
+		d3d.deviceContext->PSSetShaderResources(0, 1, &srv);
+		d3d.deviceContext->PSSetSamplers(0, 1, &samplerState);
 
-		// select which vertex buffer to display
 		UINT stride = sizeof(POS_UV);
 		UINT offset = 0;
 		d3d.deviceContext->IASetVertexBuffers(0, 1, &(toneMappingQuad.vertexBuffer), &stride, &offset);
-		//deviceContext->IASetIndexBuffer(toneMappingQuad.indexBuffer, DXGI_FORMAT_R32_UINT, 0);
-
-		//deviceContext->DrawIndexed(toneMappingQuad.indexCount, 0, 0);
 		d3d.deviceContext->Draw(toneMappingQuad.vertexCount, 0);
 
-		// unbind linear backbuffer texture so the next frame can use it as rtv again
+		//deviceContext->IASetIndexBuffer(toneMappingQuad.indexBuffer, DXGI_FORMAT_R32_UINT, 0);
+		//deviceContext->DrawIndexed(toneMappingQuad.indexCount, 0, 0);
+	}
+
+	void draw(D3d d3d, ID3D11ShaderResourceView* linearBackBuffer, ShaderManager* shaders, bool downsampling)
+	{
+		bool renderDirectlyToBackBuffer = !downsampling;
+		// draw HDR back buffer to real back buffer via tone mapping
+
+		// disable depth
+		d3d.deviceContext->OMSetDepthStencilState(depthStateNone, 1);
+
+		// set rasterizer state back to default (disables wireframe mode etc.)
+		d3d.deviceContext->RSSetState(rasterizer);
+
+		ID3D11RenderTargetView* rtv = renderDirectlyToBackBuffer ? backBufferRtv : multisampleRtv;
+		ID3D11DepthStencilView* depth = renderDirectlyToBackBuffer ? nullptr : multisampleDepthView;
+
+		Shader* toneMappingShader = shaders->getShader("toneMapping");
+		renderToTexure(d3d, toneMappingShader, linearBackBuffer, rtv, depth);
+
+		if (!renderDirectlyToBackBuffer) {
+			auto format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			d3d.deviceContext->ResolveSubresource(
+				resolvedTex, D3D11CalcSubresource(0, 0, 1),
+				multisampleTex, D3D11CalcSubresource(0, 0, 1),
+				format);
+
+			Shader* renderToTexShader = shaders->getShader("renderToTexture");
+			renderToTexure(d3d, renderToTexShader, resolvedSrv, backBufferRtv, nullptr);
+		}
+
+		// unbind srv so we can use it as rtv next frame
 		ID3D11ShaderResourceView* srv = nullptr;
 		d3d.deviceContext->PSSetShaderResources(0, 1, &srv);
 	}
 
+	void resolveAndPresent(D3d d3d, IDXGISwapChain1* swapchain) {
+
+		// TODO
+		//d3d.deviceContext->OMSetRenderTargets(1, &backBuffer, nullptr);
+
+		// switch the back buffer and the front buffer
+		swapchain->Present(0, 0);
+	}
+
+	void initDownsampleBuffers(D3d d3d, BufferSize& size)
+	{
+		release(multisampleTex);
+		release(multisampleRtv);
+		release(resolvedTex);
+		release(resolvedSrv);
+
+		auto format = DXGI_FORMAT_R8G8B8A8_UNORM;
+
+		{
+			// TEX
+			D3D11_TEXTURE2D_DESC desc = CD3D11_TEXTURE2D_DESC(format, size.width, size.height);
+			desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+			desc.MipLevels = 1;
+			desc.SampleDesc.Count = downsamplingSamples;// multisampled
+			d3d.device->CreateTexture2D(&desc, nullptr, &multisampleTex);
+
+			// RTV
+			D3D11_RENDER_TARGET_VIEW_DESC descRTV = CD3D11_RENDER_TARGET_VIEW_DESC(
+				D3D11_RTV_DIMENSION_TEXTURE2DMS,
+				format
+			);
+			d3d.device->CreateRenderTargetView(multisampleTex, &descRTV, &multisampleRtv);
+		} {
+			// TEX
+			D3D11_TEXTURE2D_DESC desc = CD3D11_TEXTURE2D_DESC(format, size.width, size.height);
+			desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+			desc.MipLevels = 1;
+			d3d.device->CreateTexture2D(&desc, nullptr, &resolvedTex);
+
+			// SRV
+			D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = CD3D11_SHADER_RESOURCE_VIEW_DESC(
+				D3D11_SRV_DIMENSION_TEXTURE2D,
+				format
+			);
+			descSRV.Texture2D.MipLevels = 1;
+			d3d.device->CreateShaderResourceView((ID3D11Resource*)resolvedTex, &descSRV, &resolvedSrv);
+		}
+	}
+
+	void initDepthBuffer(D3d d3d, BufferSize& size)
+	{
+		release(multisampleDepthView);
+		release(depthStateNone);
+
+		// create depth buffer
+		D3D11_TEXTURE2D_DESC depthTexDesc;
+		ZeroMemory(&depthTexDesc, sizeof(D3D11_TEXTURE2D_DESC));
+
+		depthTexDesc.Width = size.width;
+		depthTexDesc.Height = size.height;
+		depthTexDesc.MipLevels = 1;
+		depthTexDesc.ArraySize = 1;
+		depthTexDesc.Format = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
+		depthTexDesc.SampleDesc.Count = downsamplingSamples;
+		depthTexDesc.Usage = D3D11_USAGE_DEFAULT;
+		depthTexDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+
+		ID3D11Texture2D* depthTex;
+		d3d.device->CreateTexture2D(&depthTexDesc, nullptr, &depthTex);
+		d3d.device->CreateDepthStencilView(depthTex, nullptr, &multisampleDepthView);
+		depthTex->Release();
+
+		// create and set depth state
+		D3D11_DEPTH_STENCIL_DESC depthStateDesc;
+		ZeroMemory(&depthStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
+		depthStateDesc.DepthEnable = FALSE;
+
+		d3d.device->CreateDepthStencilState(&depthStateDesc, &depthStateNone);
+	}
+
 	void initBackBuffer(D3d d3d, IDXGISwapChain1* swapchain)
 	{
-		if (backBuffer != nullptr) {
-			backBuffer->Release();
+		if (backBufferTex != nullptr) {
+			backBufferTex->Release();
+		}
+		if (backBufferRtv != nullptr) {
+			backBufferRtv->Release();
 		}
 
+		// Preserve the existing buffer count and format.
+		// Automatically choose the width and height to match the client rect for HWNDs.
+		swapchain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, 0);
+
 		// get the address of the back buffer
-		ID3D11Texture2D* texture;
-		swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&texture);
+		swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBufferTex);
 
 		// since swapchain itself was described to be linear, we need to trigger sRGB conversion
 		D3D11_RENDER_TARGET_VIEW_DESC rtvDesc = CD3D11_RENDER_TARGET_VIEW_DESC(
@@ -63,32 +181,35 @@ namespace renderer::postprocess
 			DXGI_FORMAT_R8G8B8A8_UNORM_SRGB
 		);
 		// use the texture address to create the render target
-		d3d.device->CreateRenderTargetView(texture, &rtvDesc, &backBuffer);
-		texture->Release();
+		d3d.device->CreateRenderTargetView(backBufferTex, &rtvDesc, &backBufferRtv);
+		//texture->Release();
 	}
 
 	void initViewport(BufferSize& size) {
 		initViewport(size, &viewport);
 	}
 
-	void initLinearSampler(D3d d3d)
+	void initLinearSampler(D3d d3d, bool pointSampling)
 	{
+		if (samplerState != nullptr) {
+			samplerState->Release();
+		}
+
 		D3D11_SAMPLER_DESC samplerDesc = CD3D11_SAMPLER_DESC();
 		ZeroMemory(&samplerDesc, sizeof(samplerDesc));
 
-		//samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-		samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;// point samping does not interpolate when upscaling, so we can more easily see pixel aliasing
-		// TODO make this a render setting
+		// point samping does not interpolate when upscaling, so we can more easily see pixel aliasing
+		samplerDesc.Filter = pointSampling ? D3D11_FILTER_MIN_MAG_MIP_POINT : D3D11_FILTER_MIN_MAG_MIP_LINEAR;
 		
 		samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
 		samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
 		samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
-		samplerDesc.MaxAnisotropy = 1;// no anisotropy
+		samplerDesc.MaxAnisotropy = 1;// no anisotropy, TODO how to multisample when upscaling?
 		samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
 		samplerDesc.MinLOD = 0;
 		samplerDesc.MaxLOD = 0;// always use most detailed level
 
-		d3d.device->CreateSamplerState(&samplerDesc, &linearSamplerState);
+		d3d.device->CreateSamplerState(&samplerDesc, &samplerState);
 	}
 
 	void initVertexBuffers(D3d d3d, bool reverseZ)
@@ -122,10 +243,19 @@ namespace renderer::postprocess
 		}
 	}
 
+	void initRasterizer(D3d d3d)
+	{
+		D3D11_RASTERIZER_DESC rasterizerDesc;
+		ZeroMemory(&rasterizerDesc, sizeof(D3D11_RASTERIZER_DESC));
+
+		rasterizerDesc.MultisampleEnable = true;
+		d3d.device->CreateRasterizerState(&rasterizerDesc, &rasterizer);
+	}
+
 	void clean()
 	{
-		backBuffer->Release();
+		backBufferRtv->Release();
 		toneMappingQuad.release();
-		linearSamplerState->Release();
+		samplerState->Release();
 	}
 }

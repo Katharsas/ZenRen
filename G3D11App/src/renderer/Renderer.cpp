@@ -10,12 +10,14 @@
 // The renderer can optionally use some DX 12 functionality like flip model and VRAM stats.
 
 #include <wrl/client.h>
+#include <algorithm>
 
 using namespace Microsoft::WRL;
 
 #include "Settings.h"
 #include "RenderSettings.h"
 #include "Camera.h"
+#include "PipelineForward.h"
 #include "PipelinePostProcess.h"
 #include "PipelineWorld.h"
 #include "ShaderManager.h"
@@ -42,16 +44,9 @@ namespace renderer
 	Dx12 dx12;
 	
 	IDXGISwapChain1* swapchain;
-
-	ID3D11RenderTargetView* linearBackBuffer = nullptr; // 64-bit
-	ID3D11ShaderResourceView* linearBackBufferResource = nullptr;
-	D3D11_VIEWPORT linearBackBufferViewport;
+	ID3D11ShaderResourceView* linearBackBufferResource = nullptr; // owned by RendererForward
 
 	ShaderManager* shaders;
-
-	ID3D11DepthStencilView* depthStencilView = nullptr;
-
-	ID3D11RasterizerState* wireFrame;
 
 	RenderSettings settingsPrevious;
 	RenderSettings settings;
@@ -61,35 +56,72 @@ namespace renderer
 
 	// forward definitions
 	void initDeviceAndSwapChain(HWND hWnd);
-	void initDepthAndStencilBuffer(BufferSize& size);
-	void initLinearBackBuffer(BufferSize& size);
-	void initRasterizerStates();
 
-
-
-	void initWorld()
-	{
-		//VDFS::FileIndex vdf;
-		//vdf.loadVDF(u8"../g1_data/worlds.VDF");
-		//ZenLoad::ZenParser parser(u8"WORLD.ZEN", vdf);
-		//parser.readHeader();
-		//ZenLoad::oCWorldData world;
-		//parser.readWorld(world);
-		//ZenLoad::zCMesh* mesh = parser.getWorldMesh();
+	void updateRenderSize() {
+		renderSize = clientSize * settings.resolutionScaling;
+		renderSize.width = std::max(renderSize.width, 1u);
+		renderSize.height = std::max(renderSize.height, 1u);
 	}
 
-	void initDepthAndRenderTargets() {
-		// Preserve the existing buffer count and format.
-		// Automatically choose the width and height to match the client rect for HWNDs.
-		swapchain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, 0);
+	struct RenderDirtyFlags {
+		//bool resizeSwapChain = false;
 
-		initDepthAndStencilBuffer(renderSize);
+		bool backBuffer = false;// TODO rename to backBufferViewport
+		bool backBufferQuadVerts = false;
 
-		initLinearBackBuffer(renderSize);
-		initViewport(renderSize, &linearBackBufferViewport);
+		bool renderBuffer = false;
+		bool renderBufferSampler = false;
 
-		postprocess::initBackBuffer(d3d, swapchain);
-		postprocess::initViewport(clientSize);
+		bool depthBuffer = false;
+		
+		bool diffuseTexSampler = false;
+		//bool staticVertexBuffer = false;
+		bool shaderSettingsGlobal = false;
+
+		void onInit() {
+			backBuffer = true, backBufferQuadVerts = true,
+				renderBuffer = true, renderBufferSampler = true, depthBuffer = true,
+				diffuseTexSampler = true; shaderSettingsGlobal = true;
+		}
+		void onChangeRenderSize() {
+			renderBuffer = true;
+			depthBuffer = true;
+		}
+		void onChangeClientSize() {
+			onChangeRenderSize();
+			backBuffer = true;
+		}
+		void onChangeReverseZ() {
+			backBufferQuadVerts = true;
+			depthBuffer = true;
+		}
+	};
+
+	void reinitRenderer(RenderDirtyFlags& flags) {
+		if (flags.backBuffer) {
+			postprocess::initDownsampleBuffers(d3d, clientSize);
+			postprocess::initBackBuffer(d3d, swapchain);
+			postprocess::initViewport(clientSize);
+		}
+		if (flags.backBufferQuadVerts) {
+			postprocess::initVertexBuffers(d3d, settings.reverseZ);
+		}
+		if (flags.renderBuffer) {
+			linearBackBufferResource = forward::initRenderBuffer(d3d, renderSize);
+			forward::initViewport(renderSize);
+		}
+		if (flags.renderBufferSampler) {
+			postprocess::initLinearSampler(d3d, !settings.resolutionUpscaleSmooth);
+		}
+		if (flags.depthBuffer) {
+			forward::initDepthBuffer(d3d, renderSize, settings.reverseZ);
+		}
+		if (flags.diffuseTexSampler) {
+			world::initLinearSampler(d3d, settings);
+		}
+		if (flags.shaderSettingsGlobal) {
+			world::updateShaderSettings(d3d, settings);
+		}
 	}
 
 	void initD3D(HWND hWnd)
@@ -98,7 +130,7 @@ namespace renderer
 			::settings::SCREEN_WIDTH,
 			::settings::SCREEN_HEIGHT,
 		};
-		renderSize = clientSize * settings.resolutionScaling;
+		updateRenderSize();
 
 		renderer::addWindow("Info", {
 			[]() -> void {
@@ -108,35 +140,36 @@ namespace renderer
 		});
 
 		initDeviceAndSwapChain(hWnd);
-		initDepthAndRenderTargets();
+		world::initConstantBufferPerObject(d3d);
+
+		RenderDirtyFlags flags;
+		flags.onInit();
+		reinitRenderer(flags);
+		forward::initRasterizerStates(d3d);
+		postprocess::initDepthBuffer(d3d, clientSize);
 
 		initGui(hWnd, d3d);
 
 		camera::init();
 
 		shaders = new ShaderManager(d3d);
-		postprocess::initLinearSampler(d3d);
-		postprocess::initVertexBuffers(d3d, settings.reverseZ);
-		world::initLinearSampler(d3d, settings);
 		world::initConstantBufferPerObject(d3d);
-		world::initVertexIndexBuffers(d3d, settings.reverseZ);
-		initRasterizerStates();
+		world::initVertexIndexBuffers(d3d);
 
 		gui::settings::init(settings);
-
-		world::updateShaderSettings(d3d, settings);
 	}
 
 	void onWindowResize(uint32_t width, uint32_t height) {
 		clientSize = { width, height };
-		renderSize = clientSize * settings.resolutionScaling;
+		updateRenderSize();
 
 		// see https://docs.microsoft.com/en-us/windows/win32/direct3ddxgi/d3d10-graphics-programming-guide-dxgi#handling-window-resizing
 		if (swapchain) {
 			d3d.deviceContext->OMSetRenderTargets(0, 0, 0);
-			//d3d.deviceContext->Flush();
 
-			initDepthAndRenderTargets();
+			RenderDirtyFlags flags;
+			flags.onChangeClientSize();
+			reinitRenderer(flags);
 		}
 	}
 
@@ -156,13 +189,9 @@ namespace renderer
 		world::clean();
 
 		swapchain->Release();
-		depthStencilView->Release();
 		
 		postprocess::clean();
-
-		linearBackBuffer->Release();
-		linearBackBufferResource->Release();
-		wireFrame->Release();
+		forward::clean();
 
 		d3d.device->Release();
 		d3d.deviceContext->Release();
@@ -176,54 +205,39 @@ namespace renderer
 	void renderFrame()
 	{
 		auto deviceContext = d3d.deviceContext;
-		
+
+		RenderDirtyFlags renderState;
 		if (settings.resolutionScaling != settingsPrevious.resolutionScaling) {
-			renderSize = clientSize * settings.resolutionScaling;
-			initDepthAndRenderTargets();
+			updateRenderSize();
+			renderState.onChangeRenderSize();
+		}
+		if (settings.resolutionUpscaleSmooth != settingsPrevious.resolutionUpscaleSmooth) {
+			renderState.renderBufferSampler = true;
 		}
 		if (settings.reverseZ != settingsPrevious.reverseZ) {
-			postprocess::initVertexBuffers(d3d, settings.reverseZ);
-		}
-		if (settings.reverseZ != settingsPrevious.reverseZ) {
-			initDepthAndStencilBuffer(renderSize);
+			renderState.onChangeReverseZ();
 		}
 		if (settings.anisotropicFilter != settingsPrevious.anisotropicFilter || settings.anisotropicLevel != settingsPrevious.anisotropicFilter) {
-			world::initLinearSampler(d3d, settings);
+			renderState.diffuseTexSampler = true;
 		}
 		if (settings.shader.ambientLight != settingsPrevious.shader.ambientLight || settings.shader.mode != settingsPrevious.shader.mode) {
-			world::updateShaderSettings(d3d, settings);
+			renderState.shaderSettingsGlobal = true;
 		}
+		reinitRenderer(renderState);
 
 		camera::updateCamera(settings.reverseZ, renderSize);
 
-		// set the linear back buffer as rtv
-		deviceContext->OMSetRenderTargets(1, &linearBackBuffer, depthStencilView);
-		deviceContext->RSSetViewports(1, &linearBackBufferViewport);
-
-		// clear the back buffer to a deep blue
-		deviceContext->ClearRenderTargetView(linearBackBuffer, D3DXCOLOR(0.0f, 0.2f, 0.4f, 1.0f));
-
-		// clear depth and stencil buffer
-		const float zFar = settings.reverseZ ? 0.0 : 1.0f;
-		deviceContext->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, zFar, 0);
-
-		// set rasterizer state
-		if (settings.wireframe) {
-			deviceContext->RSSetState(wireFrame);
-		}
-
-		// draw world to linear buffer
-		world::draw(d3d, shaders);
+		// foward pipeline renders world/scene to linear backbuffer
+		forward::draw(d3d, shaders, settings);
 		
 		// postprocessing pipeline renders linear backbuffer to real backbuffer
-		postprocess::draw(d3d, linearBackBufferResource, shaders);
+		postprocess::draw(d3d, linearBackBufferResource, shaders, settings.downsampling);
 
 		// gui does not output shading information so it goes to real sRGB backbuffer as well
 		settingsPrevious = settings;
 		drawGui();
 
-		// switch the back buffer and the front buffer
-		swapchain->Present(0, 0);
+		postprocess::resolveAndPresent(d3d, swapchain);
 	}
 
 	void initDeviceAndSwapChain(HWND hWnd)
@@ -286,7 +300,7 @@ namespace renderer
 		swapChainDesc.Width = 0;										  // back buffer width and height are set later
 		swapChainDesc.Height = 0;
 		swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;      // how swap chain is to be used
-		swapChainDesc.SampleDesc.Count = 1;                               // how many multisamples
+		swapChainDesc.SampleDesc.Count = 1;                               // sample count (swapchain multisampling should never be used!)
 		swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;     // allow full-screen switching
 		if (dx12.isAvailable) {
 			LOG(DEBUG) << "Detected Windows 10 or greater! Using flip present model.";
@@ -304,106 +318,4 @@ namespace renderer
 		d3d.device = device_11_1.Detach();
 		d3d.deviceContext = deviceContext_11_1.Detach();
 	}
-
-	void initDepthAndStencilBuffer(BufferSize& size)
-	{
-		if (depthStencilView != nullptr) {
-			depthStencilView->Release();
-		}
-
-		// create depth buffer
-		D3D11_TEXTURE2D_DESC depthStencilDesc;
-		ZeroMemory(&depthStencilDesc, sizeof(D3D11_TEXTURE2D_DESC));
-
-		depthStencilDesc.Width = size.width;
-		depthStencilDesc.Height = size.height;
-		depthStencilDesc.MipLevels = 1;
-		depthStencilDesc.ArraySize = 1;
-		depthStencilDesc.Format = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
-		depthStencilDesc.SampleDesc.Count = 1;
-		depthStencilDesc.SampleDesc.Quality = 0;
-		depthStencilDesc.Usage = D3D11_USAGE_DEFAULT;
-		depthStencilDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-		depthStencilDesc.CPUAccessFlags = 0;
-		depthStencilDesc.MiscFlags = 0;
-
-		ID3D11Texture2D* depthStencilBuffer;
-		d3d.device->CreateTexture2D(&depthStencilDesc, nullptr, &depthStencilBuffer);
-		d3d.device->CreateDepthStencilView(depthStencilBuffer, nullptr, &depthStencilView);
-		depthStencilBuffer->Release();
-
-		// create and set depth state
-		D3D11_DEPTH_STENCIL_DESC depthStencilStateDesc;
-		ZeroMemory(&depthStencilStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
-
-		depthStencilStateDesc.DepthEnable = TRUE;
-		depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-		depthStencilStateDesc.DepthFunc = settings.reverseZ ? D3D11_COMPARISON_GREATER : D3D11_COMPARISON_LESS;
-		depthStencilStateDesc.StencilEnable = FALSE;
-		depthStencilStateDesc.StencilReadMask = D3D11_DEFAULT_STENCIL_READ_MASK;
-		depthStencilStateDesc.StencilWriteMask = D3D11_DEFAULT_STENCIL_WRITE_MASK;
-		const D3D11_DEPTH_STENCILOP_DESC defaultStencilOp =
-		{	
-			D3D11_STENCIL_OP_KEEP,
-			D3D11_STENCIL_OP_KEEP,
-			D3D11_STENCIL_OP_KEEP,
-			D3D11_COMPARISON_ALWAYS
-		};
-		depthStencilStateDesc.FrontFace = defaultStencilOp;
-		depthStencilStateDesc.BackFace = defaultStencilOp;
-
-		ID3D11DepthStencilState* depthStencilState;
-		d3d.device->CreateDepthStencilState(&depthStencilStateDesc, &depthStencilState);
-		d3d.deviceContext->OMSetDepthStencilState(depthStencilState, 1);
-		depthStencilState->Release();
-	}
-
-	void initLinearBackBuffer(BufferSize& size)
-	{
-		if (linearBackBuffer != nullptr) {
-			linearBackBuffer->Release();
-		}
-		if (linearBackBufferResource != nullptr) {
-			linearBackBufferResource->Release();
-		}
-
-		auto format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-
-		// Create buffer texture
-		D3D11_TEXTURE2D_DESC desc = CD3D11_TEXTURE2D_DESC(format, size.width, size.height);
-		desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
-		desc.MipLevels = 1;
-
-		ID3D11Texture2D* texture;
-		d3d.device->CreateTexture2D(&desc, nullptr, &texture);
-
-		// Create RTV
-		D3D11_RENDER_TARGET_VIEW_DESC descRTV = CD3D11_RENDER_TARGET_VIEW_DESC(
-			D3D11_RTV_DIMENSION_TEXTURE2D,
-			format
-		);
-		d3d.device->CreateRenderTargetView(texture, &descRTV, &linearBackBuffer);
-
-		// Create SRV
-		D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = CD3D11_SHADER_RESOURCE_VIEW_DESC(
-			D3D11_SRV_DIMENSION_TEXTURE2D,
-			format
-		);
-		descSRV.Texture2D.MipLevels = 1;
-		d3d.device->CreateShaderResourceView((ID3D11Resource*)texture, &descSRV, &linearBackBufferResource);
-
-		// Done
-		texture->Release();
-	}
-
-	void initRasterizerStates()
-	{
-		D3D11_RASTERIZER_DESC wireFrameDesc;
-		ZeroMemory(&wireFrameDesc, sizeof(D3D11_RASTERIZER_DESC));
-
-		wireFrameDesc.FillMode = D3D11_FILL_WIREFRAME;
-		wireFrameDesc.CullMode = D3D11_CULL_NONE;
-		d3d.device->CreateRasterizerState(&wireFrameDesc, &wireFrame);
-	}
-	
 }
