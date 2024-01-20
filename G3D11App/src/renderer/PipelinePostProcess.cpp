@@ -27,6 +27,26 @@ namespace renderer::postprocess
 
 	Mesh toneMappingQuad;
 
+	void clean()
+	{
+		release(std::vector<IUnknown*> {
+			samplerState,
+
+			multisampleTex,
+			multisampleRtv,
+
+			resolvedTex,
+			resolvedSrv,
+
+			backBufferTex,
+			backBufferRtv,
+
+			multisampleDepthView,
+			depthStateNone,
+			rasterizer,
+		});
+	}
+
 	void renderToTexure(D3d d3d, Shader* shader, ID3D11ShaderResourceView* srv, ID3D11RenderTargetView* rtv, ID3D11DepthStencilView* depth) {
 		d3d.deviceContext->OMSetRenderTargets(1, &rtv, depth);
 		d3d.deviceContext->RSSetViewports(1, &viewport);
@@ -134,21 +154,29 @@ namespace renderer::postprocess
 		release(depthStateNone);
 
 		// create depth buffer
-		D3D11_TEXTURE2D_DESC depthTexDesc;
-		ZeroMemory(&depthTexDesc, sizeof(D3D11_TEXTURE2D_DESC));
-
-		depthTexDesc.Width = size.width;
-		depthTexDesc.Height = size.height;
+		D3D11_TEXTURE2D_DESC depthTexDesc = CD3D11_TEXTURE2D_DESC(
+			DXGI_FORMAT_D32_FLOAT_S8X24_UINT,
+			size.width,
+			size.height
+		);
+		//depthTexDesc.Width = size.width;
+		//depthTexDesc.Height = size.height;
 		depthTexDesc.MipLevels = 1;
-		depthTexDesc.ArraySize = 1;
-		depthTexDesc.Format = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
+		//depthTexDesc.Format = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
 		depthTexDesc.SampleDesc.Count = downsamplingSamples;
-		depthTexDesc.Usage = D3D11_USAGE_DEFAULT;
 		depthTexDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
 
 		ID3D11Texture2D* depthTex;
 		d3d.device->CreateTexture2D(&depthTexDesc, nullptr, &depthTex);
-		d3d.device->CreateDepthStencilView(depthTex, nullptr, &multisampleDepthView);
+
+		CD3D11_DEPTH_STENCIL_VIEW_DESC depthViewDesc = CD3D11_DEPTH_STENCIL_VIEW_DESC(
+			D3D11_DSV_DIMENSION_TEXTURE2DMS
+		);
+		D3D11_TEX2DMS_DSV depthViewDmsDesc;
+		depthViewDmsDesc.UnusedField_NothingToDefine = 0;
+		depthViewDesc.Texture2DMS = depthViewDmsDesc;
+		//depthViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DMS;
+		d3d.device->CreateDepthStencilView(depthTex, &depthViewDesc, &multisampleDepthView);
 		depthTex->Release();
 
 		// create and set depth state
@@ -250,12 +278,5 @@ namespace renderer::postprocess
 
 		rasterizerDesc.MultisampleEnable = true;
 		d3d.device->CreateRasterizerState(&rasterizerDesc, &rasterizer);
-	}
-
-	void clean()
-	{
-		backBufferRtv->Release();
-		toneMappingQuad.release();
-		samplerState->Release();
 	}
 }

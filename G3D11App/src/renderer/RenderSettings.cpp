@@ -11,6 +11,9 @@ namespace renderer::gui::settings {
 	const std::array<std::string, 5> filterSettingsItems = { "Trilinear", "AF  x2", "AF  x4", "AF  x8", "AF x16" };
 	std::string filterSettingsSelected = filterSettingsItems[4];
 
+	const std::array<std::string, 4> msaaSettingsItems = { "None", "x2", "x4", "x8" };
+	std::string msaaSettingsSelected = msaaSettingsItems[0];
+
 	void init(RenderSettings& settings)
 	{
 		addSettings("Renderer", {
@@ -55,10 +58,46 @@ namespace renderer::gui::settings {
 
 		addSettings("Resolution", {
 			[&]()  -> void {
-				ImGui::PushItemWidth(120);
+				ImGui::PushItemWidth(60);
 				ImGui::InputFloat("Resolution Scaling", &settings.resolutionScaling, 0);
+				ImGui::PopItemWidth();
+				ImGui::PushItemWidth(120);
 				ImGui::Checkbox("Smooth Scaling", &settings.resolutionUpscaleSmooth);
 				ImGui::Checkbox("Downsampling", &settings.downsampling);
+				ImGui::PopItemWidth();
+			}
+		});
+
+		addSettings("Anti-Aliasing", {
+			[&]() -> void {
+				const auto& items = msaaSettingsItems;
+				auto& selected = msaaSettingsSelected;
+
+				ImGui::PushItemWidth(120);
+				if (ImGui::BeginCombo("MSAA", selected.c_str()))
+				{
+					for (int n = 0; n < items.size(); n++)
+					{
+						auto current = items[n].c_str();
+						bool isSelected = (selected == current);
+						if (ImGui::Selectable(current, isSelected)) {
+							selected = items[n];
+							if (selected == items[0]) {
+								settings.multisampleCount = 1;
+							}
+							if (selected == items[1]) {
+								settings.multisampleCount = 2;
+							}
+							if (selected == items[2]) {
+								settings.multisampleCount = 4;
+							}
+							if (selected == items[3]) {
+								settings.multisampleCount = 8;
+							}
+						}
+					}
+					ImGui::EndCombo();
+				}
 				ImGui::PopItemWidth();
 			}
 		});

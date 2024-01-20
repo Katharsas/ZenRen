@@ -100,7 +100,7 @@ namespace renderer
 	};
 
 	void release(IUnknown* dx11object);
-
+	void release(std::vector<IUnknown*>& dx11objects);
 	void initViewport(BufferSize& size, D3D11_VIEWPORT* viewport);
 }
 

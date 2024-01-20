@@ -73,6 +73,7 @@ namespace renderer
 		bool renderBufferSampler = false;
 
 		bool depthBuffer = false;
+		bool forwardRasterizer = false;
 		
 		bool diffuseTexSampler = false;
 		//bool staticVertexBuffer = false;
@@ -80,7 +81,8 @@ namespace renderer
 
 		void onInit() {
 			backBuffer = true, backBufferQuadVerts = true,
-				renderBuffer = true, renderBufferSampler = true, depthBuffer = true,
+				renderBuffer = true, renderBufferSampler = true,
+				depthBuffer = true, forwardRasterizer = true,
 				diffuseTexSampler = true; shaderSettingsGlobal = true;
 		}
 		void onChangeRenderSize() {
@@ -90,6 +92,14 @@ namespace renderer
 		void onChangeClientSize() {
 			onChangeRenderSize();
 			backBuffer = true;
+		}
+		void onChangeMultisampling() {
+			renderBuffer = true;
+			depthBuffer = true;
+			forwardRasterizer = true;
+		}
+		void onChangeWireframe() {
+			forwardRasterizer = true;
 		}
 		void onChangeReverseZ() {
 			backBufferQuadVerts = true;
@@ -107,14 +117,17 @@ namespace renderer
 			postprocess::initVertexBuffers(d3d, settings.reverseZ);
 		}
 		if (flags.renderBuffer) {
-			linearBackBufferResource = forward::initRenderBuffer(d3d, renderSize);
+			linearBackBufferResource = forward::initRenderBuffer(d3d, renderSize, settings.multisampleCount);
 			forward::initViewport(renderSize);
 		}
 		if (flags.renderBufferSampler) {
 			postprocess::initLinearSampler(d3d, !settings.resolutionUpscaleSmooth);
 		}
 		if (flags.depthBuffer) {
-			forward::initDepthBuffer(d3d, renderSize, settings.reverseZ);
+			forward::initDepthBuffer(d3d, renderSize, settings.multisampleCount, settings.reverseZ);
+		}
+		if (flags.forwardRasterizer) {
+			forward::initRasterizerStates(d3d, settings.multisampleCount, settings.wireframe);
 		}
 		if (flags.diffuseTexSampler) {
 			world::initLinearSampler(d3d, settings);
@@ -145,7 +158,6 @@ namespace renderer
 		RenderDirtyFlags flags;
 		flags.onInit();
 		reinitRenderer(flags);
-		forward::initRasterizerStates(d3d);
 		postprocess::initDepthBuffer(d3d, clientSize);
 
 		initGui(hWnd, d3d);
@@ -213,6 +225,12 @@ namespace renderer
 		}
 		if (settings.resolutionUpscaleSmooth != settingsPrevious.resolutionUpscaleSmooth) {
 			renderState.renderBufferSampler = true;
+		}
+		if (settings.wireframe != settingsPrevious.wireframe) {
+			renderState.onChangeWireframe();
+		}
+		if (settings.multisampleCount != settingsPrevious.multisampleCount) {
+			renderState.onChangeMultisampling();
 		}
 		if (settings.reverseZ != settingsPrevious.reverseZ) {
 			renderState.onChangeReverseZ();

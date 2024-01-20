@@ -9,6 +9,12 @@ namespace renderer {
 		}
 	}
 
+	void release(std::vector<IUnknown*>& dx11objects) {
+		for (auto object : dx11objects) {
+			release(object);
+		}
+	}
+
 	void initViewport(BufferSize& size, D3D11_VIEWPORT* viewport) {
 		ZeroMemory(viewport, sizeof(D3D11_VIEWPORT));
 

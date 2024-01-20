@@ -34,7 +34,10 @@ namespace renderer
 
 		float resolutionScaling = 1.0f;
 		bool resolutionUpscaleSmooth = true;
+		uint32_t multisampleCount = 1;
+
 		bool downsampling = false;// does not work currently
+		
 	};
 
 	struct StaticInstance {

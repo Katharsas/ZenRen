@@ -5,13 +5,30 @@
 
 namespace renderer::forward {
 
-	ID3D11RenderTargetView* linearBackBuffer = nullptr; // linear color, 64-bit
-	ID3D11ShaderResourceView* linearBackBufferResource = nullptr;
-	D3D11_VIEWPORT linearBackBufferViewport;
+	ID3D11Texture2D* targetTex = nullptr;// linear color, 64-bit, potentially multisampled
+	ID3D11RenderTargetView* targetRtv = nullptr;
+	D3D11_VIEWPORT viewport;
+
+	ID3D11Texture2D* resolvedTex = nullptr;// only used if targetTex is multisampled
+	ID3D11ShaderResourceView* resultSrv = nullptr;// either targetTex or resolveTex, never multisampled
 
 	ID3D11DepthStencilView* depthView = nullptr;
 	ID3D11DepthStencilState* depthState = nullptr;
-	ID3D11RasterizerState* wireFrame;
+	ID3D11RasterizerState* rasterizer = nullptr;
+
+	void clean()
+	{
+		release(std::vector<IUnknown*> {
+			targetTex,
+			targetRtv,
+			resolvedTex,
+			resultSrv,
+
+			depthView,
+			depthState,
+			rasterizer,
+		});
+	}
 
 
 	void draw(D3d d3d, ShaderManager* shaders, RenderSettings& settings) {
@@ -19,33 +36,36 @@ namespace renderer::forward {
 		d3d.deviceContext->OMSetDepthStencilState(depthState, 1);
 
 		// set the linear back buffer as rtv
-		d3d.deviceContext->OMSetRenderTargets(1, &linearBackBuffer, depthView);
-		d3d.deviceContext->RSSetViewports(1, &linearBackBufferViewport);
+		d3d.deviceContext->OMSetRenderTargets(1, &targetRtv, depthView);
+		d3d.deviceContext->RSSetViewports(1, &viewport);
 
 		// clear the back buffer to a deep blue
-		d3d.deviceContext->ClearRenderTargetView(linearBackBuffer, D3DXCOLOR(0.0f, 0.2f, 0.4f, 1.0f));
+		d3d.deviceContext->ClearRenderTargetView(targetRtv, D3DXCOLOR(0.0f, 0.2f, 0.4f, 1.0f));
 
 		// clear depth and stencil buffer
 		const float zFar = settings.reverseZ ? 0.0 : 1.0f;
 		d3d.deviceContext->ClearDepthStencilView(depthView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, zFar, 0);
 
 		// set rasterizer state
-		if (settings.wireframe) {
-			d3d.deviceContext->RSSetState(wireFrame);
-		}
+		d3d.deviceContext->RSSetState(rasterizer);
 
 		// draw world to linear buffer
 		world::draw(d3d, shaders);
+
+		if (settings.multisampleCount > 1) {
+			d3d.deviceContext->ResolveSubresource(
+				resolvedTex, D3D11CalcSubresource(0, 0, 1),
+				targetTex, D3D11CalcSubresource(0, 0, 1),
+				DXGI_FORMAT_R16G16B16A16_FLOAT);
+		}
 	}
 
-	ID3D11ShaderResourceView* initRenderBuffer(D3d d3d, BufferSize& size)
+	ID3D11ShaderResourceView* initRenderBuffer(D3d d3d, BufferSize& size, uint32_t multisampleCount)
 	{
-		if (linearBackBuffer != nullptr) {
-			linearBackBuffer->Release();
-		}
-		if (linearBackBufferResource != nullptr) {
-			linearBackBufferResource->Release();
-		}
+		release(targetTex);
+		release(targetRtv);
+		release(resolvedTex);
+		release(resultSrv);
 
 		auto format = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
@@ -53,16 +73,26 @@ namespace renderer::forward {
 		D3D11_TEXTURE2D_DESC desc = CD3D11_TEXTURE2D_DESC(format, size.width, size.height);
 		desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
 		desc.MipLevels = 1;
+		desc.SampleDesc.Count = multisampleCount;
 
-		ID3D11Texture2D* texture;
-		d3d.device->CreateTexture2D(&desc, nullptr, &texture);
+		d3d.device->CreateTexture2D(&desc, nullptr, &targetTex);
 
 		// Create RTV
 		D3D11_RENDER_TARGET_VIEW_DESC descRTV = CD3D11_RENDER_TARGET_VIEW_DESC(
-			D3D11_RTV_DIMENSION_TEXTURE2D,
+			multisampleCount > 1 ? D3D11_RTV_DIMENSION_TEXTURE2DMS : D3D11_RTV_DIMENSION_TEXTURE2D,
 			format
 		);
-		d3d.device->CreateRenderTargetView(texture, &descRTV, &linearBackBuffer);
+		d3d.device->CreateRenderTargetView(targetTex, &descRTV, &targetRtv);
+
+		
+		if (multisampleCount > 1) {
+			D3D11_TEXTURE2D_DESC resolvedTexDesc = CD3D11_TEXTURE2D_DESC(format, size.width, size.height);
+			resolvedTexDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+			resolvedTexDesc.MipLevels = 1;
+			resolvedTexDesc.SampleDesc.Count = 1;
+
+			d3d.device->CreateTexture2D(&resolvedTexDesc, nullptr, &resolvedTex);
+		}
 
 		// Create SRV
 		D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = CD3D11_SHADER_RESOURCE_VIEW_DESC(
@@ -70,51 +100,68 @@ namespace renderer::forward {
 			format
 		);
 		descSRV.Texture2D.MipLevels = 1;
-		d3d.device->CreateShaderResourceView((ID3D11Resource*)texture, &descSRV, &linearBackBufferResource);
+		if (multisampleCount > 1) {
+			d3d.device->CreateShaderResourceView((ID3D11Resource*)resolvedTex, &descSRV, &resultSrv);
+		}
+		else {
+			d3d.device->CreateShaderResourceView((ID3D11Resource*)targetTex, &descSRV, &resultSrv);
+		}
 
 		// Done
-		texture->Release();
-
-		return linearBackBufferResource;
+		return resultSrv;
 	}
 
 	void initViewport(BufferSize& size)
 	{
-		initViewport(size, &linearBackBufferViewport);
+		initViewport(size, &viewport);
 	}
 
-	void initDepthBuffer(D3d d3d, BufferSize& size, bool reverseZ)
+	void initDepthBuffer(D3d d3d, BufferSize& size, uint32_t multisampleCount, bool reverseZ)
 	{
 		release(depthView);
+		release(depthState);
 
 		// create depth buffer
-		D3D11_TEXTURE2D_DESC depthStencilDesc;
-		ZeroMemory(&depthStencilDesc, sizeof(D3D11_TEXTURE2D_DESC));
+		D3D11_TEXTURE2D_DESC depthTexDesc;
+		ZeroMemory(&depthTexDesc, sizeof(D3D11_TEXTURE2D_DESC));
 
-		depthStencilDesc.Width = size.width;
-		depthStencilDesc.Height = size.height;
-		depthStencilDesc.MipLevels = 1;
-		depthStencilDesc.ArraySize = 1;
-		depthStencilDesc.Format = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
-		depthStencilDesc.SampleDesc.Count = 1;
-		depthStencilDesc.Usage = D3D11_USAGE_DEFAULT;
-		depthStencilDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+		depthTexDesc.Width = size.width;
+		depthTexDesc.Height = size.height;
+		depthTexDesc.MipLevels = 1;
+		depthTexDesc.ArraySize = 1;
+		depthTexDesc.Format = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
+		depthTexDesc.SampleDesc.Count = multisampleCount;
+		depthTexDesc.Usage = D3D11_USAGE_DEFAULT;
+		depthTexDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
 
 		ID3D11Texture2D* depthStencilBuffer;
-		d3d.device->CreateTexture2D(&depthStencilDesc, nullptr, &depthStencilBuffer);
-		d3d.device->CreateDepthStencilView(depthStencilBuffer, nullptr, &depthView);
+		d3d.device->CreateTexture2D(&depthTexDesc, nullptr, &depthStencilBuffer);
+
+		if (multisampleCount > 1) {
+			CD3D11_DEPTH_STENCIL_VIEW_DESC depthViewDesc = CD3D11_DEPTH_STENCIL_VIEW_DESC(
+				D3D11_DSV_DIMENSION_TEXTURE2DMS
+			);
+			//D3D11_TEX2DMS_DSV depthViewDmsDesc;
+			//depthViewDmsDesc.UnusedField_NothingToDefine = 0;
+			depthViewDesc.Texture2DMS = D3D11_TEX2DMS_DSV {};
+			d3d.device->CreateDepthStencilView(depthStencilBuffer, &depthViewDesc, &depthView);
+		}
+		else {
+			d3d.device->CreateDepthStencilView(depthStencilBuffer, nullptr, &depthView);
+		}
+
 		depthStencilBuffer->Release();
 
 		// create and set depth state
-		D3D11_DEPTH_STENCIL_DESC depthStencilStateDesc;
-		ZeroMemory(&depthStencilStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
+		D3D11_DEPTH_STENCIL_DESC depthStateDesc;
+		ZeroMemory(&depthStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
 
-		depthStencilStateDesc.DepthEnable = TRUE;
-		depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-		depthStencilStateDesc.DepthFunc = reverseZ ? D3D11_COMPARISON_GREATER : D3D11_COMPARISON_LESS;
-		depthStencilStateDesc.StencilEnable = FALSE;
-		depthStencilStateDesc.StencilReadMask = D3D11_DEFAULT_STENCIL_READ_MASK;
-		depthStencilStateDesc.StencilWriteMask = D3D11_DEFAULT_STENCIL_WRITE_MASK;
+		depthStateDesc.DepthEnable = TRUE;
+		depthStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+		depthStateDesc.DepthFunc = reverseZ ? D3D11_COMPARISON_GREATER : D3D11_COMPARISON_LESS;
+		depthStateDesc.StencilEnable = FALSE;
+		depthStateDesc.StencilReadMask = D3D11_DEFAULT_STENCIL_READ_MASK;
+		depthStateDesc.StencilWriteMask = D3D11_DEFAULT_STENCIL_WRITE_MASK;
 		const D3D11_DEPTH_STENCILOP_DESC defaultStencilOp =
 		{
 			D3D11_STENCIL_OP_KEEP,
@@ -122,28 +169,24 @@ namespace renderer::forward {
 			D3D11_STENCIL_OP_KEEP,
 			D3D11_COMPARISON_ALWAYS
 		};
-		depthStencilStateDesc.FrontFace = defaultStencilOp;
-		depthStencilStateDesc.BackFace = defaultStencilOp;
+		depthStateDesc.FrontFace = defaultStencilOp;
+		depthStateDesc.BackFace = defaultStencilOp;
 
-		d3d.device->CreateDepthStencilState(&depthStencilStateDesc, &depthState);
+		d3d.device->CreateDepthStencilState(&depthStateDesc, &depthState);
 	}
 
-	void initRasterizerStates(D3d d3d)
+	void initRasterizerStates(D3d d3d, uint32_t multisampleCount, bool wireframe)
 	{
-		D3D11_RASTERIZER_DESC wireFrameDesc;
-		ZeroMemory(&wireFrameDesc, sizeof(D3D11_RASTERIZER_DESC));
+		release(rasterizer);
 
-		wireFrameDesc.FillMode = D3D11_FILL_WIREFRAME;
-		wireFrameDesc.CullMode = D3D11_CULL_NONE;
-		d3d.device->CreateRasterizerState(&wireFrameDesc, &wireFrame);
-	}
-
-	void clean()
-	{
-		linearBackBuffer->Release();
-		linearBackBufferResource->Release();
-
-		depthView->Release();
-		wireFrame->Release();
+		D3D11_RASTERIZER_DESC rasterizerDesc = CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT{});
+		if (multisampleCount > 1) {
+			rasterizerDesc.MultisampleEnable = TRUE;
+		}
+		if (wireframe) {
+			rasterizerDesc.FillMode = D3D11_FILL_WIREFRAME;
+			rasterizerDesc.CullMode = D3D11_CULL_NONE;
+		}
+		d3d.device->CreateRasterizerState(&rasterizerDesc, &rasterizer);
 	}
 }
