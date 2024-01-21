@@ -80,12 +80,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	
 	// Main message loop:
 	MSG msg;
+	bool quit = false;
 
-	while (TRUE) {
+	while (!quit) {
 		while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
 			DispatchMessageW(&msg);
 			if (msg.message == WM_QUIT) {
+				quit = true;
 				break;
 			}
 		}
