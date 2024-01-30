@@ -15,6 +15,7 @@ namespace renderer::forward {
 	ID3D11DepthStencilView* depthView = nullptr;
 	ID3D11DepthStencilState* depthState = nullptr;
 	ID3D11RasterizerState* rasterizer = nullptr;
+	ID3D11BlendState1* blendState = nullptr;
 
 	void clean()
 	{
@@ -27,6 +28,7 @@ namespace renderer::forward {
 			depthView,
 			depthState,
 			rasterizer,
+			blendState,
 		});
 	}
 
@@ -48,6 +50,7 @@ namespace renderer::forward {
 
 		// set rasterizer state
 		d3d.deviceContext->RSSetState(rasterizer);
+		d3d.deviceContext->OMSetBlendState(blendState, NULL, 0xffffffff);
 
 		// draw world to linear buffer
 		world::draw(d3d, shaders);
@@ -188,5 +191,18 @@ namespace renderer::forward {
 			rasterizerDesc.CullMode = D3D11_CULL_NONE;
 		}
 		d3d.device->CreateRasterizerState(&rasterizerDesc, &rasterizer);
+	}
+
+	void initBlendState(D3d d3d, uint32_t multisampleCount) {
+		release(blendState);
+
+		if (multisampleCount > 1) {
+			D3D11_BLEND_DESC1 blendStateDesc = CD3D11_BLEND_DESC1(CD3D11_DEFAULT{});
+			blendStateDesc.AlphaToCoverageEnable = TRUE;
+			d3d.device->CreateBlendState1(&blendStateDesc, &blendState);
+		}
+		else {
+			blendState = nullptr;
+		}
 	}
 }

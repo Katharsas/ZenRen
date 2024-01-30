@@ -74,6 +74,7 @@ namespace renderer
 
 		bool depthBuffer = false;
 		bool forwardRasterizer = false;
+		bool forwardBlendState = false;
 		
 		bool diffuseTexSampler = false;
 		//bool staticVertexBuffer = false;
@@ -82,7 +83,7 @@ namespace renderer
 		void onInit() {
 			backBuffer = true, backBufferQuadVerts = true,
 				renderBuffer = true, renderBufferSampler = true,
-				depthBuffer = true, forwardRasterizer = true,
+				depthBuffer = true, forwardRasterizer = true, forwardBlendState = true,
 				diffuseTexSampler = true; shaderSettingsGlobal = true;
 		}
 		void onChangeRenderSize() {
@@ -97,6 +98,7 @@ namespace renderer
 			renderBuffer = true;
 			depthBuffer = true;
 			forwardRasterizer = true;
+			forwardBlendState = true;
 		}
 		void onChangeWireframe() {
 			forwardRasterizer = true;
@@ -128,6 +130,9 @@ namespace renderer
 		}
 		if (flags.forwardRasterizer) {
 			forward::initRasterizerStates(d3d, settings.multisampleCount, settings.wireframe);
+		}
+		if (flags.forwardBlendState) {
+			forward::initBlendState(d3d, settings.multisampleCount);
 		}
 		if (flags.diffuseTexSampler) {
 			world::initLinearSampler(d3d, settings);

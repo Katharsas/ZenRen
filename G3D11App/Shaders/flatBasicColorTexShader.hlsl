@@ -100,7 +100,17 @@ float4 PS_Main(PS_IN input) : SV_TARGET
     if (!outputDirectEnabled || outputDirectType == FLAG_OUTPUT_DIRECT_DIFFUSE) {
         albedoColor = baseColor.Sample(SampleType, input.uvBaseColor);
 
-        clip(albedoColor[3] < 0.6f ? -1 : 1);
+        // Alpha Cutoff
+        // lower values will result in thinner coverage
+        float alphaCutoff = 0.6;
+
+        // Alpha to Coverage Sharpening
+        // sharpen the multisampled alpha to remove banding and interior transparency; outputs close to 1 or 0
+        albedoColor.a = (albedoColor.a - (1 - alphaCutoff)) / max(fwidth(albedoColor.a), 0.0001) + 0.5;
+
+        // Alpha Test
+        // if sharpening is used, the alphaCutoff its pretty much irrelevant here (we could just use 0.5)
+        clip(albedoColor.a < alphaCutoff ? -1 : 1);
     }
     else if (outputDirectEnabled && outputDirectType == FLAG_OUTPUT_DIRECT_LIGHTMAP) {
         // this splits pixels into per face groups based on lightmap or not, which is not great (?)
