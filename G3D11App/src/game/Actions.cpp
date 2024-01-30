@@ -9,6 +9,9 @@
 #include "imgui/imgui.h"
 
 namespace game {
+	using ::game::input::InputDevice;
+	using ::game::input::ButtonId;
+	using ::game::input::AxisId;
 
 	struct InputState {
 		int16_t axisDelta = 0;
@@ -38,14 +41,15 @@ namespace game {
 	const std::string ACTION_GUI_SEPARATOR = "---";
 	std::vector<std::string> actionsForGui;
 
-	std::map<const std::string, const game::input::InputId> actionsToDigitalInput;
-	std::map<const std::string, const game::input::InputId> actionsToAnalogInput;
+	std::map<const std::string, const game::input::ButtonId> actionsToDigitalInput;
+	std::map<const std::string, const game::input::AxisId> actionsToAnalogInput;
 
 	float deltaTime;
 
 	bool isActive(const std::string& actionId) {
 		auto& turnEnabledKey = actionsToDigitalInput.at(actionId);
-		return game::input::isKeyUsed(turnEnabledKey);
+		bool isEnabled = game::input::isKeyUsed(turnEnabledKey);
+		return isEnabled;
 	}
 
 	float getCameraMoveSpeed() {
@@ -100,37 +104,36 @@ namespace game {
 		},
 	};
 
-	void bindActionToKey(const std::string& actionName, const std::string& key = std::string()) {
+	void bindActionToKey(const std::string& actionName) {
 		actionsForGui.push_back(actionName);
-		if (!key.empty()) {
-			actionsToDigitalInput.insert({ actionName, { input::InputDevice::KEYBOARD, key } });
-		}
 	}
-	void bindActionToAxis(const std::string& actionName, const std::string& key = std::string()) {
+	void bindActionToKey(const std::string& actionName, const ButtonId& buttonId) {
 		actionsForGui.push_back(actionName);
-		if (!key.empty()) {
-			actionsToAnalogInput.insert({ actionName, { input::InputDevice::MOUSE, key } });
-		}
+		actionsToDigitalInput.insert({ actionName, buttonId });
+	}
+	void bindActionToAxis(const std::string& actionName, const AxisId& axisId) {
+		actionsForGui.push_back(actionName);
+		actionsToAnalogInput.insert({ actionName, axisId });
 	}
 
 	void setDefaultInputMap() {
 		bindActionToKey(ACTION_GUI_SEPARATOR + "Camera");
 		bindActionToKey(ACTION_GUI_SEPARATOR);
-		bindActionToKey("CAMERA_MOVE_FORWARDS", "W");
-		bindActionToKey("CAMERA_MOVE_BACKWARDS", "S");
-		bindActionToKey("CAMERA_MOVE_LEFT", "A");
-		bindActionToKey("CAMERA_MOVE_RIGHT", "D");
-		bindActionToKey("CAMERA_MOVE_UP", "E");
-		bindActionToKey("CAMERA_MOVE_DOWN", "C");
+		bindActionToKey("CAMERA_MOVE_FORWARDS", input::button('W'));
+		bindActionToKey("CAMERA_MOVE_BACKWARDS", input::button('S'));
+		bindActionToKey("CAMERA_MOVE_LEFT", input::button('A'));
+		bindActionToKey("CAMERA_MOVE_RIGHT", input::button('D'));
+		bindActionToKey("CAMERA_MOVE_UP", input::button('E'));
+		bindActionToKey("CAMERA_MOVE_DOWN", input::button('C'));
 		bindActionToKey(ACTION_GUI_SEPARATOR);
-		bindActionToKey("CAMERA_MOVE_FAST", "SHIFT");
+		bindActionToKey("CAMERA_MOVE_FAST", { InputDevice::KEYBOARD, VK_SHIFT });
 		bindActionToKey(ACTION_GUI_SEPARATOR);
-		bindActionToKey("CAMERA_TURN_LEFT", "Q");
-		bindActionToKey("CAMERA_TURN_RIGHT", "R");
+		bindActionToKey("CAMERA_TURN_LEFT", input::button('Q'));
+		bindActionToKey("CAMERA_TURN_RIGHT", input::button('R'));
 		bindActionToKey(ACTION_GUI_SEPARATOR);
-		bindActionToKey("CAMERA_TURN_ANALOG", "SPACE");
-		bindActionToAxis("CAMERA_TURN_AXIS_X", "Mouse X-Axis");
-		bindActionToAxis("CAMERA_TURN_AXIS_Y", "Mouse Y-Axis");
+		bindActionToKey("CAMERA_TURN_ANALOG", { InputDevice::KEYBOARD, VK_SPACE });
+		bindActionToAxis("CAMERA_TURN_AXIS_X", { InputDevice::MOUSE, MK_AXIS_X });
+		bindActionToAxis("CAMERA_TURN_AXIS_Y", { InputDevice::MOUSE, MK_AXIS_Y });
 	}
 
 	void initActions() {
@@ -152,20 +155,27 @@ namespace game {
 								ImGui::TableNextColumn();
 						}
 						else {
-							auto it = actionsToDigitalInput.find(actionname);
-							if (it == actionsToDigitalInput.end()) {
-								it = actionsToAnalogInput.find(actionname);
-								if (it == actionsToAnalogInput.end()) {
-									break;
-								}
+							auto buttonIt = actionsToDigitalInput.find(actionname);
+							auto axisIt = actionsToAnalogInput.find(actionname);
+							bool buttonExists = buttonIt != actionsToDigitalInput.end();
+							bool axisExits = axisIt != actionsToAnalogInput.end();
+							if (!buttonExists && !axisExits) {
+								break;
 							}
+
 							ImGui::TableNextColumn();
 							ImGui::Indent();
 							ImGui::Text(actionname.c_str());
 							ImGui::Unindent();
 							ImGui::TableNextColumn();
-							auto& inputId = it->second;
-							ImGui::Text(inputId.name.c_str());
+
+							if (buttonExists) {
+								const auto name = input::getName(buttonIt->second);
+								ImGui::Text(name.c_str());
+							} else {
+								const auto& name = input::getName(axisIt->second);
+								ImGui::Text(name.c_str());
+							}
 						}
 					}
 					ImGui::EndTable();
@@ -193,7 +203,7 @@ namespace game {
 			auto inputIt = actionsToAnalogInput.find(action.actionId);
 			if (inputIt != actionsToAnalogInput.end()) {
 				auto& inputId = inputIt->second;
-				action.inputState.axisDelta = game::input::getAxisDelta(inputId.name);
+				action.inputState.axisDelta = game::input::getAxisDelta(inputId);
 				action.onInputActive(action.inputState);
 			}
 		}

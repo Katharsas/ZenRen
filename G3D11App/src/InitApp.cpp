@@ -186,7 +186,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 		return 0;// TODO is this correct check?
 	}
 
-	if (game::input::onKeyUsed(message, wParam, lParam)) {
+	if (game::input::onWindowMessage(message, wParam, lParam)) {
 		return 0;
 	}
 
