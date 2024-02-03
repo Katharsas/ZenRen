@@ -171,9 +171,14 @@ namespace renderer
 
 		shaders = new ShaderManager(d3d);
 		world::initConstantBufferPerObject(d3d);
-		world::initVertexIndexBuffers(d3d);
+		world::init(d3d);
 
 		gui::settings::init(settings);
+	}
+
+	void loadLevel(std::string& level)
+	{
+		world::loadLevel(d3d, level);
 	}
 
 	void onWindowResize(uint32_t width, uint32_t height) {

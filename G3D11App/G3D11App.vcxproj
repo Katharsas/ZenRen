@@ -196,6 +196,7 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\renderer\loader\AssetFinder.cpp" />
     <ClCompile Include="src\renderer\PipelineForward.cpp" />
     <ClCompile Include="src\renderer\loader\MeshFromVdfLoader.cpp" />
     <ClCompile Include="src\game\Actions.cpp" />
@@ -258,10 +259,11 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\renderer\Texture.cpp" />
-    <ClCompile Include="src\renderer\loader\TextureFinder.cpp" />
+    <ClCompile Include="src\renderer\loader\DebugTextures.cpp" />
     <ClCompile Include="src\renderer\loader\ZenLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\renderer\loader\AssetFinder.h" />
     <ClInclude Include="lib\tinyobj\tiny_obj_loader.h" />
     <ClInclude Include="src\renderer\PipelineForward.h" />
     <ClInclude Include="src\renderer\loader\MeshFromVdfLoader.h" />
@@ -298,7 +300,7 @@
     <ClInclude Include="targetver.h" />
     <ClInclude Include="src\game\TimerPrecision.h" />
     <ClInclude Include="src\renderer\Texture.h" />
-    <ClInclude Include="src\renderer\loader\TextureFinder.h" />
+    <ClInclude Include="src\renderer\loader\DebugTextures.h" />
     <ClInclude Include="src\renderer\loader\ZenLoader.h" />
   </ItemGroup>
   <ItemGroup>

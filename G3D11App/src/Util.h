@@ -10,9 +10,10 @@ namespace util {
 
 	bool endsWith(std::string_view str, std::string_view suffix);
 	bool startsWith(std::string_view str, std::string_view prefix);
-	void asciiToLowercase(std::string& string);
+	void asciiToLower(std::string& string);
 
 	std::string getUserFolderPath();
+	bool warnOnError(const HRESULT& hr, const std::string& message);
 
 
 	template<typename Key, typename Item, typename ItemAlloc>

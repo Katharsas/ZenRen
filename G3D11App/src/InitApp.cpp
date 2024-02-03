@@ -75,8 +75,20 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		return FALSE;
 	}
 
+	game::Arguments arguments;
+	{
+		std::filesystem::path userDir = util::getUserFolderPath();
+		std::filesystem::path texDir = userDir / "CLOUD/Eigene Projekte/Gothic Reloaded Mod/Textures";
+		std::filesystem::path vdf_g1 = "data_g1";
+		arguments.assetFilesRoot = std::filesystem::absolute(texDir).lexically_normal();
+		arguments.vdfFilesRoot = std::filesystem::absolute(vdf_g1).lexically_normal();
+		arguments.level = "WORLD.ZEN";
+		//arguments.level = "oldmine.zen";
+		//arguments.level = "world.obj"; // requires world.obj to exist in asset files dir, TODO load all obj files found in asset root
+	}
+
 	// Initialize
-	game::init(hWnd);
+	game::init(hWnd, arguments);
 	
 	// Main message loop:
 	MSG msg;

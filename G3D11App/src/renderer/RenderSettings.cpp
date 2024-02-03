@@ -12,7 +12,7 @@ namespace renderer::gui::settings {
 	std::string filterSettingsSelected = filterSettingsItems[4];
 
 	const std::array<std::string, 4> msaaSettingsItems = { "None", "x2", "x4", "x8" };
-	std::string msaaSettingsSelected = msaaSettingsItems[0];
+	std::string msaaSettingsSelected = msaaSettingsItems[2];
 
 	void init(RenderSettings& settings)
 	{

@@ -7,7 +7,7 @@
 #include "Camera.h"
 #include "Texture.h"
 #include "../Util.h"
-#include "loader/TextureFinder.h";
+#include "loader/AssetFinder.h";
 #include "loader/ZenLoader.h";
 #include "loader/ObjLoader.h"
 
@@ -88,22 +88,64 @@ namespace renderer::world {
 		});
 	}
 
-	void loadTestObj(D3d d3d) {
-		
-		RenderData data;
-		
-		bool loadObj = false;
-		if (loadObj) {
-			std::string inputFile = "data_g1/world.obj";
-			data = { loader::loadObj(inputFile) };
+	const std::filesystem::path& getTexFilepathOrDefault(const std::string& texName) {
+		// TODO we should support loading textures as TEX from VDF as well if not found as file
+
+		auto optionalFilepath = loader::existsAsFile(texName);
+		if (optionalFilepath.has_value()) {
+			return *(optionalFilepath.value());
 		}
 		else {
-			data = loader::loadVdfs();
+			return loader::DEFAULT_TEXTURE;
+		}
+	}
+
+	void loadLevel(D3d d3d, std::string& level)
+	{
+		bool levelDataFound = false;
+		RenderData data;
+		util::asciiToLower(level);
+
+		if (!util::endsWith(level, ".obj") && !util::endsWith(level, ".zen")) {
+			LOG(WARNING) << "Level file format not supported: " << level;
+		}
+
+		auto optionalFilepath = loader::existsAsFile(level);
+		auto optionalVdfIndex = loader::getVdfIndex();
+
+		if (optionalFilepath.has_value()) {
+			if (util::endsWith(level, ".obj")) {
+				data = { loader::loadObj(optionalFilepath.value()->u8string()) };
+				levelDataFound = true;
+			}
+			else {
+				// TODO support loading ZEN files
+				LOG(WARNING) << "Loading from single level file not supported: " << level;
+			}
+		}
+		else if (optionalVdfIndex.has_value()) {
+			if (util::endsWith(level, ".zen")) {
+				data = loader::loadZen(level, optionalVdfIndex.value());
+				levelDataFound = true;
+			}
+			else {
+				LOG(WARNING) << "Loading from VDF file not supported: " << level;
+			}
+		}
+		else {
+			LOG(WARNING) << "Failed to find level file '" << level << "'!";
+		}
+
+		if (!levelDataFound) {
+			return;
 		}
 
 		auto& matsToVerts = data.worldMesh;
 
 		{
+			release(lightmapTexArray);
+			debugTextures.clear();
+
 			auto& lightmaps = loader::getLightmapTextures();
 			std::vector<std::vector<uint8_t>> ddsRaws;
 			for (auto& lightmap : lightmaps) {
@@ -115,9 +157,8 @@ namespace renderer::world {
 			lightmapTexArray = createShaderTexArray(d3d, ddsRaws, 256, 256);
 		}
 		
-		std::filesystem::path userDir = util::getUserFolderPath();
-		std::filesystem::path texDir = userDir / "CLOUD/Eigene Projekte/Gothic Reloaded Mod/Textures";
-		loader::scanDirForTextures(texDir);
+		
+		world.meshes.clear();
 
 		int32_t loadedCount = 0;
 
@@ -126,7 +167,7 @@ namespace renderer::world {
 			auto& vertices = pair.second;
 
 			if (!vertices.empty()) {
-				auto& actualPath = loader::getTexturePathOrDefault(material.texBaseColor);
+				auto& actualPath = getTexFilepathOrDefault(material.texBaseColor);
 
 				Mesh mesh;
 				{
@@ -163,7 +204,7 @@ namespace renderer::world {
 			auto& vertices = pair.second;
 
 			if (!vertices.empty()) {
-				auto& actualPath = loader::getTexturePathOrDefault(material.texBaseColor);
+				auto& actualPath = getTexFilepathOrDefault(material.texBaseColor);
 
 				Mesh mesh;
 				{
@@ -260,12 +301,9 @@ namespace renderer::world {
 		d3d.device->CreateSamplerState(&samplerDesc, &linearSamplerState);
 	}
 
-	void initVertexIndexBuffers(D3d d3d)
+	void init(D3d d3d)
 	{
 		initGui();
-
-		loadTestObj(d3d);
-
 
 		// select which primtive type we are using
 		d3d.deviceContext->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);

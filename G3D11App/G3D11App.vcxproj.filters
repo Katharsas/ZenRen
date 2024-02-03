@@ -81,7 +81,7 @@
     <ClCompile Include="src\imgui\imgui_custom.cpp" />
     <ClCompile Include="src\renderer\Texture.cpp" />
     <ClCompile Include="src\renderer\RenderSettings.cpp" />
-    <ClCompile Include="src\renderer\loader\TextureFinder.cpp" />
+    <ClCompile Include="src\renderer\loader\DebugTextures.cpp" />
     <ClCompile Include="src\renderer\loader\ZenLoader.cpp" />
     <ClCompile Include="src\renderer\loader\ObjLoader.cpp" />
     <ClCompile Include="src\renderer\RenderUtil.cpp" />
@@ -89,6 +89,7 @@
     <ClCompile Include="src\renderer\loader\MeshFromVdfLoader.cpp" />
     <ClCompile Include="src\renderer\RendererCommon.cpp" />
     <ClCompile Include="src\renderer\PipelineForward.cpp" />
+    <ClCompile Include="src\renderer\loader\AssetFinder.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Util.h">
@@ -133,7 +134,7 @@
     <ClInclude Include="src\renderer\Texture.h" />
     <ClInclude Include="lib\tinyobj\tiny_obj_loader.h" />
     <ClInclude Include="src\renderer\RenderSettings.h" />
-    <ClInclude Include="src\renderer\loader\TextureFinder.h" />
+    <ClInclude Include="src\renderer\loader\DebugTextures.h" />
     <ClInclude Include="src\renderer\loader\ZenLoader.h" />
     <ClInclude Include="src\renderer\loader\ObjLoader.h" />
     <ClInclude Include="src\renderer\RenderUtil.h" />
@@ -141,5 +142,6 @@
     <ClInclude Include="src\renderer\loader\MeshFromVdfLoader.h" />
     <ClInclude Include="src\renderer\RendererCommon.h" />
     <ClInclude Include="src\renderer\PipelineForward.h" />
+    <ClInclude Include="src\renderer\loader\AssetFinder.h" />
   </ItemGroup>
 </Project>

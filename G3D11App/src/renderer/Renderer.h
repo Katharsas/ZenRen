@@ -34,7 +34,7 @@ namespace renderer
 
 		float resolutionScaling = 1.0f;
 		bool resolutionUpscaleSmooth = true;
-		uint32_t multisampleCount = 1;
+		uint32_t multisampleCount = 4;
 
 		bool downsampling = false;// does not work currently
 		
@@ -89,6 +89,7 @@ namespace renderer
 	};
 
 	void initD3D(HWND hWnd);
+	void loadLevel(std::string& level);
 	void onWindowResize(uint32_t width, uint32_t height);
 	// Clean up DirectX and COM
 	void cleanD3D();

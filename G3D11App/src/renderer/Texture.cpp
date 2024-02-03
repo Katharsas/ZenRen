@@ -8,6 +8,12 @@
 #include "DirectXTex.h"
 
 namespace renderer {
+	using DirectX::ScratchImage;
+	using DirectX::TexMetadata;
+
+	bool warnOnError(const HRESULT& hr, const std::string& message) {
+		return util::warnOnError(hr, "Texture Load Error: " + message);
+	}
 
 	ID3D11ShaderResourceView* createShaderTexArray(D3d d3d, std::vector<std::vector<uint8_t>>& ddsRaws, int32_t width, int32_t height) {
 		std::vector<DirectX::ScratchImage*> imageOwners;
@@ -44,38 +50,43 @@ namespace renderer {
 		return resourceView;
 	}
 
+	void createMipmapsIfMissing(ScratchImage* image, std::string& name) {
+		const TexMetadata& metadata = image->GetMetadata();
+		uint32_t maxPixelCount = std::max(metadata.width, metadata.height);
+		uint32_t expectedMipCount = std::ceil(std::log2(maxPixelCount)) + 1;
+		if (expectedMipCount != image->GetImageCount()) {
+
+			ScratchImage imageWithMips;
+			auto hr = GenerateMipMaps(image->GetImages(), image->GetImageCount(), image->GetMetadata(), DirectX::TEX_FILTER_DEFAULT, 0, imageWithMips);
+			warnOnError(hr, name);
+
+			*image = std::move(imageWithMips);
+		}
+	}
+
 	Texture::Texture(D3d d3d, const std::string& sourceFile)
 	{
 		auto name = sourceFile;
-		util::asciiToLowercase(name);
+		util::asciiToLower(name);
 		std::wstring sourceFileW = util::utf8ToWide(name);
-		HRESULT result;
+		HRESULT hr;
+
+		ScratchImage image;
+		TexMetadata metadata;
 
 		if (util::endsWith(name, ".tga")) {
-			DirectX::ScratchImage image;
-			DirectX::TexMetadata metadata;
-			result = DirectX::LoadFromTGAFile(sourceFileW.c_str(), &metadata, image);
-
-			DirectX::CreateShaderResourceView(d3d.device, image.GetImages(), image.GetImageCount(), metadata, &resourceView);
+			hr = LoadFromTGAFile(sourceFileW.c_str(), &metadata, image);
+			warnOnError(hr, name);
 		}
 		else if (util::endsWith(name, ".png")) {
-			DirectX::ScratchImage image;
-			DirectX::TexMetadata metadata;
-			result = DirectX::LoadFromWICFile(sourceFileW.c_str(), DirectX::WIC_FLAGS_NONE, &metadata, image);
+			hr = LoadFromWICFile(sourceFileW.c_str(), DirectX::WIC_FLAGS_NONE, &metadata, image);
+			warnOnError(hr, name);
+		}
 
-			DirectX::CreateShaderResourceView(d3d.device, image.GetImages(), image.GetImageCount(), metadata, &resourceView);
-		}
-		else {
-			result = 0;// DirectX::LoadFromWICFile
-		}
-		
-		if (FAILED(result)) {
-			_com_error err(result);
-			std::wstring errorMessage = std::wstring(err.ErrorMessage());
+		createMipmapsIfMissing(&image, name);
 
-			LOG(WARNING) << "Failed to load texture: " << sourceFile;
-			LOG(WARNING) << util::wideToUtf8(errorMessage);
-		}
+		hr = CreateShaderResourceView(d3d.device, image.GetImages(), image.GetImageCount(), image.GetMetadata(), &resourceView);
+		warnOnError(hr, name);
 	}
 
 	Texture::Texture(D3d d3d, std::vector<uint8_t>& ddsRaw)

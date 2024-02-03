@@ -9,6 +9,7 @@
 #include "renderer/Gui.h"
 #include "renderer/Renderer.h"
 #include "renderer/Camera.h"
+#include "renderer/loader/AssetFinder.h"
 #include "imgui/imgui.h"
 
 
@@ -24,7 +25,7 @@ namespace game
 	stats::FrameSample frameTime;
 
 
-	void init(HWND hWnd)
+	void init(HWND hWnd, Arguments args)
 	{
 		enablePreciseTimerResolution();
 		initMicrosleep();
@@ -42,8 +43,20 @@ namespace game
 		});
 
 		initActions();
+
+		if (args.vdfFilesRoot.has_value()) {
+			renderer::loader::initVdfAssetSourceDir(args.vdfFilesRoot.value());
+		}
+		if (args.assetFilesRoot.has_value()) {
+			renderer::loader::initFileAssetSourceDir(args.assetFilesRoot.value());
+		}
 		
 		renderer::initD3D(hWnd);
+
+		if (args.level.has_value()) {
+			renderer::loadLevel(args.level.value());
+		}
+
 		LOG(DEBUG) << "Statistics in microseconds";
 	}
 

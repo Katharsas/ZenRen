@@ -12,7 +12,7 @@
 namespace renderer::loader {
 
 	using namespace DirectX;
-	using ::util::asciiToLowercase;
+	using ::util::asciiToLower;
 	using ::util::getOrCreate;
 
 	typedef WORLD_VERTEX VERTEX;
@@ -123,7 +123,7 @@ namespace renderer::loader {
 				if (!texname.empty()) {
 					auto texFilepath = std::filesystem::path(texname);
 					auto texFilename = texFilepath.filename().u8string();
-					asciiToLowercase(texFilename);
+					asciiToLower(texFilename);
 
 					auto& matVertices = getOrCreate(matsToVertices, { texFilename });
 					matVertices.insert(matVertices.end(), vertices.begin(), vertices.end());

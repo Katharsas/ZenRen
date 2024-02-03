@@ -2,6 +2,8 @@
 
 #include "../Renderer.h"
 
+#include "vdfs/fileIndex.h"
+
 namespace renderer::loader {
 
     struct ZenLightmapTexture {
@@ -12,7 +14,7 @@ namespace renderer::loader {
 
     std::vector<ZenLightmapTexture>& getLightmapTextures();
 
-    RenderData loadVdfs();
+    RenderData loadZen(std::string& zenFilename, ZenLib::VDFS::FileIndex* vdf);
     //std::vector<ZenLightmapTexture> loadZenLightmaps();
     void clean();
 }

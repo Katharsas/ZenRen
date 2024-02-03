@@ -7,6 +7,7 @@
 #include <locale>
 
 #include <shlobj_core.h>
+#include <comdef.h>
 
 namespace util {
 	
@@ -49,10 +50,16 @@ namespace util {
 	}
 
 
-	void asciiToLowercase(std::string& string) {
+	void asciiToLower(std::string& string) {
 		for (char& c : string) {
 			c = tolower(c);
 		}
+	}
+
+	std::string asciiToLower(const std::string& string) {
+		std::string result = string;
+		std::transform(result.begin(), result.end(), result.begin(), ::toupper);
+		return result;
 	}
 
 	std::string getUserFolderPath()
@@ -62,5 +69,17 @@ namespace util {
 		std::wstring wide = out;
 		CoTaskMemFree(out);
 		return wideToUtf8(wide);
+	}
+
+	bool warnOnError(const HRESULT& hr, const std::string& message) {
+		bool failed = FAILED(hr);
+		if (failed) {
+			_com_error err(hr);
+			std::wstring errorMessage = std::wstring(err.ErrorMessage());
+
+			LOG(WARNING) << message;
+			LOG(WARNING) << util::wideToUtf8(errorMessage);
+		}
+		return !failed;
 	}
 }

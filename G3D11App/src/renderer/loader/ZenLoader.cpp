@@ -8,11 +8,9 @@
 
 #include "../../Util.h"
 #include "../RenderUtil.h"
-#include "TextureFinder.h"
 #include "MeshFromVdfLoader.h"
 
 #include "DirectXTex.h"
-#include "vdfs/fileIndex.h"
 #include "zenload/zCMesh.h"
 #include "zenload/zenParser.h"
 #include "zenload/ztex2dds.h"
@@ -153,20 +151,9 @@ namespace renderer::loader {
         return statics;
     }
 
-    RenderData loadVdfs() {
-        const string vdfsArchives = "data_g1";
+    RenderData loadZen(string& zenFilename, VDFS::FileIndex* vdf) {
 
-        VDFS::FileIndex::initVDFS("Foo");
-        VDFS::FileIndex vdf;
-
-        for (const auto& entry : std::filesystem::directory_iterator(vdfsArchives)) {
-            LOG(DEBUG) << "Loading VDF: " << entry.path().filename();
-            vdf.loadVDF(entry.path().string());
-        }
-        vdf.finalizeLoad();
-
-        const string zenFilename = "WORLD.ZEN";
-        parser = ZenLoad::ZenParser(zenFilename, vdf);
+        parser = ZenLoad::ZenParser(zenFilename, *vdf);
         if (parser.getFileSize() == 0)
         {
             LOG(FATAL) << "ZEN-File either not found or empty!";
@@ -197,8 +184,8 @@ namespace renderer::loader {
         for (auto& vob : vobs) {
             auto& visualname = vob.meshName;
 
-            if (existsInstanceMesh(visualname, vdf)) {
-                bool loaded = loadInstanceMesh(staticMeshes, visualname, vdf, vob.transform);
+            if (existsInstanceMesh(visualname, *vdf)) {
+                bool loaded = loadInstanceMesh(staticMeshes, visualname, *vdf, vob.transform);
             }
             else {
                 LOG(DEBUG) << "Skipping VOB " << visualname << " (visual not found)";
