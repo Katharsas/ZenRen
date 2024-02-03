@@ -55,7 +55,22 @@ VS_OUT VS_Main(VS_IN input)
 
     if (!outputDirectEnabled || outputDirectType == FLAG_OUPUT_DIRECT_SOLID || outputDirectType == FLAG_OUTPUT_DIRECT_LIGHTMAP) {
         float lightNormalDotProduct = dot(viewNormal3, viewLight3); // for normalized input: range of -1 (down) to 1 (up)
-        float lightReceivedRatio = max(0, lightNormalDotProduct + 0.3f) + ambientLight;
+
+        // Faces directed at right angle to sun receive this ratio of maximum direct light. Faces towards the sun get more, away from sun get less.
+        float lightRatioAt90 = 0.12f; 
+        float lightReceivedRatio;
+
+        if (lightNormalDotProduct < 0) {
+            lightReceivedRatio = (lightNormalDotProduct + 1) * lightRatioAt90;
+        }
+        else {
+            lightReceivedRatio = (lightNormalDotProduct + lightRatioAt90) / (1 + lightRatioAt90);
+        }
+
+        float ambientLight2 = 0.14f; // TODO why is ambientLight even customizable outside of shader? needs to be balanced with lightRatioAt90 anyway
+        lightReceivedRatio = (lightReceivedRatio + ambientLight2) / (1 + ambientLight2);
+
+        //float lightReceivedRatio = max(0, lightNormalDotProduct + 0.3f) + ambientLight;
         output.light = lightReceivedRatio;
     }
     else {
