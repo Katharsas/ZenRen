@@ -9,10 +9,12 @@
 
 #include "Settings.h"
 #include "Util.h"
+#include "game/GameArgs.h"
 #include "game/GameLoop.h"
 #include "game/Input.h"
 #include "g3log/logworker.hpp"
 
+#include <shellapi.h>
 #include <imgui/imgui.h>
 
 
@@ -33,10 +35,11 @@ HWND                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WindowProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
+
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
-                     _In_opt_ HINSTANCE hPrevInstance,
-                     _In_ LPWSTR    lpCmdLine,
-                     _In_ int       nCmdShow)
+	_In_opt_ HINSTANCE hPrevInstance,
+	_In_ LPWSTR    lpCmdLine,
+	_In_ int       nCmdShow)
 {
 	// Configure Logger (make sure log dir exists, TODO: create dir if mising)
 
@@ -75,17 +78,28 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		return FALSE;
 	}
 
-	game::Arguments arguments;
-	{
-		std::filesystem::path userDir = util::getUserFolderPath();
-		std::filesystem::path texDir = userDir / "CLOUD/Eigene Projekte/Gothic Reloaded Mod/Textures";
-		std::filesystem::path vdf_g1 = "data_g1";
-		arguments.assetFilesRoot = std::filesystem::absolute(texDir).lexically_normal();
-		arguments.vdfFilesRoot = std::filesystem::absolute(vdf_g1).lexically_normal();
-		arguments.level = "WORLD.ZEN";
-		//arguments.level = "oldmine.zen";
-		//arguments.level = "world.obj"; // requires world.obj to exist in asset files dir, TODO load all obj files found in asset root
+	// Get argv[0]
+	wchar_t arg0wide[MAX_PATH];
+	GetModuleFileNameW(hInstance, arg0wide, MAX_PATH);
+	std::string arg0 = util::wideToUtf8(arg0wide);
+	LOG(INFO) << "Arg 0: " << arg0;
+
+	//GetCommandLineW();
+	//LOG(INFO) << "Args: " << util::wideToUtf8(std::wstring(lpCmdLine));
+
+	int argCount;
+	LPWSTR* argList = CommandLineToArgvW(lpCmdLine, &argCount);
+	std::vector<std::string> args;
+	for (int i = 0; i < argCount; ++i) {
+		args.push_back(util::wideToUtf8(std::wstring(argList[i])));
 	}
+	//LOG(INFO) << "Args: " << util::join(args, ",");
+
+	auto optionsToValues = game::parseOptions(args, game::options);
+	game::Arguments arguments;
+	game::getOptionString(game::ARG_LEVEL, &(arguments.level), optionsToValues);
+	game::getOptionPath(game::ARG_VDF_DIR, &(arguments.vdfFilesRoot), optionsToValues);
+	game::getOptionPath(game::ARG_ASSET_DIR, &(arguments.assetFilesRoot), optionsToValues);
 
 	// Initialize
 	game::init(hWnd, arguments);

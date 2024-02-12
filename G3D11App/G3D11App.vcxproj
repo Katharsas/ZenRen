@@ -196,6 +196,7 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\game\GameArgs.cpp" />
     <ClCompile Include="src\renderer\loader\AssetFinder.cpp" />
     <ClCompile Include="src\renderer\PipelineForward.cpp" />
     <ClCompile Include="src\renderer\loader\MeshFromVdfLoader.cpp" />
@@ -263,6 +264,7 @@
     <ClCompile Include="src\renderer\loader\ZenLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\game\GameArgs.h" />
     <ClInclude Include="src\renderer\loader\AssetFinder.h" />
     <ClInclude Include="lib\tinyobj\tiny_obj_loader.h" />
     <ClInclude Include="src\renderer\PipelineForward.h" />

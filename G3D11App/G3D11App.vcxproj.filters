@@ -90,6 +90,7 @@
     <ClCompile Include="src\renderer\RendererCommon.cpp" />
     <ClCompile Include="src\renderer\PipelineForward.cpp" />
     <ClCompile Include="src\renderer\loader\AssetFinder.cpp" />
+    <ClCompile Include="src\game\GameArgs.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Util.h">
@@ -143,5 +144,6 @@
     <ClInclude Include="src\renderer\RendererCommon.h" />
     <ClInclude Include="src\renderer\PipelineForward.h" />
     <ClInclude Include="src\renderer\loader\AssetFinder.h" />
+    <ClInclude Include="src\game\GameArgs.h" />
   </ItemGroup>
 </Project>
