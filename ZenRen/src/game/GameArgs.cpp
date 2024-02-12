@@ -5,18 +5,25 @@ namespace game
 {
 	using std::string;
 
-	std::unordered_map<string, string> parseOptions(const std::vector<string> args, const std::unordered_set<string> options) {
+	std::unordered_map<string, string> parseOptions(const std::vector<string> args, const std::unordered_map<string, bool> options) {
 		std::unordered_map<string, string> result;
 		for (uint32_t i = 0; i < (args.size() - 1); i++) {
 			auto& arg = args[i];
-			if (options.contains(util::asciiToLower(arg))) {
+			auto optionIt = options.find(util::asciiToLower(arg));
+			if (optionIt != options.end()) {
 				auto& value = args[i + 1];
-				if (options.contains(util::asciiToLower(value))) {
-					LOG(WARNING) << "Args: Expected value after option '" << arg << "' but no value was provided!";
+				if (optionIt->second) {
+					// not a flag, so a value following the option is expected
+					if (options.contains(util::asciiToLower(value))) {
+						LOG(WARNING) << "Args: Expected value after option '" << arg << "' but no value was provided!";
+					}
+					else {
+						result.insert({ util::asciiToLower(arg), value });
+						i++;
+					}
 				}
 				else {
-					result.insert({ util::asciiToLower(arg), value });
-					i++;
+					result.insert({ util::asciiToLower(arg), "" });
 				}
 			}
 			else {
@@ -24,6 +31,13 @@ namespace game
 			}
 		}
 		return result;
+	}
+
+	void getOptionFlag(const string& option, bool* target, const std::unordered_map<string, string> optionsToValues) {
+		auto it = optionsToValues.find(util::asciiToLower(option));
+		bool exists = it != optionsToValues.end();
+		LOG(INFO) << "Args: '" << option << "' -> '" << (exists ? "true" : "false") << "'";
+		*target = exists;
 	}
 
 	void getOptionString(const string& option, std::optional<string>* target, const std::unordered_map<string, string> optionsToValues) {

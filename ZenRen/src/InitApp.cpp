@@ -16,6 +16,8 @@
 
 #include <shellapi.h>
 #include <imgui/imgui.h>
+#include <iostream>
+#include <fstream>
 
 
 #define ENABLE_LOGFILE false
@@ -35,6 +37,12 @@ HWND                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WindowProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
+std::string formatLogEntry(g3::LogMessageMover& logEntry) {
+	const LEVELS level = logEntry.get()._level;
+	const std::string levelPre = level == WARNING ? "! " : "  ";
+	const std::string levelPost = std::string((7 - level.text.length()), ' ');
+	return levelPre + "LOG__" + level.text + levelPost + " " + logEntry.get()._message + "\n";
+}
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	_In_opt_ HINSTANCE hPrevInstance,
@@ -43,16 +51,54 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 {
 	// Configure Logger (make sure log dir exists, TODO: create dir if mising)
 
-	struct ConsoleSink {
+	struct DebugSink {
 		void ReceiveLogMessage(g3::LogMessageMover logEntry) {
-			const LEVELS level = logEntry.get()._level;
-			const std::string levelPre = level == WARNING ? "! " : "  ";
-			const std::string levelPost = std::string((7 - level.text.length()), ' ');
-			const std::string logEntryString =
-				levelPre + "LOG__" + level.text + levelPost + " " + logEntry.get()._message + "\n";
+			const std::string logEntryString = formatLogEntry(logEntry);
 			const std::wstring logEntryW = util::utf8ToWide(logEntryString);
 			OutputDebugStringW(logEntryW.c_str());
 		}
+	};
+	struct BufferUntilReadySink {
+		bool outputReady = false;
+		std::string beforeOutputReadyBuffer = "";
+		std::function<void(const std::string)> write = nullptr;
+
+		void ReceiveLogMessage(g3::LogMessageMover& logEntry) {
+			const std::string logEntryString = formatLogEntry(logEntry);
+			if (outputReady) {
+				if (beforeOutputReadyBuffer != "") {
+					write(beforeOutputReadyBuffer);
+					beforeOutputReadyBuffer = "";
+				}
+				write(logEntryString);
+			}
+			else {
+				beforeOutputReadyBuffer += logEntryString;
+			}
+		}
+	};
+	class FileSink {
+	public:
+		void ReceiveLogMessage(g3::LogMessageMover logEntry) {
+			bufferdSink.ReceiveLogMessage(logEntry);
+		}
+		void onReady(const std::string logfile) {
+			ofs.open(logfile, std::ofstream::out | std::ofstream::trunc);
+			bufferdSink.write = [this](const std::string string) -> void {
+				//std::cout << string;
+				ofs << string;
+				ofs << std::flush;
+			};
+			bufferdSink.outputReady = true;
+		}
+		virtual ~FileSink() {
+			bufferdSink.beforeOutputReadyBuffer = "";
+			ofs << "Logger exiting.";
+			ofs.close();
+		}
+	private:
+		BufferUntilReadySink bufferdSink;
+		std::ofstream ofs;
 	};
 
 	// https://github.com/KjellKod/g3sinks/blob/master/snippets/ColorCoutSink.hpp
@@ -60,8 +106,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	if (ENABLE_LOGFILE) {
 		const auto defaultSink = worker->addDefaultLogger("log", "../logs/");
 	}
-	const auto consoleSink = worker->addSink(
-		std::make_unique<ConsoleSink>(), &ConsoleSink::ReceiveLogMessage);
+	auto debugSinkHandle = worker->addSink(std::make_unique<DebugSink>(), &DebugSink::ReceiveLogMessage);
+	auto fileSinkHandle = worker->addSink(std::make_unique<FileSink>(), &FileSink::ReceiveLogMessage);
+	
 	g3::initializeLogging(worker.get());
 
 	UNREFERENCED_PARAMETER(hPrevInstance);
@@ -81,8 +128,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	// Get argv[0]
 	wchar_t arg0wide[MAX_PATH];
 	GetModuleFileNameW(hInstance, arg0wide, MAX_PATH);
-	std::string arg0 = util::wideToUtf8(arg0wide);
-	LOG(INFO) << "Arg 0: " << arg0;
+	std::string exePath = util::wideToUtf8(arg0wide);
+	//LOG(INFO) << "Arg 0: " << exePath;
 
 	//GetCommandLineW();
 	//LOG(INFO) << "Args: " << util::wideToUtf8(std::wstring(lpCmdLine));
@@ -96,6 +143,22 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	//LOG(INFO) << "Args: " << util::join(args, ",");
 
 	auto optionsToValues = game::parseOptions(args, game::options);
+	bool noLog;
+	game::getOptionFlag(game::ARG_NO_LOG, &noLog, optionsToValues);
+
+	if (noLog) {
+		// remove sink and throw away buffer
+		worker->removeSink(std::move(fileSinkHandle));
+	}
+	else {
+		// allow sink to write its buffer to file
+		auto pSink = fileSinkHandle.get()->sink().lock();
+		if (pSink) {
+			FileSink* filesink = pSink.get()->_real_sink.get();
+			filesink->onReady("ZenRen.log.txt");
+		}
+	}
+
 	game::Arguments arguments;
 	game::getOptionString(game::ARG_LEVEL, &(arguments.level), optionsToValues);
 	game::getOptionPath(game::ARG_VDF_DIR, &(arguments.vdfFilesRoot), optionsToValues);

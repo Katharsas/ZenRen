@@ -15,8 +15,10 @@ namespace renderer {
 		std::wstring sourceFileW = util::utf8ToWide(sourceFile);
 		ID3D10Blob* VS, *PS, *errVS, *errPS;
 		UINT flags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
-		D3DX11CompileFromFileW(sourceFileW.c_str(), 0, 0, "VS_Main", "vs_5_0", flags, 0, 0, &VS, &errVS, 0);
-		D3DX11CompileFromFileW(sourceFileW.c_str(), 0, 0, "PS_Main", "ps_5_0", flags, 0, 0, &PS, &errPS, 0);
+		auto hrVs = D3DX11CompileFromFileW(sourceFileW.c_str(), 0, 0, "VS_Main", "vs_5_0", flags, 0, 0, &VS, &errVS, 0);
+		util::warnOnError(hrVs, "Vertex Shader Compilation Error:");
+		auto hrPs = D3DX11CompileFromFileW(sourceFileW.c_str(), 0, 0, "PS_Main", "ps_5_0", flags, 0, 0, &PS, &errPS, 0);
+		util::warnOnError(hrPs, "Pixel Shader Compilation Error:");
 
 		if (errVS != nullptr) {
 			LOG(WARNING) << std::string((char*)errVS->GetBufferPointer());
