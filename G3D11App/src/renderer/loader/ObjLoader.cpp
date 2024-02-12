@@ -48,7 +48,7 @@ namespace renderer::loader {
 				textureCount++;
 			}
 			auto path = std::filesystem::path(texname);
-			auto filename = path.filename().u8string();
+			auto filename = ::util::toString(path.filename());
 			//LOG(DEBUG) << "  Texture: " << filename;
 		}
 
@@ -122,7 +122,7 @@ namespace renderer::loader {
 				auto& texname = materials[materialIndex].diffuse_texname;
 				if (!texname.empty()) {
 					auto texFilepath = std::filesystem::path(texname);
-					auto texFilename = texFilepath.filename().u8string();
+					auto texFilename = ::util::toString(texFilepath.filename());
 					asciiToLower(texFilename);
 
 					auto& matVertices = getOrCreate(matsToVertices, { texFilename });

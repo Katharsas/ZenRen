@@ -7,79 +7,83 @@
 
 namespace renderer
 {
+	inline std::ostream& operator <<(std::ostream& os, const D3DXCOLOR& that)
+	{
+		return os << "[R:" << that.r << " G:" << that.g << " B:" << that.b << " A:" << that.a << "]";
+	}
+
 	struct VEC3 {
 		float x, y, z;
-
-		friend std::ostream& operator <<(std::ostream& os, const VEC3& that)
-		{
-			return os << "[X=" << that.x << " Y=" << that.y << " Z=" << that.z << "]";
-		}
 	};
+	inline std::ostream& operator <<(std::ostream& os, const VEC3& that)
+	{
+		return os << "[X=" << that.x << " Y=" << that.y << " Z=" << that.z << "]";
+	}
+
 	struct UV {
 		float u, v;
-
-		friend std::ostream& operator <<(std::ostream& os, const UV& that)
-		{
-			return os << "[U=" << that.u << " V=" << that.v << "]";
-		}
 	};
+	inline std::ostream& operator <<(std::ostream& os, const UV& that)
+	{
+		return os << "[U=" << that.u << " V=" << that.v << "]";
+	}
+
 	struct ARRAY_UV {
 		float u, v;
 		float i;
-
-		friend std::ostream& operator <<(std::ostream& os, const ARRAY_UV& that)
-		{
-			return os << "[U=" << that.u << " V=" << that.v << " I=" << that.i << "]";
-		}
 	};
+	inline std::ostream& operator <<(std::ostream& os, const ARRAY_UV& that)
+	{
+		return os << "[U=" << that.u << " V=" << that.v << " I=" << that.i << "]";
+	}
 
 	struct POS_COLOR {
 		VEC3 position;
 		D3DXCOLOR color;
 	};
+
 	struct POS_UV {
 		VEC3 pos;
 		UV uv;
-
-		friend std::ostream& operator <<(std::ostream& os, const POS_UV& that)
-		{
-			return os << "[POS: " << that.pos << " UV:" << that.uv << "]";
-		}
 	};
+	inline std::ostream& operator <<(std::ostream& os, const POS_UV& that)
+	{
+		return os << "[POS: " << that.pos << " UV:" << that.uv << "]";
+	}
+
 	struct POS_NORMAL_UV {
 		VEC3 pos;
 		VEC3 normal;
 		UV uvDiffuse;
 		ARRAY_UV uvLightmap;
-
-		friend std::ostream& operator <<(std::ostream& os, const POS_NORMAL_UV& that)
-		{
-			return os << "[POS:" << that.pos << " NOR:" << that.normal << " UV_DIFF:" << that.uvDiffuse << "]";
-		}
 	};
+	inline std::ostream& operator <<(std::ostream& os, const POS_NORMAL_UV& that)
+	{
+		return os << "[POS:" << that.pos << " NOR:" << that.normal << " UV_DIFF:" << that.uvDiffuse << "]";
+	}
+
 	struct POS_NORMAL_UV_COL {
 		VEC3 pos;
 		VEC3 normal;
 		UV uv;
 		D3DXCOLOR color;
-
-		friend std::ostream& operator <<(std::ostream& os, const POS_NORMAL_UV_COL& that)
-		{
-			return os << "[POS:" << that.pos << " NOR:" << that.normal << " UV:" << that.uv << " LIGHT:" << that.color << "]";
-		}
 	};
+	inline std::ostream& operator <<(std::ostream& os, const POS_NORMAL_UV_COL& that)
+	{
+		return os << "[POS:" << that.pos << " NOR:" << that.normal << " UV:" << that.uv << " LIGHT:" << that.color << "]";
+	}
+
 	struct WORLD_VERTEX {
 		VEC3 pos;
 		VEC3 normal;
 		UV uvDiffuse;
 		ARRAY_UV uvLightmap;
 		//D3DXCOLOR colorLightmap;
-
-		friend std::ostream& operator <<(std::ostream& os, const WORLD_VERTEX& that)
-		{
-			return os << "[POS:" << that.pos << " NOR:" << that.normal << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
-		}
 	};
+	inline std::ostream& operator <<(std::ostream& os, const WORLD_VERTEX& that)
+	{
+		return os << "[POS:" << that.pos << " NOR:" << that.normal << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
+	}
 
 	struct Material {
 		std::string texBaseColor;
@@ -100,7 +104,7 @@ namespace renderer
 	};
 
 	void release(IUnknown* dx11object);
-	void release(std::vector<IUnknown*>& dx11objects);
+	void release(const std::vector<IUnknown*>& dx11objects);
 	void initViewport(BufferSize& size, D3D11_VIEWPORT* viewport);
 }
 

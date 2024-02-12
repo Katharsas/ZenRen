@@ -5,6 +5,7 @@
 #include <sstream>
 #include <codecvt>
 #include <locale>
+#include <numeric>
 
 #include <shlobj_core.h>
 #include <comdef.h>
@@ -60,6 +61,21 @@ namespace util {
 		std::string result = string;
 		std::transform(result.begin(), result.end(), result.begin(), ::toupper);
 		return result;
+	}
+
+	std::string join(const std::vector<std::string> strings, const std::string& delimiter) {
+		return strings.empty() ? "" : std::accumulate(
+				++strings.begin(), strings.end(), *strings.begin(),
+				[](auto&& a, auto&& b) -> auto& { a += ','; a += b; return a; }
+		);
+	}
+
+	std::string fromU8(const std::u8string& u8string) {
+		return std::string(u8string.cbegin(), u8string.cend());
+	}
+
+	std::string toString(const std::filesystem::path& path) {
+		return fromU8(path.u8string());
 	}
 
 	std::string getUserFolderPath()

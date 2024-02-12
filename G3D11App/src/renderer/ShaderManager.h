@@ -20,8 +20,8 @@ namespace renderer {
 
 		void clearAll();
 
-		const std::string folder = std::string(u8"Shaders");
-		const std::string extension = std::string(u8".hlsl");
+		const std::string folder = std::string("Shaders");
+		const std::string extension = std::string(".hlsl");
 
 		const std::string filePath(const std::string shaderName);
 	};

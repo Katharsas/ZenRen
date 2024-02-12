@@ -33,7 +33,7 @@ namespace renderer::loader {
 		for (const auto& dirEntry : fs::recursive_directory_iterator(rootDir)) {
 			if (!std::filesystem::is_directory(dirEntry)) {
 				const auto& path = dirEntry.path();
-				auto& filename = path.filename().u8string();
+				auto filename = util::toString(path.filename());
 				util::asciiToLower(filename);
 
 				onFile(path, filename);
@@ -67,7 +67,7 @@ namespace renderer::loader {
 	void initFileAssetSourceDir(fs::path& rootDir)
 	{
 		assetNamesToPaths.clear();
-		LOG(INFO) << "Scanning dir for asset files: " << rootDir.u8string();
+		LOG(INFO) << "Scanning dir for asset files: " << util::toString(rootDir);
 
 		walkFilesRecursively(rootDir, [](const fs::path& path, const string& filename) -> void {
 			// textures
@@ -97,7 +97,7 @@ namespace renderer::loader {
 			delete vdf;
 		}
 		vdf = new VDFS::FileIndex();
-		LOG(INFO) << "Scanning dir for VDF files: " << rootDir.u8string();
+		LOG(INFO) << "Scanning dir for VDF files: " << util::toString(rootDir);
 
 		walkFilesRecursively(rootDir, [](const fs::path& path, const std::string& filename) -> void {
 			if (util::endsWith(filename, ".vdf")) {

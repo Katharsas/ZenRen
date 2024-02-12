@@ -115,7 +115,7 @@ namespace renderer::world {
 
 		if (optionalFilepath.has_value()) {
 			if (util::endsWith(level, ".obj")) {
-				data = { loader::loadObj(optionalFilepath.value()->u8string()) };
+				data = { loader::loadObj(util::toString(*optionalFilepath.value())) };
 				levelDataFound = true;
 			}
 			else {
@@ -185,7 +185,7 @@ namespace renderer::world {
 					d3d.device->CreateBuffer(&bufferDesc, &initialData, &(mesh.vertexBuffer));
 				}
 
-				Texture* texture = new Texture(d3d, actualPath.u8string());
+				Texture* texture = new Texture(d3d, util::toString(actualPath));
 
 				mesh.baseColor = texture;
 				world.meshes.push_back(mesh);
@@ -222,7 +222,7 @@ namespace renderer::world {
 					d3d.device->CreateBuffer(&bufferDesc, &initialData, &(mesh.vertexBuffer));
 				}
 
-				Texture* texture = new Texture(d3d, actualPath.u8string());
+				Texture* texture = new Texture(d3d, util::toString(actualPath));
 
 				mesh.baseColor = texture;
 				world.meshes.push_back(mesh);

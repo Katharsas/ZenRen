@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string_view>
+#include <filesystem>
 
 namespace util {
 
@@ -11,6 +12,10 @@ namespace util {
 	bool endsWith(std::string_view str, std::string_view suffix);
 	bool startsWith(std::string_view str, std::string_view prefix);
 	void asciiToLower(std::string& string);
+
+	std::string join(const std::vector<std::string> strings, const std::string& delimiter);
+	std::string fromU8(const std::u8string& u8string);
+	std::string toString(const std::filesystem::path& path);
 
 	std::string getUserFolderPath();
 	bool warnOnError(const HRESULT& hr, const std::string& message);

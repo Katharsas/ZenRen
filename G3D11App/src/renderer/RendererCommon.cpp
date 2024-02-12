@@ -9,7 +9,7 @@ namespace renderer {
 		}
 	}
 
-	void release(std::vector<IUnknown*>& dx11objects) {
+	void release(const std::vector<IUnknown*>& dx11objects) {
 		for (auto object : dx11objects) {
 			release(object);
 		}

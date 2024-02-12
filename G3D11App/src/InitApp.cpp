@@ -51,11 +51,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 			OutputDebugStringW(logEntryW.c_str());
 		}
 	};
-	
+
 	// https://github.com/KjellKod/g3sinks/blob/master/snippets/ColorCoutSink.hpp
 	const auto worker = g3::LogWorker::createLogWorker();
 	if (ENABLE_LOGFILE) {
-		const auto defaultSink = worker->addDefaultLogger(u8"log", u8"../logs/");
+		const auto defaultSink = worker->addDefaultLogger("log", "../logs/");
 	}
 	const auto consoleSink = worker->addSink(
 		std::make_unique<ConsoleSink>(), &ConsoleSink::ReceiveLogMessage);

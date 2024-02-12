@@ -58,7 +58,7 @@ namespace renderer::loader {
     }
     const std::string normalizeTextureName(const std::string& texture) {
         auto texFilepath = std::filesystem::path(texture);
-        auto texFilename = texFilepath.filename().u8string();
+        auto texFilename = util::toString(texFilepath.filename());
         ::util::asciiToLower(texFilename);
         return texFilename;
     }

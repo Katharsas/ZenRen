@@ -97,7 +97,7 @@
       <SDLCheck>false</SDLCheck>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>$(ProjectDir)lib;C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Include;$(SolutionDir)..\g3log\build\include;$(SolutionDir)..\g3log\src;$(SolutionDir)..\ZenLib;$(ProjectDir);$(ProjectDir)src</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
@@ -117,7 +117,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>false</SDLCheck>
       <AdditionalIncludeDirectories>$(ProjectDir)lib;C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Include;$(SolutionDir)..\g3log\build\include;$(SolutionDir)..\g3log\src;$(SolutionDir)..\ZenLib;$(ProjectDir);$(ProjectDir)src</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
@@ -139,7 +139,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir)lib;C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Include;$(SolutionDir)..\g3log\build\include;$(SolutionDir)..\g3log\src;$(SolutionDir)..\ZenLib;$(ProjectDir);$(ProjectDir)src</AdditionalIncludeDirectories>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
       <AdditionalOptions>/VERBOSE /VERBOSE:LIB %(AdditionalOptions)</AdditionalOptions>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -162,7 +162,7 @@
       <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>false</SDLCheck>
       <AdditionalIncludeDirectories>$(ProjectDir)lib;C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Include;$(SolutionDir)..\g3log\build\include;$(SolutionDir)..\g3log\src;$(SolutionDir)..\ZenLib;$(ProjectDir);$(ProjectDir)src</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>

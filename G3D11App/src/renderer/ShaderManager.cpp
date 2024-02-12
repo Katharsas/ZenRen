@@ -21,7 +21,7 @@ namespace renderer {
 		LOG(INFO) << "Reloading all shaders.";
 		clearAll();
 		{
-			std::string shaderName(u8"testTriangle");
+			std::string shaderName("testTriangle");
 			Shader::VertexInputLayoutDesc layoutDesc[] =
 			{
 				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT },
@@ -29,7 +29,7 @@ namespace renderer {
 			};
 			shaders[shaderName] = new Shader(filePath(shaderName), layoutDesc, std::size(layoutDesc), d3d);
 		} {
-			std::string shaderName(u8"toneMapping");
+			std::string shaderName("toneMapping");
 			Shader::VertexInputLayoutDesc layoutDesc[] =
 			{
 				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT },
@@ -37,7 +37,7 @@ namespace renderer {
 			};
 			shaders[shaderName] = new Shader(filePath(shaderName), layoutDesc, std::size(layoutDesc), d3d);
 		} {
-			std::string shaderName(u8"renderToTexture");
+			std::string shaderName("renderToTexture");
 			Shader::VertexInputLayoutDesc layoutDesc[] =
 			{
 				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT },
@@ -45,7 +45,7 @@ namespace renderer {
 			};
 			shaders[shaderName] = new Shader(filePath(shaderName), layoutDesc, std::size(layoutDesc), d3d);
 		} {
-			std::string shaderName(u8"flatBasicColorTexShader");
+			std::string shaderName("flatBasicColorTexShader");
 			Shader::VertexInputLayoutDesc layoutDesc[] =
 			{
 				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT },
@@ -63,7 +63,7 @@ namespace renderer {
 	{
 		auto resultPair = shaders.find(shaderName);
 		if (resultPair == shaders.end()) {
-			throw std::logic_error(u8"There is no shader with name " + shaderName + u8" !");
+			throw std::logic_error("There is no shader with name " + shaderName + " !");
 		}
 		return resultPair->second;
 	}
@@ -72,7 +72,7 @@ namespace renderer {
 	{
 		auto resultPair = shaders.insert(std::make_pair(shaderName, shader));
 		if (resultPair.second == false) {
-			throw std::logic_error(u8"There already exists a shader with name " + shaderName + u8" !");
+			throw std::logic_error("There already exists a shader with name " + shaderName + " !");
 		}
 	}
 
@@ -86,7 +86,7 @@ namespace renderer {
 
 	const std::string ShaderManager::filePath(const std::string shaderName)
 	{
-		return folder + u8"/" + shaderName + extension;
+		return folder + "/" + shaderName + extension;
 	}
 
 }
