@@ -1,7 +1,18 @@
 #include "stdafx.h"
 #include "PerfStats.h"
 
+#include <numeric>
+
 namespace game::stats {
+
+	int32_t toDurationMicros(const std::chrono::steady_clock::time_point start, const std::chrono::steady_clock::time_point end) {
+		const auto duration = end - start;
+		return static_cast<int32_t> (duration / std::chrono::microseconds(1));
+	}
+	int32_t toDurationMillis(const std::chrono::steady_clock::time_point start, const std::chrono::steady_clock::time_point end) {
+		const auto duration = end - start;
+		return static_cast<int32_t> (duration / std::chrono::milliseconds(1));
+	}
 
 	struct LoggingSettings
 	{
@@ -19,12 +30,18 @@ namespace game::stats {
 	};
 
 	// logging
-	const int32_t sampleSize = 500; // number of frames until statistics are averaged and logged
+	const int32_t sampleSize = 500; // max number of frames before stas are averaged and logged
+	const int32_t maxDurationMillis = 1000; // max ms duration before stats are averaged and logged 
 
 	int32_t sampleIndex = 0;
+	bool isInitialized = false;
+	std::chrono::steady_clock::time_point lastLogged;
+
 	std::array<int32_t, sampleSize> updateTimeSamples;
 	std::array<int32_t, sampleSize> renderTimeSamples;
 	std::array<int32_t, sampleSize> sleepTimeSamples;
+
+	Stats currentStats;
 
 
 	int32_t divideOrZero(float dividend, int32_t divisor)
@@ -33,22 +50,17 @@ namespace game::stats {
 		else return static_cast<int32_t>(dividend / divisor);
 	}
 
-	int32_t average(std::array<int32_t, sampleSize> arr)
+	int32_t average(std::array<int32_t, sampleSize> arr, int32_t sampleCount)
 	{
-		int32_t sum = 0;
-		for (auto element : arr)
-		{
-			sum += element;
-		}
-		return sum / sampleSize;
+		return std::accumulate(arr.begin(), (arr.begin() + sampleCount), 0) / sampleCount;
 	}
 
-	void logStats(int32_t frameTimeTarget)
+	void logStats(int32_t frameTimeTarget, int32_t sampleCount)
 	{
 		// log fps and frame times
-		const int32_t averageUpdateTime = average(updateTimeSamples);
-		const int32_t averageRenderTime = average(renderTimeSamples);
-		const int32_t averageSleepTime = average(sleepTimeSamples);
+		const int32_t averageUpdateTime = average(updateTimeSamples, sampleCount);
+		const int32_t averageRenderTime = average(renderTimeSamples, sampleCount);
+		const int32_t averageSleepTime = average(sleepTimeSamples, sampleCount);
 		const int32_t fps = 1000000 / (averageRenderTime + averageSleepTime);
 
 		// log frame time divergence
@@ -61,7 +73,7 @@ namespace game::stats {
 		int32_t frameTimeOffCount = 0;
 		int32_t frameTimeOffSum = 0;
 
-		for (int i = 0; i < sampleSize; i++)
+		for (int i = 0; i < sampleCount; i++)
 		{
 			const int32_t ft = renderTimeSamples[i] + sleepTimeSamples[i];
 			const int32_t off = ft - frameTimeTarget;
@@ -108,19 +120,32 @@ namespace game::stats {
 		}
 		Sleep(100);
 		exit(0);*/
+
+		currentStats.fps = fps;
 	}
 
 	void addFrameSample(FrameSample sample, int32_t frameTimeTarget) {
+		if (!isInitialized) {
+			lastLogged = std::chrono::high_resolution_clock::now();
+			isInitialized = true;
+		}
+
 		updateTimeSamples[sampleIndex] = sample.updateTimeMicros;
 		renderTimeSamples[sampleIndex] = sample.renderTimeMicros;
 		sleepTimeSamples[sampleIndex] = sample.sleepTimeMicros;
 
 		sampleIndex++;
+		int32_t millisSinceLastLogged = toDurationMillis(lastLogged, sample.last);
 
-		if (sampleIndex >= sampleSize)
+		if (sampleIndex >= sampleSize || millisSinceLastLogged >= maxDurationMillis)
 		{
-			logStats(frameTimeTarget);
+			logStats(frameTimeTarget, sampleIndex);
 			sampleIndex = 0;
+			lastLogged = std::chrono::high_resolution_clock::now();
 		}
+	}
+
+	Stats& getCurrentStats() {
+		return currentStats;
 	}
 }

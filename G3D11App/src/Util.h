@@ -12,7 +12,7 @@ namespace util {
 	bool endsWith(std::string_view str, std::string_view suffix);
 	bool startsWith(std::string_view str, std::string_view prefix);
 	void asciiToLower(std::string& string);
-
+	std::string leftPad(const std::string& string, const uint32_t count, const char paddingChar = ' ');
 	std::string join(const std::vector<std::string> strings, const std::string& delimiter);
 	std::string fromU8(const std::u8string& u8string);
 	std::string toString(const std::filesystem::path& path);

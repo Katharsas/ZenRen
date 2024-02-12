@@ -2,6 +2,13 @@
 
 namespace game::stats {
 
+	int32_t toDurationMicros(const std::chrono::steady_clock::time_point start, const std::chrono::steady_clock::time_point end);
+	int32_t toDurationMillis(const std::chrono::steady_clock::time_point start, const std::chrono::steady_clock::time_point end);
+
+	struct Stats {
+		int32_t fps = 0;
+	};
+
 	struct FrameSample
 	{
 		bool firstFrame = true;
@@ -11,11 +18,6 @@ namespace game::stats {
 		int32_t updateTimeMicros;
 		int32_t renderTimeMicros;
 		int32_t sleepTimeMicros;
-
-		int32_t toDurationMicros(std::chrono::steady_clock::time_point start, std::chrono::steady_clock::time_point end) {
-			const auto duration = end - start;
-			return static_cast<int32_t> (duration / std::chrono::microseconds(1));
-		}
 
 		int32_t updateStart() {
 			const auto now = std::chrono::high_resolution_clock::now();
@@ -57,4 +59,5 @@ namespace game::stats {
 	};
 
 	void addFrameSample(FrameSample sample, int32_t frameTimeTarget);
+	Stats& getCurrentStats();
 }

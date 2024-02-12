@@ -36,7 +36,7 @@ namespace game {
 	const float cameraMoveSpeedFast = cameraMoveSpeed * 10;
 
 	const float cameraTurnSpeed = 2.f;
-	const float cameraSensitivity = 0.2f;
+	const float cameraSensitivity = 0.003f;
 
 	const std::string ACTION_GUI_SEPARATOR = "---";
 	std::vector<std::string> actionsForGui;
@@ -91,14 +91,14 @@ namespace game {
 		ActionAnalog {
 			"CAMERA_TURN_AXIS_X", ([](InputState state) -> void {
 				if (isActive("CAMERA_TURN_ANALOG")) {
-					renderer::camera::turnCameraHorizontal(deltaTime * cameraSensitivity * state.axisDelta);
+					renderer::camera::turnCameraHorizontal(cameraSensitivity * state.axisDelta);
 				}
 			})
 		},
 		ActionAnalog {
 			"CAMERA_TURN_AXIS_Y", ([](InputState state) -> void {
 				if (isActive("CAMERA_TURN_ANALOG")) {
-					renderer::camera::turnCameraVertical(deltaTime * cameraSensitivity * state.axisDelta);
+					renderer::camera::turnCameraVertical(cameraSensitivity * state.axisDelta);
 				}
 			})
 		},

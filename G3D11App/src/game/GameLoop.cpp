@@ -18,7 +18,7 @@ namespace game
 	struct Settings {
 		// frame limiter
 		bool frameLimiterEnabled = true;
-		int32_t frameLimit = 40;
+		int32_t frameLimit = 60;
 	};
 
 	Settings settings;

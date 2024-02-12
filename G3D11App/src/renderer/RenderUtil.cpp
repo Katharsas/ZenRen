@@ -24,7 +24,7 @@ namespace renderer::util {
 		uint32_t totalMb = vramInfo.Budget / 1024 / 1024;
 		uint32_t percentage = ((float) currentMb / totalMb) * 100;
 		std::ostringstream buffer;
-		buffer << "VRAM Usage: " << percentage << " %% (" << currentMb << "MB)";
+		buffer << percentage << " %% (" << currentMb << " / " << totalMb << " MB)";
 		return buffer.str();
 	}
 }

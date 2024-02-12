@@ -63,6 +63,15 @@ namespace util {
 		return result;
 	}
 
+	std::string leftPad(const std::string& string, const uint32_t count, const char paddingChar)
+	{
+		std::string result = string;
+		if (count > result.size()) {
+			result.insert(0, count - result.size(), paddingChar);
+		}
+		return result;
+	}
+
 	std::string join(const std::vector<std::string> strings, const std::string& delimiter) {
 		return strings.empty() ? "" : std::accumulate(
 				++strings.begin(), strings.end(), *strings.begin(),

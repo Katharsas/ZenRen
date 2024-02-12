@@ -25,6 +25,8 @@ using namespace Microsoft::WRL;
 #include "RenderUtil.h"
 #include "../Util.h"
 #include "Gui.h"
+#include "../game/PerfStats.h"
+
 #include "imgui/imgui.h"
 
 //#include <vdfs/fileIndex.h>
@@ -152,8 +154,10 @@ namespace renderer
 
 		renderer::addWindow("Info", {
 			[]() -> void {
-				const std::string line = renderer::util::getVramUsage(dx12.adapter);
-				ImGui::Text(line.c_str());
+				const std::string vram = "VRAM: " + renderer::util::getVramUsage(dx12.adapter);
+				ImGui::Text(vram.c_str());
+				const std::string fps = "FPS:  " + std::to_string(game::stats::getCurrentStats().fps);
+				ImGui::Text(fps.c_str());
 			}
 		});
 
