@@ -21,8 +21,9 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{A107347B-1932-4E11-B800-7300227827EB}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>G3D11App</RootNamespace>
+    <RootNamespace>ZenRen</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>ZenRen</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -180,10 +181,10 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="G3D11App.rc" />
+    <ResourceCompile Include="ZenRen.rc" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="G3D11App.ico" />
+    <Image Include="ZenRen.ico" />
     <Image Include="small.ico" />
   </ItemGroup>
   <ItemGroup>

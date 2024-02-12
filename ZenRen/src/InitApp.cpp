@@ -1,4 +1,4 @@
-﻿// G3D11App.cpp : Defines the entry point for the application.
+﻿// ZenRen.cpp : Defines the entry point for the application.
 //
 
 #include "stdafx.h"

@@ -18,7 +18,7 @@
     <Text Include="lib\imgui\LICENSE.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="G3D11App.rc">
+    <ResourceCompile Include="ZenRen.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
   </ItemGroup>
@@ -26,7 +26,7 @@
     <Image Include="small.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="G3D11App.ico">
+    <Image Include="ZenRen.ico">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>

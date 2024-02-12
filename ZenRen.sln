@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.32602.291
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "G3D11App", "G3D11App\G3D11App.vcxproj", "{A107347B-1932-4E11-B800-7300227827EB}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ZenRen", "ZenRen\ZenRen.vcxproj", "{A107347B-1932-4E11-B800-7300227827EB}"
 	ProjectSection(ProjectDependencies) = postProject
 		{AC9DDD5F-3732-3CF7-B7FF-2C95FDC11A40} = {AC9DDD5F-3732-3CF7-B7FF-2C95FDC11A40}
 	EndProjectSection

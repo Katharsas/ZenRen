@@ -249,5 +249,5 @@ ModelManifest.xml
 #########################
 
 imgui.ini
-/G3D11App/lib/imgui/misc/
-/G3D11App/data_*
+/ZenRen/lib/imgui/misc/
+/ZenRen/data_*
