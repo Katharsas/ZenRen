@@ -8,19 +8,11 @@
 #include "zenload/zCMesh.h"
 #include "zenload/zCProgMeshProto.h"
 
-namespace renderer::loader {
-    
-    struct SoftwareLightmapTexture {
-        int32_t width;
-        int32_t height;
-        //std::vector<uint8_t> ddsRaw;
-        DirectX::Image* image;
-    };
-
+namespace renderer::loader
+{
     void loadWorldMesh(
         std::unordered_map<Material, std::vector<WORLD_VERTEX>>& target,
-        ZenLib::ZenLoad::zCMesh& worldMesh,
-        const std::vector<SoftwareLightmapTexture>& lightmapTextures);
+        ZenLib::ZenLoad::zCMesh* worldMesh);
     
     void loadInstanceMesh(
         std::unordered_map<Material, std::vector<POS_NORMAL_UV>>& target,

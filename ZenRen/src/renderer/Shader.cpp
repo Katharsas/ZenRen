@@ -7,6 +7,10 @@
 
 namespace renderer {
 
+	bool throwOnError(const HRESULT& hr) {
+		return util::throwOnError(hr, "Shader Creation Error:");
+	}
+
 	Shader::Shader(const std::string& sourceFile, const VertexInputLayoutDesc layoutDesc[], const int length, D3d d3d)
 	{
 		LOG(DEBUG) << "Compiling shader from file: " << sourceFile;
@@ -16,9 +20,7 @@ namespace renderer {
 		ID3D10Blob* VS, *PS, *errVS, *errPS;
 		UINT flags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 		auto hrVs = D3DX11CompileFromFileW(sourceFileW.c_str(), 0, 0, "VS_Main", "vs_5_0", flags, 0, 0, &VS, &errVS, 0);
-		util::warnOnError(hrVs, "Vertex Shader Compilation Error:");
 		auto hrPs = D3DX11CompileFromFileW(sourceFileW.c_str(), 0, 0, "PS_Main", "ps_5_0", flags, 0, 0, &PS, &errPS, 0);
-		util::warnOnError(hrPs, "Pixel Shader Compilation Error:");
 
 		if (errVS != nullptr) {
 			LOG(WARNING) << std::string((char*)errVS->GetBufferPointer());
@@ -26,11 +28,16 @@ namespace renderer {
 		if (errPS != nullptr) {
 			LOG(WARNING) << std::string((char*)errPS->GetBufferPointer());
 		}
-		// TODO if shader compilation fails, debugger might stop on exception before errors are flushed to log
+
+		util::throwOnError(hrVs, "Vertex Shader Compilation Error:");
+		util::throwOnError(hrPs, "Pixel Shader Compilation Error:");
 
 		// encapsulate shader blobs into shader objects
-		d3d.device->CreateVertexShader(VS->GetBufferPointer(), VS->GetBufferSize(), nullptr, &vertexShader);
-		d3d.device->CreatePixelShader(PS->GetBufferPointer(), PS->GetBufferSize(), nullptr, &pixelShader);
+		HRESULT hr;
+		hr = d3d.device->CreateVertexShader(VS->GetBufferPointer(), VS->GetBufferSize(), nullptr, &vertexShader);
+		throwOnError(hr);
+		hr = d3d.device->CreatePixelShader(PS->GetBufferPointer(), PS->GetBufferSize(), nullptr, &pixelShader);
+		throwOnError(hr);
 
 		// create full layout desc from given partial layout desc
 		D3D11_INPUT_ELEMENT_DESC * d3d11LayoutDesc = new D3D11_INPUT_ELEMENT_DESC[length];
@@ -43,7 +50,8 @@ namespace renderer {
 			d3d11LayoutDesc[i].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
 			d3d11LayoutDesc[i].InstanceDataStepRate = 0;
 		}
-		d3d.device->CreateInputLayout(d3d11LayoutDesc, length, VS->GetBufferPointer(), VS->GetBufferSize(), &vertexLayout);
+		hr = d3d.device->CreateInputLayout(d3d11LayoutDesc, length, VS->GetBufferPointer(), VS->GetBufferSize(), &vertexLayout);
+		throwOnError(hr);
 
 		delete[] d3d11LayoutDesc;
 		VS->Release();

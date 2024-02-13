@@ -263,6 +263,7 @@
     <ClCompile Include="src\renderer\Texture.cpp" />
     <ClCompile Include="src\renderer\loader\DebugTextures.cpp" />
     <ClCompile Include="src\renderer\loader\ZenLoader.cpp" />
+    <ClCompile Include="src\renderer\loader\TexFromVdfLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\game\GameArgs.h" />
@@ -305,6 +306,7 @@
     <ClInclude Include="src\renderer\Texture.h" />
     <ClInclude Include="src\renderer\loader\DebugTextures.h" />
     <ClInclude Include="src\renderer\loader\ZenLoader.h" />
+    <ClInclude Include="src\renderer\loader\TexFromVdfLoader.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\g3log\build\g3log.vcxproj">

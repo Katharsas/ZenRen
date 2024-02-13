@@ -45,9 +45,16 @@ namespace renderer
 		DirectX::XMMATRIX transform;
 	};
 
+	struct InMemoryTexFile {
+		int32_t width;
+		int32_t height;
+		std::vector<uint8_t> ddsRaw;
+	};
+
 	struct RenderData {
 		std::unordered_map<Material, std::vector<WORLD_VERTEX>> worldMesh;
 		std::unordered_map<Material, std::vector<POS_NORMAL_UV>> staticMeshes;
+		std::vector<InMemoryTexFile> worldMeshLightmaps;
 	};
 
 	struct Mesh

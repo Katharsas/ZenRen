@@ -6,6 +6,7 @@
 #include <codecvt>
 #include <locale>
 #include <numeric>
+#include <exception>
 
 #include <shlobj_core.h>
 #include <comdef.h>
@@ -96,15 +97,36 @@ namespace util {
 		return wideToUtf8(wide);
 	}
 
-	bool warnOnError(const HRESULT& hr, const std::string& message) {
+	std::string replaceExtension(const std::string& filename, const std::string& extension) {
+		size_t lastdot = filename.find_last_of(".");
+		if (lastdot == std::string::npos) {
+			return filename + extension;
+		}
+		return filename.substr(0, lastdot) + extension;
+	}
+
+	bool handleHr(const HRESULT& hr, const std::string& message, bool throwOnError) {
 		bool failed = FAILED(hr);
 		if (failed) {
 			_com_error err(hr);
-			std::wstring errorMessage = std::wstring(err.ErrorMessage());
+			std::wstring errorMessageW = std::wstring(err.ErrorMessage());
+			std::string errorMessage = util::wideToUtf8(errorMessageW);
 
 			LOG(WARNING) << message;
-			LOG(WARNING) << util::wideToUtf8(errorMessage);
+			LOG(WARNING) << errorMessage;
+
+			if (throwOnError) {
+				throw std::exception((message + "\n" + errorMessage).c_str());
+			}
 		}
 		return !failed;
+	}
+
+	bool warnOnError(const HRESULT& hr, const std::string& message) {
+		return handleHr(hr, message, false);
+	}
+
+	bool throwOnError(const HRESULT& hr, const std::string& message) {
+		return handleHr(hr, message, true);
 	}
 }

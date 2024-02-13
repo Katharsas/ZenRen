@@ -10,6 +10,7 @@
 #include "loader/AssetFinder.h";
 #include "loader/ZenLoader.h";
 #include "loader/ObjLoader.h"
+#include "loader/TexFromVdfLoader.h"
 
 // TODO move to RenderDebugGui
 #include "Gui.h"
@@ -88,16 +89,25 @@ namespace renderer::world {
 		});
 	}
 
-	const std::filesystem::path& getTexFilepathOrDefault(const std::string& texName) {
-		// TODO we should support loading textures as TEX from VDF as well if not found as file
-
+	Texture* createTexture(D3d d3d, const std::string& texName)
+	{
 		auto optionalFilepath = loader::existsAsFile(texName);
 		if (optionalFilepath.has_value()) {
-			return *(optionalFilepath.value());
+			auto path = *optionalFilepath.value();
+			return new Texture(d3d, util::toString(path));
 		}
-		else {
-			return loader::DEFAULT_TEXTURE;
+
+		auto optionalVdfIndex = loader::getVdfIndex();
+		if (optionalVdfIndex.has_value()) {
+			std::string zTexName = util::replaceExtension(texName, "-c.tex");// compiled textures have -C suffix
+
+			if (optionalVdfIndex.value()->hasFile(zTexName)) {
+				InMemoryTexFile tex = loader::loadTex(zTexName, optionalVdfIndex.value());
+				return new Texture(d3d, tex.ddsRaw, true, zTexName);
+			}
 		}
+		
+		return new Texture(d3d, util::toString(loader::DEFAULT_TEXTURE));
 	}
 
 	void loadLevel(D3d d3d, std::string& level)
@@ -146,12 +156,11 @@ namespace renderer::world {
 			release(lightmapTexArray);
 			debugTextures.clear();
 
-			auto& lightmaps = loader::getLightmapTextures();
 			std::vector<std::vector<uint8_t>> ddsRaws;
-			for (auto& lightmap : lightmaps) {
+			for (auto& lightmap : data.worldMeshLightmaps) {
 				ddsRaws.push_back(lightmap.ddsRaw);
 
-				Texture* texture = new Texture(d3d, lightmap.ddsRaw);
+				Texture* texture = new Texture(d3d, lightmap.ddsRaw, false, "lightmap_xxx");
 				debugTextures.push_back(texture);
 			}
 			lightmapTexArray = createShaderTexArray(d3d, ddsRaws, 256, 256);
@@ -167,8 +176,7 @@ namespace renderer::world {
 			auto& vertices = pair.second;
 
 			if (!vertices.empty()) {
-				auto& actualPath = getTexFilepathOrDefault(material.texBaseColor);
-
+				Texture* texture = createTexture(d3d, material.texBaseColor);
 				Mesh mesh;
 				{
 					// vertex data
@@ -184,9 +192,6 @@ namespace renderer::world {
 					initialData.pSysMem = vertices.data();
 					d3d.device->CreateBuffer(&bufferDesc, &initialData, &(mesh.vertexBuffer));
 				}
-
-				Texture* texture = new Texture(d3d, util::toString(actualPath));
-
 				mesh.baseColor = texture;
 				world.meshes.push_back(mesh);
 
@@ -204,8 +209,7 @@ namespace renderer::world {
 			auto& vertices = pair.second;
 
 			if (!vertices.empty()) {
-				auto& actualPath = getTexFilepathOrDefault(material.texBaseColor);
-
+				Texture* texture = createTexture(d3d, material.texBaseColor);
 				Mesh mesh;
 				{
 					// vertex data
@@ -221,9 +225,6 @@ namespace renderer::world {
 					initialData.pSysMem = vertices.data();
 					d3d.device->CreateBuffer(&bufferDesc, &initialData, &(mesh.vertexBuffer));
 				}
-
-				Texture* texture = new Texture(d3d, util::toString(actualPath));
-
 				mesh.baseColor = texture;
 				world.meshes.push_back(mesh);
 

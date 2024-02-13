@@ -9,6 +9,7 @@
 #include "../../Util.h"
 #include "../RenderUtil.h"
 #include "MeshFromVdfLoader.h"
+#include "TexFromVdfLoader.h"
 
 #include "DirectXTex.h"
 #include "zenload/zCMesh.h"
@@ -27,12 +28,6 @@ namespace renderer::loader {
     //using ::util::asciiToLowercase;
     using ::util::getOrCreate;
 
-    ZenLoad::ZenParser parser;
-    ZenLoad::zCMesh* worldMesh;
-
-    vector<ZenLightmapTexture> lightmapTextures;
-    vector<Image> lightmapTexturesData;
-
     /**
      * Recursive function to list some data about the zen-file
      */
@@ -49,50 +44,6 @@ namespace renderer::loader {
             // List the information about the children as well
             //listVobInformation(v.childVobs);
         }
-    }
-
-    void loadZenLightmaps() {
-        for (auto& lightmap : worldMesh->getLightmapTextures()) {
-            int32_t width;
-            int32_t height;
-            vector<uint8_t> ddsRaw;
-            int32_t message = ZenLoad::convertZTEX2DDS(lightmap, ddsRaw, true, &width, &height);
-            if (message != 0) {
-                LOG(WARNING) << "Failed to convert lightmap zTex to DDS: Error code '" << message << "'!";
-            }
-            ZenLightmapTexture tex = { width, height, ddsRaw };
-            lightmapTextures.push_back(tex);
-
-            ScratchImage image;
-            TexMetadata metadata;
-            HRESULT result = DirectX::LoadFromDDSMemory(tex.ddsRaw.data(), tex.ddsRaw.size(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, &metadata, image);
-
-            ScratchImage* bytePerPixelImage = new ScratchImage;// leak
-            result = Convert(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DXGI_FORMAT_R8G8B8A8_UNORM, TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT, *bytePerPixelImage);
-
-            lightmapTexturesData.push_back(*bytePerPixelImage->GetImage(0, 0, 0));
-        }
-    }
-
-    vector<ZenLightmapTexture>& getLightmapTextures() {
-        return lightmapTextures;
-    }
-
-    unordered_map<Material, vector<WORLD_VERTEX>> loadWorldMesh()
-    {
-        unordered_map<Material, vector<WORLD_VERTEX>> matsToVertices;
-
-        vector<SoftwareLightmapTexture> softwareTextures;
-        for (int i = 0; i < lightmapTextures.size(); i++) {
-            softwareTextures.push_back({
-                lightmapTextures[i].width,
-                lightmapTextures[i].height,
-                &lightmapTexturesData[i],
-            });
-        }
-
-        loadWorldMesh(matsToVertices, *parser.getWorldMesh(), softwareTextures);
-        return matsToVertices;
     }
 
     bool existsInstanceMesh(string& visualname, VDFS::FileIndex& vdf)
@@ -153,7 +104,7 @@ namespace renderer::loader {
 
     RenderData loadZen(string& zenFilename, VDFS::FileIndex* vdf) {
 
-        parser = ZenLoad::ZenParser(zenFilename, *vdf);
+        auto parser = ZenLoad::ZenParser(zenFilename, *vdf);
         if (parser.getFileSize() == 0)
         {
             LOG(FATAL) << "ZEN-File either not found or empty!";
@@ -171,21 +122,23 @@ namespace renderer::loader {
         ZenLoad::oCWorldData world;
         parser.readWorld(world);
         
-        worldMesh = parser.getWorldMesh();
+        ZenLoad::zCMesh* worldMesh = parser.getWorldMesh();
 
-        loadZenLightmaps();
-        auto worldMesh = loadWorldMesh();
+        vector<InMemoryTexFile> lightmaps = loadZenLightmaps(worldMesh);
 
-        auto vobs = loadVobs(world.rootVobs);
+        unordered_map<Material, vector<WORLD_VERTEX>> worldMeshData;
+        loadWorldMesh(worldMeshData, parser.getWorldMesh());
+
+        vector<StaticInstance> vobs = loadVobs(world.rootVobs);
 
         LOG(INFO) << "Zen loaded!";
 
-        unordered_map<Material, vector<POS_NORMAL_UV>> staticMeshes;
+        unordered_map<Material, vector<POS_NORMAL_UV>> staticMeshData;
         for (auto& vob : vobs) {
             auto& visualname = vob.meshName;
 
             if (existsInstanceMesh(visualname, *vdf)) {
-                bool loaded = loadInstanceMesh(staticMeshes, visualname, *vdf, vob.transform);
+                bool loaded = loadInstanceMesh(staticMeshData, visualname, *vdf, vob.transform);
             }
             else {
                 LOG(DEBUG) << "Skipping VOB " << visualname << " (visual not found)";
@@ -195,8 +148,9 @@ namespace renderer::loader {
         LOG(INFO) << "Meshes loaded!";
 
         return {
-            worldMesh,
-            staticMeshes,
+            worldMeshData,
+            staticMeshData,
+            lightmaps
         };
 	}
 }

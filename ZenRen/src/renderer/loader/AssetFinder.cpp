@@ -22,11 +22,7 @@ namespace renderer::loader {
 	VDFS::FileIndex* vdf = nullptr;
 
 	string filenameWithTga(const string& filename) {
-		size_t lastdot = filename.find_last_of(".");
-		if (lastdot == string::npos) {
-			return filename + ".tga";
-		}
-		return filename.substr(0, lastdot) + ".tga";
+		return util::replaceExtension(filename, ".tga");
 	}
 
 	void walkFilesRecursively(fs::path& rootDir, const std::function<void(const fs::path&, const string&)> onFile) {

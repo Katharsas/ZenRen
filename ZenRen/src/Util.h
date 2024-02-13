@@ -19,7 +19,10 @@ namespace util {
 	std::string toString(const std::filesystem::path& path);
 
 	std::string getUserFolderPath();
+	std::string replaceExtension(const std::string& filename, const std::string& extension);
+
 	bool warnOnError(const HRESULT& hr, const std::string& message);
+	bool throwOnError(const HRESULT& hr, const std::string& message);
 
 
 	template<typename Key, typename Item, typename ItemAlloc>

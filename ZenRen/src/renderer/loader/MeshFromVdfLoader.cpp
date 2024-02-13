@@ -13,6 +13,7 @@ namespace renderer::loader {
     using ::std::array;
     using ::std::vector;
     using ::std::unordered_map;
+    using ::std::unordered_set;
 	using ::util::getOrCreate;
 
     int32_t wrapModulo(int32_t positiveOrNegative, int32_t modulo)
@@ -63,46 +64,22 @@ namespace renderer::loader {
         return texFilename;
     }
 
-    const D3DXCOLOR sampleLightmap(const VEC3& vertexPos, const ARRAY_UV& uvLightmap, const SoftwareLightmapTexture& lightmapTex) {
-        // CPU per vertex sampling because the lightmaps are so low resolution that per pixel sampling is just overkill
-        // GPU per vertex sampling might be easier, however this is probably faster during rendering.
-        
-        float uAbs = (lightmapTex.width * uvLightmap.u) + 0.5f;
-        float vAbs = (lightmapTex.height * uvLightmap.v) + 0.5f;
-        uint32_t uPixel = wrapModulo(uAbs, lightmapTex.width);
-        uint32_t vPixel = wrapModulo(vAbs, lightmapTex.height);
-
-        const uint32_t pixelSize = 4;
-        const auto& image = *lightmapTex.image;
-
-        uint8_t* pixel = image.pixels + (image.rowPitch * vPixel) + (pixelSize * uPixel);
-
-        D3DXCOLOR result;
-        result.r = (*(pixel + 0)) / 255.0f;
-        result.g = (*(pixel + 1)) / 255.0f;
-        result.b = (*(pixel + 2)) / 255.0f;
-        result.a = (*(pixel + 3)) / 255.0f;
-        return result;
-    }
-
     void loadWorldMesh(
         unordered_map<Material, vector<WORLD_VERTEX>>& target,
-        ZenLoad::zCMesh& worldMesh,
-        const vector<SoftwareLightmapTexture>& lightmapTextures)
+        ZenLoad::zCMesh* worldMesh)
     {
         ZenLoad::PackedMesh packedMesh;
-        worldMesh.packMesh(packedMesh, 0.01f);
+        worldMesh->packMesh(packedMesh, 0.01f);
 
         for (const auto& submesh : packedMesh.subMeshes) {
             if (submesh.indices.empty()) {
                 continue;
             }
             if (submesh.triangleLightmapIndices.empty()) {
-                throw std::logic_error("Expected world mesh to have lighmap information!");
+                throw std::logic_error("Expected world mesh to have lightmap information!");
             }
 
             vector<WORLD_VERTEX> faces;
-            unordered_map<uint32_t, bool> lightmaps;// values unused
 
             int32_t faceIndex = 0;
             for (int32_t indicesIndex = 0; indicesIndex < submesh.indices.size(); indicesIndex += 3) {
@@ -112,8 +89,7 @@ namespace renderer::loader {
                 ZenLoad::Lightmap lightmap;
                 const int16_t faceLightmapIndex = submesh.triangleLightmapIndices[faceIndex];
                 if (faceLightmapIndex != -1) {
-                    lightmap = worldMesh.getLightmapReferences()[faceLightmapIndex];
-                    lightmaps.insert({ lightmap.lightmapTextureIndex , true });
+                    lightmap = worldMesh->getLightmapReferences()[faceLightmapIndex];
                 }
 
                 array<WORLD_VERTEX, 3> face;
@@ -127,7 +103,6 @@ namespace renderer::loader {
 
                     if (faceLightmapIndex == -1) {
                         vertex.uvLightmap = { 0, 0, -1 };
-                        //vertex.colorLightmap = { 1, 1, 1, 1 };
                     }
                     else {
                         float unscale = 100;
@@ -139,10 +114,6 @@ namespace renderer::loader {
                         vertex.uvLightmap.u = XMVectorGetX(XMVector3Dot(lightmapDir, normalRight));
                         vertex.uvLightmap.v = XMVectorGetX(XMVector3Dot(lightmapDir, normalUp));
                         vertex.uvLightmap.i = lightmap.lightmapTextureIndex;
-                        
-                        // TODO should we consider software sampling going forward?
-                        //const auto& lightmapTex = lightmapTextures[lightmap.lightmapTextureIndex];
-                        //vertex.colorLightmap = sampleLightmap(vertex.pos, vertex.uvLightmap, lightmapTex);
                     }
                     face.at(2 - vertexIndex) = vertex;// flip faces apparently, but not z ?!
                     vertexIndex++;
@@ -175,7 +146,7 @@ namespace renderer::loader {
                 continue;
             }
             if (!submesh.triangleLightmapIndices.empty()) {
-                throw std::logic_error("Expected VOB mesh to NOT have lighmap information!");
+                throw std::logic_error("Expected VOB mesh to NOT have lightmap information!");
             }
 
             vector<POS_NORMAL_UV> faces;
