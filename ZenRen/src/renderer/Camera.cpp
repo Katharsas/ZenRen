@@ -26,14 +26,17 @@ namespace renderer::camera {
 
 	ObjectMatrices getWorldViewMatrix(const XMMATRIX & objectsWorldMatrix)
 	{
-		const XMMATRIX worldViewTransposed = objectsWorldMatrix * matrices.view;
+		const XMMATRIX worldView = objectsWorldMatrix * matrices.view;
+
+		// pre-transposed for HLSL usage - since HLSL requires all matrices in tranposed form, we save a double transpose on worldViewNormal
 		ObjectMatrices result;
-		result.worldView = XMMatrixTranspose(worldViewTransposed);
-		result.worldViewNormal = XMMatrixInverse(nullptr, worldViewTransposed);
+		result.worldView = XMMatrixTranspose(worldView);
+		result.worldViewNormal = XMMatrixInverse(nullptr, worldView);
 		return result;
 	}
 	XMMATRIX getProjectionMatrix()
 	{
+		// pre-transposed for HLSL usage
 		return XMMatrixTranspose(matrices.projection);
 	}
 

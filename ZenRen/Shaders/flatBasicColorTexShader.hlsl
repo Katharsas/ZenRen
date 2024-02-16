@@ -46,12 +46,17 @@ VS_OUT VS_Main(VS_IN input)
     VS_OUT output;
     float4 viewPosition = mul(input.position, worldViewMatrix);
 
-    float4 viewNormal = mul(input.normal, worldViewMatrixInverseTranposed);
-    float3 viewNormal3 = normalize((float3) viewNormal);
+    // TODO doing light calculation in view space results in flickering,
+    // so until we know whats going wrong just do it in world space.
 
-    float4 light = float4(0, 1, 0, 1);
-    float4 viewLight = mul(light, worldViewMatrixInverseTranposed);
-    float3 viewLight3 = normalize((float3) (viewLight * 1));
+    float3 viewNormal3 = normalize((float3) input.normal);
+    //float3 viewNormal3 = normalize((float3) mul(input.normal, worldViewMatrixInverseTranposed));
+    //float3 viewNormal3 = normalize(mul((float3) input.normal, (float3x3) worldViewMatrixInverseTranposed));
+
+    // light dir is really a normal pointing directly towards light
+    float3 viewLight3 = float3(0, 1, 0);
+    //float3 viewLight3 = normalize((float3) mul(float4(0, 1, 0, 0), worldViewMatrixInverseTranposed));
+    //float3 viewLight3 = normalize(mul(float3(0, 1, 0), (float3x3) worldViewMatrixInverseTranposed));
 
     if (!outputDirectEnabled || outputDirectType == FLAG_OUPUT_DIRECT_SOLID || outputDirectType == FLAG_OUTPUT_DIRECT_LIGHTMAP) {
         float lightNormalDotProduct = dot(viewNormal3, viewLight3); // for normalized input: range of -1 (down) to 1 (up)
