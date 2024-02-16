@@ -76,7 +76,7 @@ namespace renderer {
 		metadata.arraySize = images.size();
 
 		// TODO
-		// It is unclear it MipMaps work here.
+		// It is unclear if MipMaps work here.
 		// We should instead write Image to DDS raw memory (see https://stackoverflow.com/questions/76144325/convert-any-input-dds-into-another-dds-format-in-directxtex)
 		// and then load raw memory with CreateDDSTextureFromMemory (see https://github.com/Microsoft/DirectXTK/wiki/DDSTextureLoader)
 
@@ -91,7 +91,15 @@ namespace renderer {
 		return resourceView;
 	}
 
-	Texture::Texture(D3d d3d, const std::string& sourceFile)
+	void createSetSrv(D3d d3d, const ScratchImage& image, const std::string& name, bool sRgb, ID3D11ShaderResourceView** ppSrv) {
+		auto sRgbFlag = sRgb ? DirectX::CREATETEX_FORCE_SRGB : DirectX::CREATETEX_IGNORE_SRGB;
+		auto hr = DirectX::CreateShaderResourceViewEx(
+			d3d.device, image.GetImages(), image.GetImageCount(), image.GetMetadata(),
+			D3D11_USAGE::D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0, sRgbFlag, ppSrv);
+		throwOnError(hr, name);
+	}
+
+	Texture::Texture(D3d d3d, const std::string& sourceFile, bool sRgb)
 	{
 		auto name = sourceFile;
 		util::asciiToLower(name);
@@ -101,7 +109,7 @@ namespace renderer {
 		TexMetadata metadata;
 
 		if (util::endsWith(name, ".tga")) {
-			hr = LoadFromTGAFile(sourceFileW.c_str(), &metadata, image);
+			hr = LoadFromTGAFile(sourceFileW.c_str(), DirectX::TGA_FLAGS_NONE, &metadata, image);
 			throwOnError(hr, name);
 		}
 		else if (util::endsWith(name, ".png")) {
@@ -111,11 +119,10 @@ namespace renderer {
 
 		createMipmapsIfMissing(&image, name);
 
-		hr = CreateShaderResourceView(d3d.device, image.GetImages(), image.GetImageCount(), image.GetMetadata(), &resourceView);
-		throwOnError(hr, name);
+		createSetSrv(d3d, image, name, sRgb, &resourceView);
 	}
 
-	Texture::Texture(D3d d3d, std::vector<uint8_t>& ddsRaw, bool isGothicZTex, const std::string& name)
+	Texture::Texture(D3d d3d, std::vector<uint8_t>& ddsRaw, bool isGothicZTex, const std::string& name, bool sRgb)
 	{
 		HRESULT hr;
 		DirectX::ScratchImage image;
@@ -124,7 +131,9 @@ namespace renderer {
 		throwOnError(hr, name);
 
 		if (isGothicZTex) {
-			// GPU does not support zTex DDS format as render target, so mipmap generation would fail.
+			// GPU does not support zTex DDS format (DXGI_FORMAT_BC1_UNORM) as render target, so mipmap generation would fail.
+			// TODO it might be better to either force ARGB conversion during convertZTEX2DDS or with flag during LoadFromDDSMemory.
+			// This would potentially allow mip map recreation
 			if (!hasExpectedMipmapCount(&image, true)) {
 				LOG(WARNING) << "Texture Load Warning: Incorrect number of Mipmaps found! " << name;
 			}
@@ -133,8 +142,7 @@ namespace renderer {
 			createMipmapsIfMissing(&image, name);
 		}
 
-		hr = DirectX::CreateShaderResourceView(d3d.device, image.GetImages(), image.GetImageCount(), metadata, &resourceView);
-		throwOnError(hr, name);
+		createSetSrv(d3d, image, name, sRgb, &resourceView);
 	}
 
 	Texture::~Texture()

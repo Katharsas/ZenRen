@@ -62,7 +62,7 @@ float4 PS_Main(PS_INPUT input, uint sampleIndex : SV_SAMPLEINDEX) : SV_TARGET
 	// sample linear
 	float4 color = TX_BackBufferHDR.Sample(SS_Linear, input.texcoord);
 
-	float gammaAdjust = 1.1f;
+	float gammaAdjust = 1.0f;
 	color.rgb = pow(color.rgb, float3(gammaAdjust, gammaAdjust, gammaAdjust));// TODO should this come before or after tonemapping?
 
 	// This could be calculated by luminance of the picture to get eye adjustment effect.

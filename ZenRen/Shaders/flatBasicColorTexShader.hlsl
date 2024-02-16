@@ -57,7 +57,7 @@ VS_OUT VS_Main(VS_IN input)
         float lightNormalDotProduct = dot(viewNormal3, viewLight3); // for normalized input: range of -1 (down) to 1 (up)
 
         // Faces directed at right angle to sun receive this ratio of maximum direct light. Faces towards the sun get more, away from sun get less.
-        float lightRatioAt90 = 0.12f; 
+        float lightRatioAt90 = 0.25f; 
         float lightReceivedRatio;
 
         if (lightNormalDotProduct < 0) {
@@ -71,7 +71,8 @@ VS_OUT VS_Main(VS_IN input)
         lightReceivedRatio = (lightReceivedRatio + ambientLight2) / (1 + ambientLight2);
 
         //float lightReceivedRatio = max(0, lightNormalDotProduct + 0.3f) + ambientLight;
-        output.light = lightReceivedRatio;
+        float sunStrength = 1.8f;
+        output.light = lightReceivedRatio * sunStrength;
     }
     else {
         output.light = 1;

@@ -9,8 +9,8 @@ namespace renderer {
 	class Texture
 	{
 	public:
-		Texture(D3d d3d, const std::string& sourceFile);
-		Texture(D3d d3d, std::vector<uint8_t>& ddsRaw, bool isGothicZTex, const std::string& name);
+		Texture(D3d d3d, const std::string& sourceFile, bool sRgb = true);
+		Texture(D3d d3d, std::vector<uint8_t>& ddsRaw, bool isGothicZTex, const std::string& name, bool sRgb = true);
 		~Texture();
 		ID3D11ShaderResourceView* GetResourceView();
 	private:
