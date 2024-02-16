@@ -13,22 +13,27 @@ namespace game {
 	using ::game::input::ButtonId;
 	using ::game::input::AxisId;
 
-	struct InputState {
-		int16_t axisDelta = 0;
-	};
-	struct ActionDigital {
+	struct ActionDigitalWhileActive {
 		const std::string actionId;
 		void (*onInputActive)();
 	};
+	struct ActionDigitalOnToggle {
+		const std::string actionId;
+		void (*onInputActive)(bool isActive);
+	};
+
+	struct AnalogInputState {
+		int32_t axisDelta = 0;
+	};
 	struct ActionAnalog {
 		const std::string actionId;
-		void (*onInputActive)(InputState inputState);
-		InputState inputState;
+		void (*onInputActive)(AnalogInputState inputState);
+		AnalogInputState inputState;
 	};
 
 	struct InputAction
 	{
-		void (*onInputActive)(InputState inputState);
+		void (*onInputActive)(AnalogInputState inputState);
 	};
 
 	// input actions
@@ -45,6 +50,7 @@ namespace game {
 	std::map<const std::string, const game::input::AxisId> actionsToAnalogInput;
 
 	float deltaTime;
+	bool isMouseVisible = true;
 
 	bool isActive(const std::string& actionId) {
 		auto& turnEnabledKey = actionsToDigitalInput.at(actionId);
@@ -61,42 +67,47 @@ namespace game {
 		}
 	}
 
-	std::array actionsDigital{
-		ActionDigital { "CAMERA_MOVE_FORWARDS", []() -> void {
+	std::array actionsDigitalWhileActive{
+		ActionDigitalWhileActive { "CAMERA_MOVE_FORWARDS", []() -> void {
 			renderer::camera::moveCameraDepth(getCameraMoveSpeed());
 		} },
-		ActionDigital { "CAMERA_MOVE_BACKWARDS", []() -> void {
+		ActionDigitalWhileActive { "CAMERA_MOVE_BACKWARDS", []() -> void {
 			renderer::camera::moveCameraDepth(getCameraMoveSpeed() * -1);
 		} },
-		ActionDigital { "CAMERA_MOVE_LEFT", []() -> void {
+		ActionDigitalWhileActive { "CAMERA_MOVE_LEFT", []() -> void {
 			renderer::camera::moveCameraHorizontal(getCameraMoveSpeed() * -1);
 		} },
-		ActionDigital { "CAMERA_MOVE_RIGHT", []() -> void {
+		ActionDigitalWhileActive { "CAMERA_MOVE_RIGHT", []() -> void {
 			renderer::camera::moveCameraHorizontal(getCameraMoveSpeed());
 		} },
-		ActionDigital { "CAMERA_MOVE_UP", []() -> void {
+		ActionDigitalWhileActive { "CAMERA_MOVE_UP", []() -> void {
 			renderer::camera::moveCameraVertical(getCameraMoveSpeed());
 		} },
-		ActionDigital { "CAMERA_MOVE_DOWN", []() -> void {
+		ActionDigitalWhileActive { "CAMERA_MOVE_DOWN", []() -> void {
 			renderer::camera::moveCameraVertical(getCameraMoveSpeed() * -1);
 		} },
-		ActionDigital { "CAMERA_TURN_LEFT", []() -> void {
+		ActionDigitalWhileActive { "CAMERA_TURN_LEFT", []() -> void {
 			renderer::camera::turnCameraHorizontal(deltaTime * cameraTurnSpeed * -1);
 		} },
-		ActionDigital { "CAMERA_TURN_RIGHT", []() -> void {
+		ActionDigitalWhileActive { "CAMERA_TURN_RIGHT", []() -> void {
 			renderer::camera::turnCameraHorizontal(deltaTime * cameraTurnSpeed);
+		} },
+	};
+	std::array actionsDigitalOnToggle{
+		ActionDigitalOnToggle { "CAMERA_TURN_ANALOG", [](bool isActive) -> void {
+			game::input::toggleFixedHiddenCursorMode(isActive);
 		} },
 	};
 	std::array actionsAnalog{
 		ActionAnalog {
-			"CAMERA_TURN_AXIS_X", ([](InputState state) -> void {
+			"CAMERA_TURN_AXIS_X", ([](AnalogInputState state) -> void {
 				if (isActive("CAMERA_TURN_ANALOG")) {
 					renderer::camera::turnCameraHorizontal(cameraSensitivity * state.axisDelta);
 				}
 			})
 		},
 		ActionAnalog {
-			"CAMERA_TURN_AXIS_Y", ([](InputState state) -> void {
+			"CAMERA_TURN_AXIS_Y", ([](AnalogInputState state) -> void {
 				if (isActive("CAMERA_TURN_ANALOG")) {
 					renderer::camera::turnCameraVertical(cameraSensitivity * state.axisDelta);
 				}
@@ -187,14 +198,28 @@ namespace game {
 	void processUserInput(float deltaTime) {
 		game::deltaTime = deltaTime;
 
-		// check if input is mapped to a button and activate if pressed
-		for (auto& action : actionsDigital) {
+		// check if input is mapped to a button and activate while pressed
+		for (auto& action : actionsDigitalWhileActive) {
 			auto inputIt = actionsToDigitalInput.find(action.actionId);
 			if (inputIt != actionsToDigitalInput.end()) {
 				auto& inputId = inputIt->second;
 				bool isPressed = game::input::isKeyUsed(inputId);
 				if (isPressed) {
 					action.onInputActive();
+				}
+			}
+		}
+		// check if input is mapped to a button and activate on button down/release
+		for (auto& action : actionsDigitalOnToggle) {
+			auto inputIt = actionsToDigitalInput.find(action.actionId);
+			if (inputIt != actionsToDigitalInput.end()) {
+				auto& inputId = inputIt->second;
+				// this makes it impossible to use single key for two toggle actions,
+				// could be changed by resetting all buttons only after evaluating all toggle actions
+				bool hasChanged = game::input::hasKeyChangedAndReset(inputId);
+				if (hasChanged) {
+					bool isPressed = game::input::isKeyUsed(inputId);
+					action.onInputActive(isPressed);
 				}
 			}
 		}

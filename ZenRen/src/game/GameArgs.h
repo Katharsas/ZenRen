@@ -26,8 +26,8 @@ namespace game
 
 	std::unordered_map<std::string, std::string> parseOptions(const std::vector<std::string> args, const std::unordered_map<std::string, bool> options);
 
-	void getOptionFlag(const std::string& option, bool* target, const std::unordered_map< std::string, std::string> optionsToValues);
-	void getOptionString(const std::string& option, std::optional<std::string>* target, const std::unordered_map<std::string, std::string> optionsToValues);
-	void getOptionPath(const std::string& option, std::optional<std::filesystem::path>* target, const std::unordered_map<std::string, std::string> optionsToValues);
+	void getOptionFlag(const std::string& option, bool* target, const std::unordered_map<std::string, std::string>& optionsToValues);
+	void getOptionString(const std::string& option, std::optional<std::string>* target, const std::unordered_map<std::string, std::string>& optionsToValues);
+	void getOptionPath(const std::string& option, std::optional<std::filesystem::path>* target, const std::unordered_map<std::string, std::string>& optionsToValues);
 }
 

@@ -33,14 +33,14 @@ namespace game
 		return result;
 	}
 
-	void getOptionFlag(const string& option, bool* target, const std::unordered_map<string, string> optionsToValues) {
+	void getOptionFlag(const string& option, bool* target, const std::unordered_map<string, string>& optionsToValues) {
 		auto it = optionsToValues.find(util::asciiToLower(option));
 		bool exists = it != optionsToValues.end();
 		LOG(INFO) << "Args: '" << option << "' -> '" << (exists ? "true" : "false") << "'";
 		*target = exists;
 	}
 
-	void getOptionString(const string& option, std::optional<string>* target, const std::unordered_map<string, string> optionsToValues) {
+	void getOptionString(const string& option, std::optional<string>* target, const std::unordered_map<string, string>& optionsToValues) {
 		auto it = optionsToValues.find(util::asciiToLower(option));
 		if (it != optionsToValues.end()) {
 			LOG(INFO) << "Args: '" << option << "' -> '" << it->second << "'";
@@ -52,7 +52,7 @@ namespace game
 		}
 	}
 
-	void getOptionPath(const string& option, std::optional<std::filesystem::path>* target, const std::unordered_map<string, string> optionsToValues) {
+	void getOptionPath(const string& option, std::optional<std::filesystem::path>* target, const std::unordered_map<string, string>& optionsToValues) {
 		auto it = optionsToValues.find(util::asciiToLower(option));
 		if (it != optionsToValues.end()) {
 			LOG(INFO) << "Args: '" << option << "' -> '" << it->second << "'";

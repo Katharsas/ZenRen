@@ -4,17 +4,19 @@
 
 namespace game::input {
 
+    bool rdpCompatMode = false;
     bool debugLogInputs = false;
 
+    std::map<const uint32_t, bool> keyboardChanged;
     std::map<const uint32_t, bool> keyboardState;
     std::map<const uint32_t, bool> mouseState;
 
     struct MousePos {
-        uint16_t x = 0;
-        uint16_t y = 0;
+        uint32_t x = 0;
+        uint32_t y = 0;
     };
-    MousePos mousePosCurrent;
     MousePos mousePosLast;
+    bool fixedCursorMode = false;
 
     const UINT mouseButtonDownMessages[] = { WM_LBUTTONDOWN, WM_RBUTTONDOWN, WM_MBUTTONDOWN, WM_XBUTTONDOWN };
     /*const UINT mouseButtonUpMessages[] = {WM_LBUTTONUP, WM_RBUTTONUP, WM_MBUTTONUP, WM_XBUTTONUP};*/
@@ -51,15 +53,50 @@ namespace game::input {
         }
     }
 
-    int16_t getAxisDelta(const AxisId& axisId) {
+    bool hasKeyChangedAndReset(const ButtonId& keyId) {
+        if (keyId.device == InputDevice::KEYBOARD) {
+            bool hasChanged = keyboardChanged[keyId.code];
+            keyboardChanged[keyId.code] = false;
+            return hasChanged;
+        }
+        else {
+            return false;// TODO
+        }
+    }
+
+    void setRdpCompatMode(bool isActive) {
+        rdpCompatMode = isActive;
+    }
+
+    void toggleFixedHiddenCursorMode(bool isActive) {
+        // SetCursorPos does not work over RDP because RDP uses client mouse to hide lag, which ignores SetCursorPos on host
+        if (!rdpCompatMode) {
+            ShowCursor(!isActive);
+            fixedCursorMode = isActive;
+        }
+    }
+
+    int32_t getAxisDelta(const AxisId& axisId) {
+        POINT point;
+        GetCursorPos(&point);
         if (axisId.code == MK_AXIS_X) {
-            int16_t delta = mousePosCurrent.x - mousePosLast.x;
-            mousePosLast.x = mousePosCurrent.x;
+            int32_t delta = point.x - mousePosLast.x;
+            if (fixedCursorMode) {
+                SetCursorPos(mousePosLast.x, point.y);
+            }
+            else {
+                mousePosLast.x = point.x;
+            }
             return delta;
         }
         if (axisId.code == MK_AXIS_Y) {
-            int16_t delta = mousePosCurrent.y - mousePosLast.y;
-            mousePosLast.y = mousePosCurrent.y;
+            int32_t delta = point.y - mousePosLast.y;
+            if (fixedCursorMode) {
+                SetCursorPos(point.x, mousePosLast.y);
+            }
+            else {
+                mousePosLast.y = point.y;
+            }
             return delta;
         }
     }
@@ -101,15 +138,20 @@ namespace game::input {
     bool onWindowMessage(UINT message, WPARAM keycode, LPARAM extendedParameters) {
         if (message == WM_KEYUP) {
             keyboardState[keycode] = false;
+            keyboardChanged[keycode] = true;
             if (debugLogInputs) {
                 LOG(DEBUG) << "Key released: " << getKeyname(extendedParameters);
             }
             return true;
         }
         else if (message == WM_KEYDOWN) {
-            keyboardState[keycode] = true;
-            if (debugLogInputs) {
-                LOG(DEBUG) << "Key pressed: " << getKeyname(extendedParameters);
+            // keydown can be sent multiple times before keyup happens
+            if (!keyboardState[keycode]) {
+                keyboardState[keycode] = true;
+                keyboardChanged[keycode] = true;
+                if (debugLogInputs) {
+                    LOG(DEBUG) << "Key pressed: " << getKeyname(extendedParameters);
+                }
             }
             return true;
         }
@@ -153,17 +195,6 @@ namespace game::input {
                 }
 
                 mouseState[mousecode] = false;
-                return true;
-            }
-        }
-        {
-            if (message == WM_MOUSEMOVE) {
-                WORD lowerWordX = (uint16_t)extendedParameters;
-                WORD upperWordY = (uint16_t)(extendedParameters >> 16);
-
-                //LOG(DEBUG) << "Mouse moved - X: " << lowerWordX << ", Y: " << upperWordY;
-                mousePosCurrent.x = lowerWordX;
-                mousePosCurrent.y = upperWordY;
                 return true;
             }
         }

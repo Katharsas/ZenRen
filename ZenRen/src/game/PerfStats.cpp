@@ -50,7 +50,7 @@ namespace game::stats {
 		else return static_cast<int32_t>(dividend / divisor);
 	}
 
-	int32_t average(std::array<int32_t, sampleSize> arr, int32_t sampleCount)
+	int32_t average(const std::array<int32_t, sampleSize>& arr, int32_t sampleCount)
 	{
 		return std::accumulate(arr.begin(), (arr.begin() + sampleCount), 0) / sampleCount;
 	}

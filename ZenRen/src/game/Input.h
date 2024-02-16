@@ -19,7 +19,10 @@ namespace game::input {
 	};
 
 	bool isKeyUsed(const ButtonId& keyId);
-	int16_t getAxisDelta(const AxisId& axisId);
+	bool hasKeyChangedAndReset(const ButtonId& keyId);
+	void setRdpCompatMode(bool isActive);
+	void toggleFixedHiddenCursorMode(bool isActive);
+	int32_t getAxisDelta(const AxisId& axisId);
 
 	ButtonId button(wchar_t letter);
 
