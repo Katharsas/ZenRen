@@ -251,3 +251,5 @@ ModelManifest.xml
 imgui.ini
 /ZenRen/lib/imgui/misc/
 /ZenRen/data_*
+*.tlog
+*.log.txt
