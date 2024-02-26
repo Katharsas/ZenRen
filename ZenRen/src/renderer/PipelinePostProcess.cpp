@@ -25,7 +25,7 @@ namespace renderer::postprocess
 
 	uint32_t downsamplingSamples = 8;
 
-	Mesh toneMappingQuad;
+	DecalMesh toneMappingQuad;
 
 	void clean()
 	{

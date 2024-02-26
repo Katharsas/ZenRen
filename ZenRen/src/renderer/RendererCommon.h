@@ -4,6 +4,7 @@
 
 #include <string>
 #include <ostream>
+#include <vector>
 
 namespace renderer
 {
@@ -59,16 +60,20 @@ namespace renderer
 		return os << "[POS: " << that.pos << " UV:" << that.uv << "]";
 	}
 
-	struct POS_NORMAL_UV {
-		VEC3 pos;
+	typedef VEC3 POS;
+	struct NORMAL_UV_LUV {
 		VEC3 normal;
 		UV uvDiffuse;
 		ARRAY_UV uvLightmap;
 	};
-	inline std::ostream& operator <<(std::ostream& os, const POS_NORMAL_UV& that)
+	inline std::ostream& operator <<(std::ostream& os, const NORMAL_UV_LUV& that)
 	{
-		return os << "[POS:" << that.pos << " NOR:" << that.normal << " UV_DIFF:" << that.uvDiffuse << "]";
+		return os << "[NOR:" << that.normal << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
 	}
+	struct VEC_POS_NORMAL_UV_LMUV {
+		std::vector<POS> vecPos;
+		std::vector<NORMAL_UV_LUV> vecNormalUv;
+	};
 
 	struct POS_NORMAL_UV_COL {
 		VEC3 pos;
@@ -79,18 +84,6 @@ namespace renderer
 	inline std::ostream& operator <<(std::ostream& os, const POS_NORMAL_UV_COL& that)
 	{
 		return os << "[POS:" << that.pos << " NOR:" << that.normal << " UV:" << that.uv << " LIGHT:" << that.color << "]";
-	}
-
-	struct WORLD_VERTEX {
-		VEC3 pos;
-		VEC3 normal;
-		UV uvDiffuse;
-		ARRAY_UV uvLightmap;
-		//D3DXCOLOR colorLightmap;
-	};
-	inline std::ostream& operator <<(std::ostream& os, const WORLD_VERTEX& that)
-	{
-		return os << "[POS:" << that.pos << " NOR:" << that.normal << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
 	}
 
 	struct Material {

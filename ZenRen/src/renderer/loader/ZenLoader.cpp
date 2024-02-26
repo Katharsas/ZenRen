@@ -53,7 +53,7 @@ namespace renderer::loader {
         return vdf.hasFile(filename);
     }
 
-    bool loadInstanceMesh(unordered_map<Material, vector<POS_NORMAL_UV>>& target, string& visualname, VDFS::FileIndex& vdf, XMMATRIX& transform)
+    bool loadInstanceMesh(unordered_map<Material, VEC_POS_NORMAL_UV_LMUV>& target, string& visualname, VDFS::FileIndex& vdf, XMMATRIX& transform)
     {
         string filename = visualname + ".MRM";
         if (!vdf.hasFile(filename)) {
@@ -126,14 +126,14 @@ namespace renderer::loader {
 
         vector<InMemoryTexFile> lightmaps = loadZenLightmaps(worldMesh);
 
-        unordered_map<Material, vector<WORLD_VERTEX>> worldMeshData;
+        unordered_map<Material, VEC_POS_NORMAL_UV_LMUV> worldMeshData;
         loadWorldMesh(worldMeshData, parser.getWorldMesh());
 
         vector<StaticInstance> vobs = loadVobs(world.rootVobs);
 
         LOG(INFO) << "Zen loaded!";
 
-        unordered_map<Material, vector<POS_NORMAL_UV>> staticMeshData;
+        unordered_map<Material, VEC_POS_NORMAL_UV_LMUV> staticMeshData;
         for (auto& vob : vobs) {
             auto& visualname = vob.meshName;
 

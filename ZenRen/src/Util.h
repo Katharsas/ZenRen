@@ -24,6 +24,19 @@ namespace util {
 	bool warnOnError(const HRESULT& hr, const std::string& message);
 	bool throwOnError(const HRESULT& hr, const std::string& message);
 
+	template<typename Key, typename Value>
+	Value& getOrCreate(std::unordered_map<Key, Value>& map, const Key& key)
+	{
+		auto it = map.find(key);
+		if (it == map.end()) {
+			Value value;
+			const auto [insertedIt, __] = map.insert(std::make_pair(key, value));
+			return insertedIt->second;
+		}
+		else {
+			return it->second;
+		}
+	}
 
 	template<typename Key, typename Item, typename ItemAlloc>
 	std::vector<Item>& getOrCreate(std::unordered_map<Key, std::vector<Item, ItemAlloc>>& map, const Key& key)

@@ -52,14 +52,30 @@ namespace renderer
 	};
 
 	struct RenderData {
-		std::unordered_map<Material, std::vector<WORLD_VERTEX>> worldMesh;
-		std::unordered_map<Material, std::vector<POS_NORMAL_UV>> staticMeshes;
+		std::unordered_map<Material, VEC_POS_NORMAL_UV_LMUV> worldMesh;
+		std::unordered_map<Material, VEC_POS_NORMAL_UV_LMUV> staticMeshes;
 		std::vector<InMemoryTexFile> worldMeshLightmaps;
+	};
+
+	struct DecalMesh
+	{
+		ID3D11Buffer* vertexBuffer = nullptr;
+		int32_t vertexCount;
+		Texture* baseColor = nullptr;
+
+		void release()
+		{
+			renderer::release(vertexBuffer);
+			if (baseColor != nullptr) {
+				delete baseColor;
+			}
+		}
 	};
 
 	struct Mesh
 	{
-		ID3D11Buffer* vertexBuffer = nullptr;
+		ID3D11Buffer* vertexBufferPos = nullptr;
+		ID3D11Buffer* vertexBufferNormalUv = nullptr;
 		int32_t vertexCount;
 
 		// Ideally, we could not create one mesh per texture, but instead have a single mesh for whole world.
@@ -69,9 +85,8 @@ namespace renderer
 
 		void release()
 		{
-			if (vertexBuffer != nullptr) {
-				vertexBuffer->Release();
-			}
+			renderer::release(vertexBufferPos);
+			renderer::release(vertexBufferNormalUv);
 			if (baseColor != nullptr) {
 				delete baseColor;
 			}

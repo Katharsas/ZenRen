@@ -92,6 +92,7 @@
     <ClCompile Include="src\renderer\loader\AssetFinder.cpp" />
     <ClCompile Include="src\game\GameArgs.cpp" />
     <ClCompile Include="src\renderer\loader\TexFromVdfLoader.cpp" />
+    <ClCompile Include="src\renderer\loader\MeshUtil.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Util.h">
@@ -147,5 +148,6 @@
     <ClInclude Include="src\renderer\loader\AssetFinder.h" />
     <ClInclude Include="src\game\GameArgs.h" />
     <ClInclude Include="src\renderer\loader\TexFromVdfLoader.h" />
+    <ClInclude Include="src\renderer\loader\MeshUtil.h" />
   </ItemGroup>
 </Project>

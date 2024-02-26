@@ -20,8 +20,6 @@ using namespace DirectX;
 
 namespace renderer::world {
 
-	typedef WORLD_VERTEX VERTEX;
-
 	// Note: smallest type for constant buffer values is 32 bit; cannot use bool or uint_16 without packing
 
 	enum ShaderOutputDirect : uint32_t {
@@ -110,6 +108,51 @@ namespace renderer::world {
 		return new Texture(d3d, util::toString(loader::DEFAULT_TEXTURE));
 	}
 
+	uint32_t loadVertexData(D3d d3d, std::vector<Mesh>& target, const std::unordered_map<Material, VEC_POS_NORMAL_UV_LMUV>& meshData) {
+		uint32_t loadedCount = 0;
+		for (const auto& pair : meshData) {
+			auto& material = pair.first;
+			auto& vertices = pair.second;
+
+			if (!vertices.vecPos.empty()) {
+				Texture* texture = createTexture(d3d, material.texBaseColor);
+				Mesh mesh;
+				{
+					// vertex data
+					mesh.vertexCount = vertices.vecPos.size();
+					{
+						D3D11_BUFFER_DESC bufferDesc;
+						ZeroMemory(&bufferDesc, sizeof(bufferDesc));
+
+						bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+						bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+						bufferDesc.ByteWidth = sizeof(POS) * vertices.vecPos.size();
+
+						D3D11_SUBRESOURCE_DATA initialData;
+						initialData.pSysMem = vertices.vecPos.data();
+						d3d.device->CreateBuffer(&bufferDesc, &initialData, &(mesh.vertexBufferPos));
+					} {
+						D3D11_BUFFER_DESC bufferDesc;
+						ZeroMemory(&bufferDesc, sizeof(bufferDesc));
+
+						bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+						bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+						bufferDesc.ByteWidth = sizeof(NORMAL_UV_LUV) * vertices.vecNormalUv.size();
+
+						D3D11_SUBRESOURCE_DATA initialData;
+						initialData.pSysMem = vertices.vecNormalUv.data();
+						d3d.device->CreateBuffer(&bufferDesc, &initialData, &(mesh.vertexBufferNormalUv));
+					}
+				}
+				mesh.baseColor = texture;
+				target.push_back(mesh);
+
+				loadedCount++;
+			}
+		}
+		return loadedCount;
+	}
+
 	void loadLevel(D3d d3d, std::string& level)
 	{
 		bool levelDataFound = false;
@@ -150,8 +193,6 @@ namespace renderer::world {
 			return;
 		}
 
-		auto& matsToVerts = data.worldMesh;
-
 		{
 			release(lightmapTexArray);
 			debugTextures.clear();
@@ -170,69 +211,10 @@ namespace renderer::world {
 		
 		world.meshes.clear();
 
-		int32_t loadedCount = 0;
-
-		for (const auto& pair : matsToVerts) {
-			auto& material = pair.first;
-			auto& vertices = pair.second;
-
-			if (!vertices.empty()) {
-				Texture* texture = createTexture(d3d, material.texBaseColor);
-				Mesh mesh;
-				{
-					// vertex data
-					mesh.vertexCount = vertices.size();
-					D3D11_BUFFER_DESC bufferDesc;
-					ZeroMemory(&bufferDesc, sizeof(bufferDesc));
-
-					bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-					bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-					bufferDesc.ByteWidth = sizeof(VERTEX) * vertices.size();
-
-					D3D11_SUBRESOURCE_DATA initialData;
-					initialData.pSysMem = vertices.data();
-					d3d.device->CreateBuffer(&bufferDesc, &initialData, &(mesh.vertexBuffer));
-				}
-				mesh.baseColor = texture;
-				world.meshes.push_back(mesh);
-
-				loadedCount++;
-			}
-		}
-
+		int32_t loadedCount = loadVertexData(d3d, world.meshes, data.worldMesh);
 		LOG(DEBUG) << "World material/texture count: " << loadedCount;
 
-		loadedCount = 0;
-
-		for (const auto& pair : data.staticMeshes) {
-
-			auto& material = pair.first;
-			auto& vertices = pair.second;
-
-			if (!vertices.empty()) {
-				Texture* texture = createTexture(d3d, material.texBaseColor);
-				Mesh mesh;
-				{
-					// vertex data
-					mesh.vertexCount = vertices.size();
-					D3D11_BUFFER_DESC bufferDesc;
-					ZeroMemory(&bufferDesc, sizeof(bufferDesc));
-
-					bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-					bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-					bufferDesc.ByteWidth = sizeof(POS_NORMAL_UV) * vertices.size();
-
-					D3D11_SUBRESOURCE_DATA initialData;
-					initialData.pSysMem = vertices.data();
-					d3d.device->CreateBuffer(&bufferDesc, &initialData, &(mesh.vertexBuffer));
-				}
-				mesh.baseColor = texture;
-				world.meshes.push_back(mesh);
-
-				loadedCount++;
-			}
-		}
-
+		loadedCount = loadVertexData(d3d, world.meshes, data.staticMeshes);
 		LOG(DEBUG) << "StaticInstances material/texture count: " << loadedCount;
 	}
 
@@ -366,15 +348,16 @@ namespace renderer::world {
 		// lightmaps
 		d3d.deviceContext->PSSetShaderResources(1, 1, &lightmapTexArray);
 
-		// vertex buffer(s)
-		UINT stride = sizeof(VERTEX);
-		UINT offset = 0;
-
+		// vertex buffers
 		for (auto& mesh : world.meshes) {
 			auto* resourceView = mesh.baseColor->GetResourceView();
 			d3d.deviceContext->PSSetShaderResources(0, 1, &resourceView);
-			d3d.deviceContext->IASetVertexBuffers(0, 1, &(mesh.vertexBuffer), &stride, &offset);
 
+			UINT strides[] = { sizeof(POS), sizeof(NORMAL_UV_LUV) };
+			UINT offsets[] = { 0, 0 };
+			ID3D11Buffer* vertexBuffers[] = { mesh.vertexBufferPos, mesh.vertexBufferNormalUv };
+
+			d3d.deviceContext->IASetVertexBuffers(0, 2, vertexBuffers, strides, offsets);
 			d3d.deviceContext->Draw(mesh.vertexCount, 0);
 		}
 	}

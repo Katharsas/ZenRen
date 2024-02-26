@@ -3,11 +3,11 @@
 
 namespace renderer::util {
 
-	void dumpVerts(std::string& matName, std::vector<POS_NORMAL_UV>& verts) {
+	void dumpVerts(const std::string& matName, const std::vector<POS>& vertPos, const std::vector<NORMAL_UV_LUV>& vertOther) {
 		std::ostringstream buffer;
 		buffer << matName << std::endl;
-		for (auto& vert : verts) {
-			buffer << "    " << vert << std::endl;
+		for (uint32_t i = 0; i < vertPos.size(); i++) {
+			buffer << "    " << vertPos[i] << "  " << vertOther[i] << std::endl;
 		}
 		LOG(INFO) << buffer.str();
 	}

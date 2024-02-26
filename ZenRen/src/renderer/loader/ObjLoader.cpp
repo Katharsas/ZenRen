@@ -3,6 +3,7 @@
 
 #include <filesystem>
 
+#include "MeshUtil.h"
 #include "../../Util.h"
 #include "../RenderUtil.h"
 
@@ -15,9 +16,7 @@ namespace renderer::loader {
 	using ::util::asciiToLower;
 	using ::util::getOrCreate;
 
-	typedef WORLD_VERTEX VERTEX;
-
-	std::unordered_map<Material, std::vector<VERTEX>> loadObj(const std::string& inputFile) {
+	std::unordered_map<Material, VEC_POS_NORMAL_UV_LMUV> loadObj(const std::string& inputFile) {
 
 		tinyobj::ObjReaderConfig reader_config;
 		reader_config.triangulate = true;
@@ -58,7 +57,7 @@ namespace renderer::loader {
 
 		const float scale = 1.0f;
 
-		std::unordered_map<Material, std::vector<WORLD_VERTEX>> matsToVertices;
+		std::unordered_map<Material, VEC_POS_NORMAL_UV_LMUV> matsToVertices;
 		int32_t faceCount = 0;
 		int32_t faceSkippedCount = 0;
 
@@ -70,64 +69,64 @@ namespace renderer::loader {
 				if (vertexCount != 3) {
 					LOG(FATAL) << "Only exactly 3 vertices per face are allowed!";
 				}
-				std::array<VERTEX, 3> vertices;
+				std::array<POS, 3> facePos;
+				std::array<NORMAL_UV_LUV, 3> faceOther;
 				bool hasNormals = false;
 				for (size_t vertexIndex = 0; vertexIndex < vertexCount; vertexIndex++) {
 
 					tinyobj::index_t idx = shapes[shapeIndex].mesh.indices[indexOffset + vertexIndex];
-					VERTEX vertex;
+					POS pos;
+					NORMAL_UV_LUV other;
 
 					tinyobj::real_t vx = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
 					tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
 					tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
-					vertex.pos = { vx * scale, vy * scale, vz * -scale };// FLIPPED Z -> flip axis
+					pos = { vx * scale, vy * scale, vz * -scale };// FLIPPED Z -> flip axis
 
 					if (idx.normal_index >= 0) {
 						tinyobj::real_t nx = attrib.normals[3 * size_t(idx.normal_index) + 0];
 						tinyobj::real_t ny = attrib.normals[3 * size_t(idx.normal_index) + 1];
 						tinyobj::real_t nz = attrib.normals[3 * size_t(idx.normal_index) + 2];
-						vertex.normal = { nx, ny, -nz };// FLIPPED Z -> flip axis
+						other.normal = { nx, ny, -nz };// FLIPPED Z -> flip axis
 						hasNormals = true;
 					}
 
 					if (idx.texcoord_index >= 0) {
 						tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
 						tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
-						vertex.uvDiffuse = { tx, ty };
+						other.uvDiffuse = { tx, ty };
 					}
 					else {
-						vertex.uvDiffuse = { 0, 0 };
+						other.uvDiffuse = { 0, 0 };
 					}
 
 					//vertex.colorLightmap = { 1, 1, 1, 1 };
-					vertex.uvLightmap = { 0, 0 };
+					other.uvLightmap = { 0, 0 };
 
-					vertices.at(2 - vertexIndex) = vertex;// FLIPPED Z -> flip faces
+					// Wavefront .obj verts are stored counter-clockwise, so we switch to clockwise
+					facePos.at(2 - vertexIndex) = pos;
+					faceOther.at(2 - vertexIndex) = other;
 				}
 				if (!hasNormals) {
 					// calculate face normals
-					XMVECTOR v1 = XMVectorSet(vertices[0].pos.x, vertices[0].pos.y, vertices[0].pos.z, 0);
-					XMVECTOR v2 = XMVectorSet(vertices[1].pos.x, vertices[1].pos.y, vertices[1].pos.z, 0);
-					XMVECTOR v3 = XMVectorSet(vertices[2].pos.x, vertices[2].pos.y, vertices[2].pos.z, 0);
-					XMVECTOR normal = XMVector3Normalize(XMVector3Cross(v2 - v1, v3 - v1));
-					VEC3 normalVec3 = { XMVectorGetX(normal), XMVectorGetY(normal), XMVectorGetZ(normal) };
+					std::array posXm = { toXM4Pos(facePos[0]), toXM4Pos(facePos[1]), toXM4Pos(facePos[2]) };
+					XMVECTOR normal = XMVector3Normalize(XMVector3Cross(posXm[1] - posXm[0], posXm[2] - posXm[0]));
+					VEC3 normalVec3 = toVec3(normal);
 					for (size_t vertexIndex = 0; vertexIndex < vertexCount; vertexIndex++) {
-						vertices.at(vertexIndex).normal = normalVec3;
+						faceOther.at(vertexIndex).normal = normalVec3;
 					}
 				}
 
 				// per-face material
 				const uint32_t materialIndex = shapes[shapeIndex].mesh.material_ids[faceIndex];
 
-				auto& texname = materials[materialIndex].diffuse_texname;
-				if (!texname.empty()) {
-					auto texFilepath = std::filesystem::path(texname);
-					auto texFilename = ::util::toString(texFilepath.filename());
-					asciiToLower(texFilename);
+				auto& texture = materials[materialIndex].diffuse_texname;
+				if (!texture.empty()) {
+					const auto texFilepath = std::filesystem::path(texture);
+					const auto texFilename = ::util::toString(texFilepath.filename());
 
-					auto& matVertices = getOrCreate(matsToVertices, { texFilename });
-					matVertices.insert(matVertices.end(), vertices.begin(), vertices.end());
-
+					Material material = { ::util::asciiToLower(texFilename) };
+					insert(matsToVertices, material, facePos, faceOther);
 					faceCount++;
 				}
 				else {

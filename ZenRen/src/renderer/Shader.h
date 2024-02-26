@@ -12,6 +12,7 @@ namespace renderer {
 			LPCSTR SemanticName;
 			UINT SemanticIndex = 0;
 			DXGI_FORMAT Format;
+			UINT InputSlot = 0;
 		};
 
 		Shader(const std::string& sourceFile, const VertexInputLayoutDesc layout[], const int length, D3d d3d);

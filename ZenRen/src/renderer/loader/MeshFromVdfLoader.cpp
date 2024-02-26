@@ -3,6 +3,7 @@
 
 #include <filesystem>
 
+#include "MeshUtil.h"
 #include "../../Util.h"
 
 namespace renderer::loader {
@@ -26,61 +27,6 @@ namespace renderer::loader {
     XMMATRIX inversedTransposed(const XMMATRIX& source) {
         const XMMATRIX transposed = XMMatrixTranspose(source);
         return XMMatrixInverse(nullptr, transposed);
-    }
-
-    UV from(const ZenLib::ZMath::float2& source)
-    {
-        return UV { source.x, source.y };
-    }
-
-    VEC3 from(const ZenLib::ZMath::float3& source)
-    {
-        return VEC3 { source.x, source.y, source.z };
-    }
-
-    template <typename T> bool isZero(const T& vec3, float threshold)
-    {
-        return std::abs(vec3.x) <= threshold && std::abs(vec3.y) <= threshold && std::abs(vec3.z) <= threshold;
-    }
-    template <typename T> XMVECTOR toXM4Pos(const T& vec3)
-    {
-        return XMVectorSet(vec3.x, vec3.y, vec3.z, 1);
-    }
-    template <typename T> XMVECTOR toXM4Dir(const T& vec3)
-    {
-        return XMVectorSet(vec3.x, vec3.y, vec3.z, 0);
-    }
-
-    VEC3 toVec3(const XMVECTOR& xm4)
-    {
-        XMFLOAT4 result;
-        XMStoreFloat4(&result, xm4);
-        return VEC3{ result.x, result.y, result.z };
-    }
-
-    VEC4 toVec4(const XMVECTOR& xm4)
-    {
-        XMFLOAT4 result;
-        XMStoreFloat4(&result, xm4);
-        return VEC4{ result.x, result.y, result.z, result.w };
-    }
-
-    inline std::ostream& operator <<(std::ostream& os, const XMVECTOR& that)
-    {
-        XMFLOAT4 float4;
-        XMStoreFloat4(&float4, that);
-        return os << "[X:" << float4.x << " Y:" << float4.y << " Z:" << float4.z << " W:" << float4.w << "]";
-    }
-
-    void warnIfNotNormalized(const XMVECTOR& source)
-    {
-        XMVECTOR normalized = XMVector3Normalize(source);
-        XMVECTOR nearEqualMask = XMVectorNearEqual(source, normalized, XMVectorReplicate(.0001f));
-        XMVECTOR nearEqualXm = XMVectorSelect(XMVectorReplicate(1.f), XMVectorReplicate(.0f), nearEqualMask);
-        VEC4 nearEqual = toVec4(nearEqualXm);
-        if (nearEqual.x != 0 || nearEqual.y != 0 || nearEqual.z != 0 || nearEqual.w != 0) {
-            LOG(INFO) << "Vector was not normalized! " << source << "  |  " << normalized << "  |  " << nearEqualXm;
-        }
     }
 
     VEC3 transformDir(const XMVECTOR& source, const XMMATRIX& transform, bool debugChecksEnabled = false)
@@ -112,15 +58,18 @@ namespace renderer::loader {
             verts.at(vertIndices[currentIndex + 2]),
         };
     }
-    const std::string normalizeTextureName(const std::string& texture) {
-        auto texFilepath = std::filesystem::path(texture);
-        auto texFilename = util::toString(texFilepath.filename());
-        ::util::asciiToLower(texFilename);
-        return texFilename;
+
+    void insert(unordered_map<Material, VEC_POS_NORMAL_UV_LMUV>& target, const ZenLoad::zCMaterialData& material, const vector<POS>& positions, const vector<NORMAL_UV_LUV>& normalsAndUvs)
+    {
+        const auto& texture = material.texture;
+        if (!texture.empty()) {
+            Material material = { ::util::asciiToLower(texture) };
+            insert(target, material, positions, normalsAndUvs);
+        }
     }
 
     void loadWorldMesh(
-        unordered_map<Material, vector<WORLD_VERTEX>>& target,
+        unordered_map<Material, VEC_POS_NORMAL_UV_LMUV>& target,
         ZenLoad::zCMesh* worldMesh)
     {
         ZenLoad::PackedMesh packedMesh;
@@ -134,7 +83,8 @@ namespace renderer::loader {
                 throw std::logic_error("Expected world mesh to have lightmap information!");
             }
 
-            vector<WORLD_VERTEX> faces;
+            vector<POS> facesPos;
+            vector<NORMAL_UV_LUV> facesOther;
 
             int32_t faceIndex = 0;
             for (int32_t indicesIndex = 0; indicesIndex < submesh.indices.size(); indicesIndex += 3) {
@@ -147,49 +97,91 @@ namespace renderer::loader {
                     lightmap = worldMesh->getLightmapReferences()[faceLightmapIndex];
                 }
 
-                array<WORLD_VERTEX, 3> face;
+                array<POS, 3> facePos;
+                array<NORMAL_UV_LUV, 3> faceOther;
 
-                uint32_t vertexIndex = 0;
-                for (const auto& zenVert : zenFace) {
-                    WORLD_VERTEX vertex;
-                    vertex.pos = from(zenVert.Position);
-                    vertex.normal = from(zenVert.Normal);
-                    vertex.uvDiffuse = from(zenVert.TexCoord);
+                for (int32_t i = 0; i < 3; i++) {
+                    const auto& zenVert = zenFace[i];
+                    POS pos;
+                    pos = from(zenVert.Position);
+                    NORMAL_UV_LUV other;
+                    other.normal = from(zenVert.Normal);
+                    other.uvDiffuse = from(zenVert.TexCoord);
 
                     if (faceLightmapIndex == -1) {
-                        vertex.uvLightmap = { 0, 0, -1 };
+                        other.uvLightmap = { 0, 0, -1 };
                     }
                     else {
                         float unscale = 100;
-                        XMVECTOR pos = XMVectorSet(vertex.pos.x * unscale, vertex.pos.y * unscale, vertex.pos.z * unscale, 0);
+                        XMVECTOR posXm = XMVectorSet(pos.x * unscale, pos.y * unscale, pos.z * unscale, 0);
                         XMVECTOR origin = XMVectorSet(lightmap.origin.x, lightmap.origin.y, lightmap.origin.z, 0);
                         XMVECTOR normalUp = XMVectorSet(lightmap.normalUp.x, lightmap.normalUp.y, lightmap.normalUp.z, 0);
                         XMVECTOR normalRight = XMVectorSet(lightmap.normalRight.x, lightmap.normalRight.y, lightmap.normalRight.z, 0);
-                        XMVECTOR lightmapDir = pos - origin;
-                        vertex.uvLightmap.u = XMVectorGetX(XMVector3Dot(lightmapDir, normalRight));
-                        vertex.uvLightmap.v = XMVectorGetX(XMVector3Dot(lightmapDir, normalUp));
-                        vertex.uvLightmap.i = lightmap.lightmapTextureIndex;
+                        XMVECTOR lightmapDir = posXm - origin;
+                        other.uvLightmap.u = XMVectorGetX(XMVector3Dot(lightmapDir, normalRight));
+                        other.uvLightmap.v = XMVectorGetX(XMVector3Dot(lightmapDir, normalUp));
+                        other.uvLightmap.i = lightmap.lightmapTextureIndex;
                     }
-                    face.at(2 - vertexIndex) = vertex;// flip faces apparently, but not z ?!
-                    vertexIndex++;
+                    // flip faces (seems like zEngine uses counter-clockwise winding, while we use clockwise winding)
+                    facePos.at(2 - i) = pos;
+                    faceOther.at(2 - i) = other;
                 }
-                faces.insert(faces.end(), face.begin(), face.end());
+                facesPos.insert(facesPos.end(), facePos.begin(), facePos.end());
+                facesOther.insert(facesOther.end(), faceOther.begin(), faceOther.end());
                 faceIndex++;
             }
 
-            const auto& texture = submesh.material.texture;
-            if (!texture.empty()) {
-                Material material = { normalizeTextureName(texture) };
-                auto& matVertices = getOrCreate(target, material);
-                matVertices.insert(matVertices.end(), faces.begin(), faces.end());
+            insert(target, submesh.material, facesPos, facesOther);
+        }
+    }
+
+    void posToXM4(const array<ZenLoad::WorldVertex, 3>& zenFace, array<XMVECTOR, 3>& target) {
+        for (int32_t i = 0; i < 3; i++) {
+            const auto& zenVert = zenFace[i];
+            target[i] = toXM4Pos(zenVert.Position);
+        }
+    }
+
+    XMVECTOR calcFlatFaceNormal(const array<XMVECTOR, 3>& posXm) {
+        // calculate flat face normal
+        // counter-clockwise winding, flip XMVector3Cross argument order for clockwise winding
+        return  XMVector3Cross(XMVectorSubtract(posXm[2], posXm[0]), XMVectorSubtract(posXm[1], posXm[0]));
+    }
+
+    uint8_t normalToXM4(const array<ZenLoad::WorldVertex, 3>& zenFace, array<XMVECTOR, 3>& target, const XMVECTOR& faceNormalXm, bool debugChecksEnabled) {
+        uint8_t zeroNormals = 0;
+        for (int32_t i = 0; i < 3; i++) {
+            const auto& zenVert = zenFace[i];
+            if (debugChecksEnabled && isZero(zenVert.Normal, zeroThreshold)) {
+                target[i] = faceNormalXm;
+                zeroNormals++;
+            }
+            else {
+                target[i] = toXM4Dir(zenVert.Normal);
             }
         }
+        return zeroNormals;
+    }
+
+    uint8_t normalAngleCheck(const array<XMVECTOR, 3>& normalsXm, const XMVECTOR& faceNormalXm, bool debugChecksEnabled) {
+        uint8_t wrongNormals = 0;
+        if (debugChecksEnabled) {
+            for (int32_t i = 0; i < 3; i++) {
+                XMVECTOR angleXm = XMVector3AngleBetweenNormals(faceNormalXm, normalsXm[i]);
+                float normalFlatnessRadian = XMVectorGetX(angleXm);
+                float normalFlatnessDegrees = normalFlatnessRadian * (180.0 / 3.141592653589793238463);
+                if (normalFlatnessDegrees > 90) {
+                    wrongNormals++;
+                }
+            }
+        }
+        return wrongNormals;
     }
 
     unordered_set<string> processedVisuals;
 
 	void loadInstanceMesh(
-        unordered_map<Material, vector<POS_NORMAL_UV>>& target,
+        unordered_map<Material, VEC_POS_NORMAL_UV_LMUV>& target,
         const ZenLoad::zCProgMeshProto& mesh,
         const XMMATRIX& transform,
         const string& visualname,
@@ -212,69 +204,50 @@ namespace renderer::loader {
                 throw std::logic_error("Expected VOB mesh to NOT have lightmap information!");
             }
 
-            vector<POS_NORMAL_UV> faces;
+            vector<POS> facesPos;
+            vector<NORMAL_UV_LUV> facesOther;
+
             for (uint32_t indicesIndex = 0; indicesIndex < submesh.indices.size(); indicesIndex += 3) {
                 
                 const array zenFace = getFaceVerts(packedMesh.vertices, submesh.indices, indicesIndex);
-                array<POS_NORMAL_UV, 3> face;
+                array<POS, 3> facePos;
+                array<NORMAL_UV_LUV, 3> faceOther;
 
                 // read positions
                 array<XMVECTOR, 3> posXm;
-                for (int32_t i = 0; i < face.size(); i++) {
-                    const auto& zenVert = zenFace[i];
-                    posXm[i] = toXM4Pos(zenVert.Position);
-                }
+                posToXM4(zenFace, posXm);
 
-                // read normals, set to flat if zero
+                // read normals
+                totalNormals += 3;
+                XMVECTOR faceNormalXm;
+                if (debugChecksEnabled) {
+                    faceNormalXm = calcFlatFaceNormal(posXm);
+                }
                 array<XMVECTOR, 3> normalsXm;
-
-                // counter-clockwise winding, flip XMVector3Cross argument order for clockwise winding
-                XMVECTOR faceNormalXm = XMVector3Cross(XMVectorSubtract(posXm[2], posXm[0]), XMVectorSubtract(posXm[1], posXm[0]));
-                for (int32_t i = 0; i < face.size(); i++) {
-                    const auto& zenVert = zenFace[i];
-                    if (debugChecksEnabled && isZero(zenVert.Normal, zeroThreshold)) {
-                        normalsXm[i] = faceNormalXm;
-                        zeroNormals++;
-                    }
-                    else {
-                        normalsXm[i] = toXM4Dir(zenVert.Normal);
-                    }
-                    totalNormals++;
-                }
+                zeroNormals += normalToXM4(zenFace, normalsXm, faceNormalXm, debugChecksEnabled);
 
                 // detect wrong normals
-                if (debugChecksEnabled) {
-                    for (int32_t i = 0; i < face.size(); i++) {
-                        XMVECTOR angleXm = XMVector3AngleBetweenNormals(faceNormalXm, normalsXm[i]);
-                        float normalFlatnessRadian = XMVectorGetX(angleXm);
-                        float normalFlatnessDegrees = normalFlatnessRadian * (180.0 / 3.141592653589793238463);
-                        if (normalFlatnessDegrees > 90) {
-                            extremeNormals++;
-                        }
-                    }
-                }
+                extremeNormals += normalAngleCheck(normalsXm, faceNormalXm, debugChecksEnabled);
 
                 // transform
-                for (int32_t i = 0; i < face.size(); i++) {
+                for (int32_t i = 0; i < 3; i++) {
                     const auto& zenVert = zenFace[i];
-                    POS_NORMAL_UV vertex;
-                    vertex.pos = transformPos(posXm[i], transform);
-                    vertex.normal = transformDir(normalsXm[i], normalTransform, debugChecksEnabled);
-                    vertex.uvDiffuse = from(zenVert.TexCoord);
-                    vertex.uvLightmap = { 0, 0 };
+                    POS pos;
+                    pos = transformPos(posXm[i], transform);
+                    NORMAL_UV_LUV other;
+                    other.normal = transformDir(normalsXm[i], normalTransform, debugChecksEnabled);
+                    other.uvDiffuse = from(zenVert.TexCoord);
+                    other.uvLightmap = { 0, 0 };
 
                     // flip faces (seems like zEngine uses counter-clockwise winding, while we use clockwise winding)
-                    face.at(2 - i) = vertex;
+                    facePos.at(2 - i) = pos;
+                    faceOther.at(2 - i) = other;
                 }
-                faces.insert(faces.end(), face.begin(), face.end());
+                facesPos.insert(facesPos.end(), facePos.begin(), facePos.end());
+                facesOther.insert(facesOther.end(), faceOther.begin(), faceOther.end());
             }
 
-            const auto& texture = submesh.material.texture;
-            if (!texture.empty()) {
-                Material material = { normalizeTextureName(texture) };
-                auto& matVertices = getOrCreate(target, material);
-                matVertices.insert(matVertices.end(), faces.begin(), faces.end());
-            }
+            insert(target, submesh.material, facesPos, facesOther);
         }
 
         if (debugChecksEnabled) {
