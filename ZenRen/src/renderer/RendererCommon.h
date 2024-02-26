@@ -20,6 +20,14 @@ namespace renderer
 		return os << "[X=" << that.x << " Y=" << that.y << " Z=" << that.z << "]";
 	}
 
+	struct VEC4 {
+		float x, y, z, w;
+	};
+	inline std::ostream& operator <<(std::ostream& os, const VEC4& that)
+	{
+		return os << "[X=" << that.x << " Y=" << that.y << " Z=" << that.z << " W=" << that.w << "]";
+	}
+
 	struct UV {
 		float u, v;
 	};

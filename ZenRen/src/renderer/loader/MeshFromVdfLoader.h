@@ -17,6 +17,8 @@ namespace renderer::loader
     void loadInstanceMesh(
         std::unordered_map<Material, std::vector<POS_NORMAL_UV>>& target,
         const ZenLib::ZenLoad::zCProgMeshProto& mesh,
-        const DirectX::XMMATRIX& transform);
+        const DirectX::XMMATRIX& transform,
+        const std::string& visualname,
+        bool debugChecksEnabled = false);
 }
 

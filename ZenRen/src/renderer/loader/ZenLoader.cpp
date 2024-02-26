@@ -62,7 +62,7 @@ namespace renderer::loader {
 
         ZenLoad::zCProgMeshProto rawMesh(filename, vdf);
 
-        loadInstanceMesh(target, rawMesh, transform);
+        loadInstanceMesh(target, rawMesh, transform, visualname);
         return true;
     }
 
