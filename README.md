@@ -3,6 +3,9 @@
 
 Simple, high performance DirectX11.1 renderer for Gothic assets (VDF or single files).
 
+### Download (Windows)
+- https://github.com/Katharsas/ZenRen/releases/latest
+
 ### Currently supports
 - Worldmesh (ZEN)
 - Static Objects (VOBs)
