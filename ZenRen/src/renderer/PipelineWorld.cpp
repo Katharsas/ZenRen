@@ -44,8 +44,11 @@ namespace renderer::world {
 	};
 
 	struct World {
+		std::vector<PrepassMeshes> prepassMeshes;
 		std::vector<Mesh> meshes;
 		XMMATRIX transform;
+
+		CbPerObject matrices;
 	};
 
 	ID3D11Buffer* cbGlobalSettingsBuffer;
@@ -57,11 +60,20 @@ namespace renderer::world {
 
 	World world;
 
+	// Texture Ownership
+	// BaseColor textures are owned by textureCache
+	// Lightmap textures are owned by debugTextures/lightmapTexArray
+	//   - debugTextures -> single textures used by ImGUI
+	//   - lightmapTexArray -> array used by forward renderer
+
+	std::unordered_map<std::string, Texture*> textureCache;
+
 	ID3D11SamplerState* linearSamplerState = nullptr;
 	ID3D11ShaderResourceView* lightmapTexArray = nullptr;
 
 	std::vector<Texture*> debugTextures;
 	int32_t selectedDebugTexture = 0;
+
 
 	void initGui() {
 		// TODO move to RenderDebugGui
@@ -108,41 +120,66 @@ namespace renderer::world {
 		return new Texture(d3d, util::toString(loader::DEFAULT_TEXTURE));
 	}
 
-	uint32_t loadVertexData(D3d d3d, std::vector<Mesh>& target, const std::unordered_map<Material, VEC_POS_NORMAL_UV_LMUV>& meshData) {
+	Texture* getOrCreateTexture(D3d d3d, const std::string& texName) {
+		std::function<Texture* ()> createTex = [d3d, texName]() { return createTexture(d3d, texName); };
+		return util::getOrCreate(textureCache, texName, createTex);
+	}
+
+	template<typename T>
+	void createVertexBuffer(D3d d3d, ID3D11Buffer** target, const std::vector<T>& vertexData)
+	{
+		D3D11_BUFFER_DESC bufferDesc;
+		ZeroMemory(&bufferDesc, sizeof(bufferDesc));
+
+		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+		bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+		bufferDesc.ByteWidth = sizeof(T) * vertexData.size();
+
+		D3D11_SUBRESOURCE_DATA initialData;
+		initialData.pSysMem = vertexData.data();
+		d3d.device->CreateBuffer(&bufferDesc, &initialData, target);
+	}
+
+	uint32_t loadPrepassData(D3d d3d, std::vector<PrepassMeshes>& target, const std::unordered_map<Material, VEC_POS_NORMAL_UV_LMUV>& meshData)
+	{
+		uint32_t loadedCount = 0;
+		std::vector<POS> allVerts;
+
+		for (const auto& pair : meshData) {
+			auto& vecPos = pair.second.vecPos;
+			if (!vecPos.empty()) {
+				Texture* texture = getOrCreateTexture(d3d, pair.first.texBaseColor);
+				if (!texture->hasAlpha()) {
+					allVerts.insert(allVerts.end(), vecPos.begin(), vecPos.end());
+					loadedCount++;
+				}
+			}
+		}
+		PrepassMeshes mesh;
+		mesh.vertexCount = allVerts.size();
+		createVertexBuffer(d3d, &mesh.vertexBufferPos, allVerts);
+		target.push_back(mesh);
+		return loadedCount;
+	}
+
+	uint32_t loadVertexData(D3d d3d, std::vector<Mesh>& target, const std::unordered_map<Material, VEC_POS_NORMAL_UV_LMUV>& meshData)
+	{
+		// TODO 
+		// create Texture cache that maps texBaseColor name to texture
+		// allow prepass to populate cache to get hasAlpha information on texture
+
 		uint32_t loadedCount = 0;
 		for (const auto& pair : meshData) {
 			auto& material = pair.first;
 			auto& vertices = pair.second;
 
 			if (!vertices.vecPos.empty()) {
-				Texture* texture = createTexture(d3d, material.texBaseColor);
+				Texture* texture = getOrCreateTexture(d3d, material.texBaseColor);
 				Mesh mesh;
 				{
-					// vertex data
 					mesh.vertexCount = vertices.vecPos.size();
-					{
-						D3D11_BUFFER_DESC bufferDesc;
-						ZeroMemory(&bufferDesc, sizeof(bufferDesc));
-
-						bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-						bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-						bufferDesc.ByteWidth = sizeof(POS) * vertices.vecPos.size();
-
-						D3D11_SUBRESOURCE_DATA initialData;
-						initialData.pSysMem = vertices.vecPos.data();
-						d3d.device->CreateBuffer(&bufferDesc, &initialData, &(mesh.vertexBufferPos));
-					} {
-						D3D11_BUFFER_DESC bufferDesc;
-						ZeroMemory(&bufferDesc, sizeof(bufferDesc));
-
-						bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-						bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-						bufferDesc.ByteWidth = sizeof(NORMAL_UV_LUV) * vertices.vecNormalUv.size();
-
-						D3D11_SUBRESOURCE_DATA initialData;
-						initialData.pSysMem = vertices.vecNormalUv.data();
-						d3d.device->CreateBuffer(&bufferDesc, &initialData, &(mesh.vertexBufferNormalUv));
-					}
+					createVertexBuffer(d3d, &mesh.vertexBufferPos, vertices.vecPos);
+					createVertexBuffer(d3d, &mesh.vertexBufferNormalUv, vertices.vecNormalUv);
 				}
 				mesh.baseColor = texture;
 				target.push_back(mesh);
@@ -208,14 +245,19 @@ namespace renderer::world {
 			lightmapTexArray = createShaderTexArray(d3d, ddsRaws, 256, 256);
 		}
 		
-		
 		world.meshes.clear();
+		world.prepassMeshes.clear();
 
-		int32_t loadedCount = loadVertexData(d3d, world.meshes, data.worldMesh);
-		LOG(DEBUG) << "World material/texture count: " << loadedCount;
+		int32_t loadedCount = 0;
+		loadedCount = loadPrepassData(d3d, world.prepassMeshes, data.worldMesh);
+		//loadedCount += loadPrepassData(d3d, world.prepassMeshes, data.staticMeshes);// for now we only use world mesh in depth prepass
+		LOG(DEBUG) << "Depth Prepass - World material/texture count: " << loadedCount;
+
+		loadedCount = loadVertexData(d3d, world.meshes, data.worldMesh);
+		LOG(DEBUG) << "World Pass - World material/texture count: " << loadedCount;
 
 		loadedCount = loadVertexData(d3d, world.meshes, data.staticMeshes);
-		LOG(DEBUG) << "StaticInstances material/texture count: " << loadedCount;
+		LOG(DEBUG) << "World Pass- StaticInstances material/texture count: " << loadedCount;
 	}
 
 	void updateObjects()
@@ -234,6 +276,13 @@ namespace renderer::world {
 		XMMATRIX scaleM = XMMatrixScaling(1, scale, 1);
 		world.transform = scaleM;
 		//world.transform = world.transform * rotation;
+
+		const auto objectMatrices = camera::getWorldViewMatrix(world.transform);
+		world.matrices = {
+			objectMatrices.worldView,
+			objectMatrices.worldViewNormal,
+			camera::getProjectionMatrix(),
+		};
 	}
 
 	void updateShaderSettings(D3d d3d, RenderSettings& settings)
@@ -320,7 +369,31 @@ namespace renderer::world {
 		d3d.device->CreateBuffer(&bufferDesc, nullptr, &cbPerObjectBuffer);
 	}
 
-	void draw(D3d d3d, ShaderManager* shaders)
+	void drawPrepass(D3d d3d, ShaderManager* shaders)
+	{
+		Shader* shader = shaders->getShader("depthPrepass");
+		d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
+		d3d.deviceContext->VSSetShader(shader->getVertexShader(), 0, 0);
+		d3d.deviceContext->PSSetShader(nullptr, 0, 0);
+
+		//d3d.deviceContext->PSSetSamplers(0, 0, nullptr);
+
+		// constant buffer (object)
+		d3d.deviceContext->UpdateSubresource(cbPerObjectBuffer, 0, nullptr, &world.matrices, 0, 0);
+		d3d.deviceContext->VSSetConstantBuffers(1, 1, &cbPerObjectBuffer);
+
+		// vertex buffers
+		for (auto& mesh : world.prepassMeshes) {
+			UINT strides[] = { sizeof(POS) };
+			UINT offsets[] = { 0 };
+			ID3D11Buffer* vertexBuffers[] = { mesh.vertexBufferPos };
+
+			d3d.deviceContext->IASetVertexBuffers(0, std::size(vertexBuffers), vertexBuffers, strides, offsets);
+			d3d.deviceContext->Draw(mesh.vertexCount, 0);
+		}
+	}
+
+	void drawWorld(D3d d3d, ShaderManager* shaders)
 	{
 		// set the shader objects avtive
 		Shader* shader = shaders->getShader("flatBasicColorTexShader");
@@ -331,13 +404,7 @@ namespace renderer::world {
 		d3d.deviceContext->PSSetSamplers(0, 1, &linearSamplerState);
 
 		// constant buffer (object)
-		const auto objectMatrices = camera::getWorldViewMatrix(world.transform);
-		CbPerObject cbPerObject = {
-			objectMatrices.worldView,
-			objectMatrices.worldViewNormal,
-			camera::getProjectionMatrix(),
-		};
-		d3d.deviceContext->UpdateSubresource(cbPerObjectBuffer, 0, nullptr, &cbPerObject, 0, 0);
+		d3d.deviceContext->UpdateSubresource(cbPerObjectBuffer, 0, nullptr, &world.matrices, 0, 0);
 		d3d.deviceContext->VSSetConstantBuffers(1, 1, &cbPerObjectBuffer);
 		d3d.deviceContext->PSSetConstantBuffers(1, 1, &cbPerObjectBuffer);
 
@@ -357,7 +424,7 @@ namespace renderer::world {
 			UINT offsets[] = { 0, 0 };
 			ID3D11Buffer* vertexBuffers[] = { mesh.vertexBufferPos, mesh.vertexBufferNormalUv };
 
-			d3d.deviceContext->IASetVertexBuffers(0, 2, vertexBuffers, strides, offsets);
+			d3d.deviceContext->IASetVertexBuffers(0, std::size(vertexBuffers), vertexBuffers, strides, offsets);
 			d3d.deviceContext->Draw(mesh.vertexCount, 0);
 		}
 	}
@@ -374,6 +441,9 @@ namespace renderer::world {
 		}
 		for (auto& mesh : world.meshes) {
 			mesh.release();
+		}
+		for (auto& tex : textureCache) {
+			delete tex.second;
 		}
 	}
 }

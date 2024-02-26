@@ -53,6 +53,8 @@ namespace renderer::gui::settings {
 					ImGui::EndCombo();
 				}
 				ImGui::PopItemWidth();
+
+				ImGui::Checkbox("Depth Prepass", &settings.depthPrepass);
 			}
 		});
 

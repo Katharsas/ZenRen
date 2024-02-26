@@ -13,8 +13,10 @@ namespace renderer {
 		Texture(D3d d3d, std::vector<uint8_t>& ddsRaw, bool isGothicZTex, const std::string& name, bool sRgb = true);
 		~Texture();
 		ID3D11ShaderResourceView* GetResourceView();
+		bool hasAlpha();
 	private:
 		ID3D11ShaderResourceView* resourceView = nullptr;
+		bool hasAlpha_ = false;
 	};
 }
 

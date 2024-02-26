@@ -40,10 +40,13 @@
     <None Include="Shaders\flatBasicColorTexShader.hlsl">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="packages.config" />
     <None Include="Shaders\renderToTexture.hlsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="Shaders\depthPrepass.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Util.cpp">

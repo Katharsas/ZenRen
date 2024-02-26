@@ -32,7 +32,6 @@ namespace renderer::forward {
 		});
 	}
 
-
 	void draw(D3d d3d, ShaderManager* shaders, RenderSettings& settings) {
 		// enable depth
 		d3d.deviceContext->OMSetDepthStencilState(depthState, 1);
@@ -53,7 +52,10 @@ namespace renderer::forward {
 		d3d.deviceContext->OMSetBlendState(blendState, NULL, 0xffffffff);
 
 		// draw world to linear buffer
-		world::draw(d3d, shaders);
+		if (settings.depthPrepass) {
+			world::drawPrepass(d3d, shaders);
+		}
+		world::drawWorld(d3d, shaders);
 
 		if (settings.multisampleCount > 1) {
 			d3d.deviceContext->ResolveSubresource(
@@ -161,7 +163,7 @@ namespace renderer::forward {
 
 		depthStateDesc.DepthEnable = TRUE;
 		depthStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-		depthStateDesc.DepthFunc = reverseZ ? D3D11_COMPARISON_GREATER : D3D11_COMPARISON_LESS;
+		depthStateDesc.DepthFunc = reverseZ ? D3D11_COMPARISON_GREATER_EQUAL : D3D11_COMPARISON_LESS_EQUAL;
 		depthStateDesc.StencilEnable = FALSE;
 		depthStateDesc.StencilReadMask = D3D11_DEFAULT_STENCIL_READ_MASK;
 		depthStateDesc.StencilWriteMask = D3D11_DEFAULT_STENCIL_WRITE_MASK;

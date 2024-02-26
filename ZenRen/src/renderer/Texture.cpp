@@ -6,14 +6,23 @@
 #include "RendererCommon.h"
 #include "../Util.h"
 
+#include "magic_enum/magic_enum.hpp"
 #include "DirectXTex.h"
 
 namespace renderer {
 	using DirectX::ScratchImage;
 	using DirectX::TexMetadata;
+	using DirectX::DDSMetaData;
+
+	const uint32_t MASK_DDPF_ALPHAPIXELS = 0x00000001;
+	const std::array formatsNoAlpha = { DXGI_FORMAT::DXGI_FORMAT_BC1_UNORM };
+	const std::array formatsWithAlpha = { DXGI_FORMAT::DXGI_FORMAT_BC2_UNORM };
 
 	bool throwOnError(const HRESULT& hr, const std::string& message) {
 		return util::throwOnError(hr, "Texture Load Error: " + message);
+	}
+	void throwError(const std::string& message) {
+		util::throwError("Texture Load Error: " + message);
 	}
 
 	void resizeIfOtherSize(ScratchImage* image, int32_t width, int32_t height, const std::string& name) {
@@ -46,6 +55,28 @@ namespace renderer {
 			throwOnError(hr, name);
 
 			*image = std::move(imageWithMips);
+		}
+	}
+
+	bool hasAlphaData(const DDSMetaData& ddPixelFormat, const TexMetadata metadata, const std::string& name) {
+		bool isCompressed = ddPixelFormat.fourCC != 0x0;
+		if (!isCompressed) {
+			return (ddPixelFormat.flags & MASK_DDPF_ALPHAPIXELS) == 1;
+		}
+		else {
+			// for compressed textures, we just assume that certain formats are for non-alpha textures, because there is no way to find out without decompressing
+			for (DXGI_FORMAT format : formatsNoAlpha) {
+				if (metadata.format == format) {
+					return false;
+				}
+			}
+			for (DXGI_FORMAT format : formatsWithAlpha) {
+				if (metadata.format == format) {
+					return true;
+				}
+			}
+			auto formatString = std::string(magic_enum::enum_name(metadata.format));
+			throwError("Failed to determine if texture '" + name + "' uses alpha or not! Unrecognized format: " + formatString);
 		}
 	}
 
@@ -109,7 +140,7 @@ namespace renderer {
 		TexMetadata metadata;
 
 		if (util::endsWith(name, ".tga")) {
-			hr = LoadFromTGAFile(sourceFileW.c_str(), DirectX::TGA_FLAGS_NONE, &metadata, image);
+			hr = LoadFromTGAFile(sourceFileW.c_str(), DirectX::TGA_FLAGS_ALLOW_ALL_ZERO_ALPHA, &metadata, image);
 			throwOnError(hr, name);
 		}
 		else if (util::endsWith(name, ".png")) {
@@ -119,21 +150,23 @@ namespace renderer {
 
 		createMipmapsIfMissing(&image, name);
 
+		DirectX::TEX_ALPHA_MODE alphaMode = metadata.GetAlphaMode();
+		hasAlpha_ = alphaMode != DirectX::TEX_ALPHA_MODE::TEX_ALPHA_MODE_OPAQUE;
 		createSetSrv(d3d, image, name, sRgb, &resourceView);
 	}
 
 	Texture::Texture(D3d d3d, std::vector<uint8_t>& ddsRaw, bool isGothicZTex, const std::string& name, bool sRgb)
 	{
 		HRESULT hr;
-		DirectX::ScratchImage image;
-		DirectX::TexMetadata metadata;
-		hr = DirectX::LoadFromDDSMemory(ddsRaw.data(), ddsRaw.size(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, &metadata, image);
+		ScratchImage image;
+		TexMetadata metadata;
+		DDSMetaData ddPixelFormat;
+		hr = DirectX::LoadFromDDSMemoryEx(ddsRaw.data(), ddsRaw.size(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, &metadata, &ddPixelFormat, image);
 		throwOnError(hr, name);
 
 		if (isGothicZTex) {
-			// GPU does not support zTex DDS format (DXGI_FORMAT_BC1_UNORM) as render target, so mipmap generation would fail.
-			// TODO it might be better to either force ARGB conversion during convertZTEX2DDS or with flag during LoadFromDDSMemory.
-			// This would potentially allow mip map recreation
+			// GPU does not support compressed zTex DDS format (DXGI_FORMAT_BC1_UNORM) as render target, so mipmap generation would fail.
+			// TODO it might be better to decompress theses textures to allow mip map recreation, but that would likely take time.
 			if (!hasExpectedMipmapCount(&image, true)) {
 				LOG(WARNING) << "Texture Load Warning: Incorrect number of Mipmaps found! " << name;
 			}
@@ -142,6 +175,7 @@ namespace renderer {
 			createMipmapsIfMissing(&image, name);
 		}
 
+		hasAlpha_ = hasAlphaData(ddPixelFormat, metadata, name);
 		createSetSrv(d3d, image, name, sRgb, &resourceView);
 	}
 
@@ -153,5 +187,9 @@ namespace renderer {
 	ID3D11ShaderResourceView* Texture::GetResourceView()
 	{
 		return resourceView;
+	}
+
+	bool Texture::hasAlpha() {
+		return hasAlpha_;
 	}
 }

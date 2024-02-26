@@ -426,12 +426,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\flatBasicColorTexShader.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='DebugFast|Win32'">Vertex</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='DebugFast|x64'">Vertex</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
       <FileType>Document</FileType>
     </None>
   </ItemGroup>
@@ -440,14 +434,19 @@
       <FileType>Document</FileType>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\depthPrepass.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="..\packages\directxtex_desktop_2019.2022.7.30.1\build\native\directxtex_desktop_2019.targets" Condition="Exists('..\packages\directxtex_desktop_2019.2022.7.30.1\build\native\directxtex_desktop_2019.targets')" />
+    <Import Project="..\packages\directxtex_desktop_2019.2024.2.22.1\build\native\directxtex_desktop_2019.targets" Condition="Exists('..\packages\directxtex_desktop_2019.2024.2.22.1\build\native\directxtex_desktop_2019.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('..\packages\directxtex_desktop_2019.2022.7.30.1\build\native\directxtex_desktop_2019.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\directxtex_desktop_2019.2022.7.30.1\build\native\directxtex_desktop_2019.targets'))" />
+    <Error Condition="!Exists('..\packages\directxtex_desktop_2019.2024.2.22.1\build\native\directxtex_desktop_2019.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\directxtex_desktop_2019.2024.2.22.1\build\native\directxtex_desktop_2019.targets'))" />
   </Target>
 </Project>

@@ -11,7 +11,8 @@ namespace renderer::world {
 	void initLinearSampler(D3d d3d, RenderSettings& settings);
 	void init(D3d d3d);
 	void initConstantBufferPerObject(D3d d3d);
-	void draw(D3d d3d, ShaderManager* shaders);
+	void drawPrepass(D3d d3d, ShaderManager* shaders);
+	void drawWorld(D3d d3d, ShaderManager* shaders);
 	void clean();
 }
 

@@ -14,7 +14,7 @@ namespace renderer::loader
         vdf->getFileData(texFilename, texRaw);
 
         InMemoryTexFile tex;
-        int32_t message = ZenLoad::convertZTEX2DDS(texRaw, tex.ddsRaw, true, &tex.width, &tex.height);
+        int32_t message = ZenLoad::convertZTEX2DDS(texRaw, tex.ddsRaw, false, &tex.width, &tex.height);
         if (message != 0) {
             LOG(WARNING) << "Failed to convert zTex '" << texFilename << "' to DDS: Error code '" << message << "'!";
         }
@@ -26,7 +26,7 @@ namespace renderer::loader
 
         for (auto& lightmap : worldMesh->getLightmapTextures()) {
             InMemoryTexFile tex;
-            int32_t message = ZenLoad::convertZTEX2DDS(lightmap, tex.ddsRaw, true, &tex.width, &tex.height);
+            int32_t message = ZenLoad::convertZTEX2DDS(lightmap, tex.ddsRaw, false, &tex.width, &tex.height);
             if (message != 0) {
                 LOG(WARNING) << "Failed to convert lightmap zTex to DDS: Error code '" << message << "'!";
             }

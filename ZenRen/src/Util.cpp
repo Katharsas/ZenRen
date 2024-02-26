@@ -60,7 +60,7 @@ namespace util {
 
 	std::string asciiToLower(const std::string& string) {
 		std::string result = string;
-		std::transform(result.begin(), result.end(), result.begin(), ::toupper);
+		std::transform(result.begin(), result.end(), result.begin(), ::tolower);
 		return result;
 	}
 
@@ -128,5 +128,10 @@ namespace util {
 
 	bool throwOnError(const HRESULT& hr, const std::string& message) {
 		return handleHr(hr, message, true);
+	}
+
+	void throwError(const std::string& message) {
+		LOG(WARNING) << message;
+		throw std::exception((message).c_str());
 	}
 }

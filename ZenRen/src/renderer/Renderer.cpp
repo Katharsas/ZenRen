@@ -219,6 +219,8 @@ namespace renderer
 		postprocess::clean();
 		forward::clean();
 
+		d3d.deviceContext->Flush();
+
 		d3d.device->Release();
 		d3d.deviceContext->Release();
 	}

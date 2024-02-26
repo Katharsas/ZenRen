@@ -22,31 +22,38 @@ namespace renderer {
 		clearAll();
 		{
 			std::string shaderName("testTriangle");
-			Shader::VertexInputLayoutDesc layoutDesc[] =
+			std::vector<VertexInputLayoutDesc> layoutDesc =
 			{
 				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT },
 				{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT },
 			};
-			shaders[shaderName] = new Shader(filePath(shaderName), layoutDesc, std::size(layoutDesc), d3d);
+			shaders[shaderName] = new Shader(d3d, filePath(shaderName), layoutDesc);
 		} {
 			std::string shaderName("toneMapping");
-			Shader::VertexInputLayoutDesc layoutDesc[] =
+			std::vector<VertexInputLayoutDesc> layoutDesc =
 			{
 				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT },
 				{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT },
 			};
-			shaders[shaderName] = new Shader(filePath(shaderName), layoutDesc, std::size(layoutDesc), d3d);
+			shaders[shaderName] = new Shader(d3d, filePath(shaderName), layoutDesc);
 		} {
 			std::string shaderName("renderToTexture");
-			Shader::VertexInputLayoutDesc layoutDesc[] =
+			std::vector<VertexInputLayoutDesc> layoutDesc =
 			{
 				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT },
 				{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT },
 			};
-			shaders[shaderName] = new Shader(filePath(shaderName), layoutDesc, std::size(layoutDesc), d3d);
+			shaders[shaderName] = new Shader(d3d, filePath(shaderName), layoutDesc);
+		} {
+			std::string shaderName("depthPrepass");
+			std::vector<VertexInputLayoutDesc> layoutDesc =
+			{
+				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT }
+			};
+			shaders[shaderName] = new Shader(d3d, filePath(shaderName), layoutDesc, true);
 		} {
 			std::string shaderName("flatBasicColorTexShader");
-			Shader::VertexInputLayoutDesc layoutDesc[] =
+			std::vector<VertexInputLayoutDesc> layoutDesc =
 			{
 				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0 },
 				{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 1 },
@@ -55,7 +62,7 @@ namespace renderer {
 				{ "INDEX_LIGHTMAP", 0, DXGI_FORMAT_R16_SINT, 1 },
 				{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1 },
 			};
-			shaders[shaderName] = new Shader(filePath(shaderName), layoutDesc, std::size(layoutDesc), d3d);
+			shaders[shaderName] = new Shader(d3d, filePath(shaderName), layoutDesc);
 		}
 	}
 

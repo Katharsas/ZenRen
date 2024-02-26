@@ -35,9 +35,9 @@ namespace renderer
 		float resolutionScaling = 1.0f;
 		bool resolutionUpscaleSmooth = true;
 		uint32_t multisampleCount = 4;
-
 		bool downsampling = false;// does not work currently
 		
+		bool depthPrepass = false;
 	};
 
 	struct StaticInstance {
@@ -61,14 +61,10 @@ namespace renderer
 	{
 		ID3D11Buffer* vertexBuffer = nullptr;
 		int32_t vertexCount;
-		Texture* baseColor = nullptr;
 
 		void release()
 		{
 			renderer::release(vertexBuffer);
-			if (baseColor != nullptr) {
-				delete baseColor;
-			}
 		}
 	};
 
@@ -76,7 +72,7 @@ namespace renderer
 	{
 		ID3D11Buffer* vertexBufferPos = nullptr;
 		ID3D11Buffer* vertexBufferNormalUv = nullptr;
-		int32_t vertexCount;
+		int32_t vertexCount = 0;
 
 		// Ideally, we could not create one mesh per texture, but instead have a single mesh for whole world.
 		// This would require us to map every texture used for the mesh to an offset into the vertex buffer.
@@ -87,26 +83,17 @@ namespace renderer
 		{
 			renderer::release(vertexBufferPos);
 			renderer::release(vertexBufferNormalUv);
-			if (baseColor != nullptr) {
-				delete baseColor;
-			}
 		}
 	};
 
-	struct MeshIndexed
+	struct PrepassMeshes
 	{
-		ID3D11Buffer* vertexBuffer = nullptr;
-		ID3D11Buffer* indexBuffer = nullptr;
-		int32_t indexCount;
+		ID3D11Buffer* vertexBufferPos = nullptr;
+		int32_t vertexCount = 0;
 
 		void release()
 		{
-			if (vertexBuffer != nullptr) {
-				vertexBuffer->Release();
-			}
-			if (indexBuffer != nullptr) {
-				indexBuffer->Release();
-			}
+			renderer::release(vertexBufferPos);
 		}
 	};
 

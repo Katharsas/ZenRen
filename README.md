@@ -17,6 +17,7 @@ Simple, high performance DirectX11.1 renderer for Gothic assets (VDF or single f
   - MSAA, up to 4x SMAA
   - Transparency Multisampling (Alpha-To-Coverage with Sharpening)
   - Resolution Scaling
+  - Depth Prepass
 - Postprocessing
   - Tonemapping
   - Gamma, Brightness, Contrast
@@ -24,7 +25,6 @@ Simple, high performance DirectX11.1 renderer for Gothic assets (VDF or single f
   - High DPI Aware
 
 ### TODO
-- Depth Prepass
 - Sky
 - Water / Morph-Meshes
 - Per-Vertex baked shadows
