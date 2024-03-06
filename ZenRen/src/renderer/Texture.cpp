@@ -80,7 +80,7 @@ namespace renderer {
 		}
 	}
 
-	ID3D11ShaderResourceView* createShaderTexArray(D3d d3d, std::vector<std::vector<uint8_t>>& ddsRaws, int32_t width, int32_t height, bool noMip) {
+	ID3D11ShaderResourceView* createShaderTexArray(D3d d3d, std::vector<std::vector<uint8_t>>& ddsRaws, int32_t width, int32_t height, bool sRgb, bool noMip) {
 		std::vector<DirectX::ScratchImage*> imageOwners;
 		std::vector<DirectX::Image> images;
 
@@ -112,7 +112,11 @@ namespace renderer {
 		// and then load raw memory with CreateDDSTextureFromMemory (see https://github.com/Microsoft/DirectXTK/wiki/DDSTextureLoader)
 
 		ID3D11ShaderResourceView* resourceView;
-		auto hr = DirectX::CreateShaderResourceView(d3d.device, images.data(), images.size(), metadata, &resourceView);
+		auto sRgbFlag = sRgb ? DirectX::CREATETEX_FORCE_SRGB : DirectX::CREATETEX_IGNORE_SRGB;
+		auto hr = DirectX::CreateShaderResourceViewEx(
+			d3d.device, images.data(), images.size(), metadata,
+			D3D11_USAGE::D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0, sRgbFlag, &resourceView);
+
 		throwOnError(hr, "lightmap_array_srv");
 
 		for (auto& owner : imageOwners) {
@@ -127,6 +131,7 @@ namespace renderer {
 		auto hr = DirectX::CreateShaderResourceViewEx(
 			d3d.device, image.GetImages(), image.GetImageCount(), image.GetMetadata(),
 			D3D11_USAGE::D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0, sRgbFlag, ppSrv);
+
 		throwOnError(hr, name);
 	}
 

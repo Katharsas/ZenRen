@@ -34,7 +34,7 @@
     <None Include="Shaders\toneMapping.hlsl">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="Shaders\testTriangle.hlsl">
+    <None Include="Shaders\wireframe.hlsl">
       <Filter>Shaders</Filter>
     </None>
     <None Include="Shaders\flatBasicColorTexShader.hlsl">
@@ -96,6 +96,8 @@
     <ClCompile Include="src\game\GameArgs.cpp" />
     <ClCompile Include="src\renderer\loader\TexFromVdfLoader.cpp" />
     <ClCompile Include="src\renderer\loader\MeshUtil.cpp" />
+    <ClCompile Include="src\renderer\loader\VertPosLookup.cpp" />
+    <ClCompile Include="src\renderer\loader\StaticLightFromGroundFace.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Util.h">
@@ -152,5 +154,9 @@
     <ClInclude Include="src\game\GameArgs.h" />
     <ClInclude Include="src\renderer\loader\TexFromVdfLoader.h" />
     <ClInclude Include="src\renderer\loader\MeshUtil.h" />
+    <ClInclude Include="src\renderer\loader\VertPosLookup.h" />
+    <ClInclude Include="lib\octree_attcs\octree.h" />
+    <ClInclude Include="lib\octree_attcs\octree_container.h" />
+    <ClInclude Include="src\renderer\loader\StaticLightFromGroundFace.h" />
   </ItemGroup>
 </Project>

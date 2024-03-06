@@ -2,10 +2,10 @@
 // Vertex Shader
 //--------------------------------------------------------------------------------------
 
-static const uint FLAG_OUPUT_DIRECT_SOLID = 0;
+static const uint FLAG_OUTPUT_DIRECT_SOLID = 0;
 static const uint FLAG_OUTPUT_DIRECT_DIFFUSE = 1;
 static const uint FLAG_OUTPUT_DIRECT_NORMAL = 2;
-static const uint FLAG_OUTPUT_DIRECT_LIGHTMAP = 3;
+static const uint FLAG_OUTPUT_DIRECT_LIGHT_STATIC = 3;
 
 cbuffer cbSettings : register(b0) {
     float ambientLight;
@@ -27,7 +27,7 @@ struct VS_IN
     float4 normal : NORMAL;
     float2 uvBaseColor : TEXCOORD0;
     float3 uvLightmap : TEXCOORD1;
-    //float4 colorLightmap : COLOR;
+    float4 colLight : COLOR;
 };
 
 struct VS_OUT
@@ -58,7 +58,7 @@ VS_OUT VS_Main(VS_IN input)
     //float3 viewLight3 = normalize((float3) mul(float4(0, 1, 0, 0), worldViewMatrixInverseTranposed));
     //float3 viewLight3 = normalize(mul(float3(0, 1, 0), (float3x3) worldViewMatrixInverseTranposed));
 
-    if (!outputDirectEnabled || outputDirectType == FLAG_OUPUT_DIRECT_SOLID || outputDirectType == FLAG_OUTPUT_DIRECT_LIGHTMAP) {
+    if (!outputDirectEnabled || outputDirectType == FLAG_OUTPUT_DIRECT_SOLID) {
         float lightNormalDotProduct = dot(viewNormal3, viewLight3); // for normalized input: range of -1 (down) to 1 (up)
 
         // Faces directed at right angle to sun receive this ratio of maximum direct light. Faces towards the sun get more, away from sun get less.
@@ -76,8 +76,10 @@ VS_OUT VS_Main(VS_IN input)
         lightReceivedRatio = (lightReceivedRatio + ambientLight2) / (1 + ambientLight2);
 
         //float lightReceivedRatio = max(0, lightNormalDotProduct + 0.3f) + ambientLight;
-        float sunStrength = 1.8f;
-        output.light = lightReceivedRatio * sunStrength;
+        float sunStrength = 1.7f;
+        float staticStrength = 2.f;
+        float staticLightAverage = (input.colLight.r + input.colLight.g + input.colLight.b) / 3.0f;
+        output.light = ((lightReceivedRatio * sunStrength) * 0.5f) + ((staticLightAverage * staticStrength) * 0.5f);
     }
     else {
         output.light = 1;
@@ -92,7 +94,7 @@ VS_OUT VS_Main(VS_IN input)
     }
     else {
         // vertex color not used by PS
-        output.color = float4(1, 1, 1, 1);
+        output.color = input.colLight;
     }
 	return output;
 }
@@ -117,6 +119,10 @@ struct PS_IN
 
 float4 PS_Main(PS_IN input) : SV_TARGET
 {
+    // light color
+    float4 lightColor = float4(float3(1, 1, 1) * input.light, 1);
+
+    // albedo color
     float4 albedoColor;
     if (!outputDirectEnabled || outputDirectType == FLAG_OUTPUT_DIRECT_DIFFUSE) {
         albedoColor = baseColor.Sample(SampleType, input.uvBaseColor);
@@ -133,20 +139,20 @@ float4 PS_Main(PS_IN input) : SV_TARGET
         // if sharpening is used, the alphaCutoff its pretty much irrelevant here (we could just use 0.5)
         clip(albedoColor.a < alphaCutoff ? -1 : 1);
     }
-    else if (outputDirectEnabled && outputDirectType == FLAG_OUTPUT_DIRECT_LIGHTMAP) {
+    else if (outputDirectEnabled && outputDirectType == FLAG_OUTPUT_DIRECT_LIGHT_STATIC) {
         // this splits pixels into per face groups based on lightmap or not, which is not great (?)
         if (input.uvLightmap.z >= 0) {
-            albedoColor = lightmaps.Sample(SampleType, input.uvLightmap);
+            //albedoColor = lightmaps.Sample(SampleType, input.uvLightmap);
+            albedoColor = input.color;
         }
         else {
-            albedoColor = float4(1, 1, 1, 1);
+            albedoColor = input.color;
         }
     }
     else {
         albedoColor = input.color;
     }
     
-    float4 lightColor = float4(float3(1, 1, 1) * input.light, 1);
     float4 shadedColor = albedoColor * lightColor;
 
     return shadedColor;

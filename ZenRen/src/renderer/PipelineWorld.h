@@ -13,6 +13,7 @@ namespace renderer::world {
 	void initConstantBufferPerObject(D3d d3d);
 	void drawPrepass(D3d d3d, ShaderManager* shaders);
 	void drawWorld(D3d d3d, ShaderManager* shaders);
+	void drawWireframe(D3d d3d, ShaderManager* shaders);
 	void clean();
 }
 

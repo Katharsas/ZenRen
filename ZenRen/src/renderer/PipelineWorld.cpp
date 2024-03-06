@@ -26,7 +26,7 @@ namespace renderer::world {
 		Solid = 0,
 		Diffuse = 1,
 		Normal = 2,
-		Lightmap = 3,
+		Light_Static = 3,
 	};
 
 	__declspec(align(16))
@@ -140,10 +140,10 @@ namespace renderer::world {
 		d3d.device->CreateBuffer(&bufferDesc, &initialData, target);
 	}
 
-	uint32_t loadPrepassData(D3d d3d, std::vector<PrepassMeshes>& target, const std::unordered_map<Material, VEC_POS_NORMAL_UV_LMUV>& meshData)
+	uint32_t loadPrepassData(D3d d3d, std::vector<PrepassMeshes>& target, const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData)
 	{
 		uint32_t loadedCount = 0;
-		std::vector<POS> allVerts;
+		std::vector<VERTEX_POS> allVerts;
 
 		for (const auto& pair : meshData) {
 			auto& vecPos = pair.second.vecPos;
@@ -162,7 +162,7 @@ namespace renderer::world {
 		return loadedCount;
 	}
 
-	uint32_t loadVertexData(D3d d3d, std::vector<Mesh>& target, const std::unordered_map<Material, VEC_POS_NORMAL_UV_LMUV>& meshData)
+	uint32_t loadVertexData(D3d d3d, std::vector<Mesh>& target, const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData)
 	{
 		// TODO 
 		// create Texture cache that maps texBaseColor name to texture
@@ -242,7 +242,7 @@ namespace renderer::world {
 				debugTextures.push_back(texture);
 			}
 			// TODO it is totally unclear if these should be loaded as sRGB or linear!
-			lightmapTexArray = createShaderTexArray(d3d, ddsRaws, 256, 256);
+			lightmapTexArray = createShaderTexArray(d3d, ddsRaws, 256, 256, false);
 		}
 		
 		world.meshes.clear();
@@ -297,8 +297,8 @@ namespace renderer::world {
 		else if (settings.shader.mode == ShaderMode::Normals) {
 			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Normal;
 		}
-		else if (settings.shader.mode == ShaderMode::Lightmap) {
-			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Lightmap;
+		else if (settings.shader.mode == ShaderMode::Light_Static) {
+			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Light_Static;
 		}
 		else if (settings.shader.mode == ShaderMode::Solid || settings.shader.mode == ShaderMode::Default) {
 			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Solid;
@@ -384,7 +384,7 @@ namespace renderer::world {
 
 		// vertex buffers
 		for (auto& mesh : world.prepassMeshes) {
-			UINT strides[] = { sizeof(POS) };
+			UINT strides[] = { sizeof(VERTEX_POS) };
 			UINT offsets[] = { 0 };
 			ID3D11Buffer* vertexBuffers[] = { mesh.vertexBufferPos };
 
@@ -397,8 +397,8 @@ namespace renderer::world {
 	{
 		// set the shader objects avtive
 		Shader* shader = shaders->getShader("flatBasicColorTexShader");
-		d3d.deviceContext->VSSetShader(shader->getVertexShader(), 0, 0);
 		d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
+		d3d.deviceContext->VSSetShader(shader->getVertexShader(), 0, 0);
 		d3d.deviceContext->PSSetShader(shader->getPixelShader(), 0, 0);
 
 		d3d.deviceContext->PSSetSamplers(0, 1, &linearSamplerState);
@@ -420,7 +420,31 @@ namespace renderer::world {
 			auto* resourceView = mesh.baseColor->GetResourceView();
 			d3d.deviceContext->PSSetShaderResources(0, 1, &resourceView);
 
-			UINT strides[] = { sizeof(POS), sizeof(NORMAL_UV_LUV) };
+			UINT strides[] = { sizeof(VERTEX_POS), sizeof(VERTEX_OTHER) };
+			UINT offsets[] = { 0, 0 };
+			ID3D11Buffer* vertexBuffers[] = { mesh.vertexBufferPos, mesh.vertexBufferNormalUv };
+
+			d3d.deviceContext->IASetVertexBuffers(0, std::size(vertexBuffers), vertexBuffers, strides, offsets);
+			d3d.deviceContext->Draw(mesh.vertexCount, 0);
+		}
+	}
+
+	void drawWireframe(D3d d3d, ShaderManager* shaders)
+	{
+		Shader* shader = shaders->getShader("wireframe");
+		d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
+		d3d.deviceContext->VSSetShader(shader->getVertexShader(), 0, 0);
+		d3d.deviceContext->PSSetShader(shader->getPixelShader(), 0, 0);
+
+		//d3d.deviceContext->PSSetSamplers(0, 0, nullptr);
+
+		// constant buffer (object)
+		d3d.deviceContext->UpdateSubresource(cbPerObjectBuffer, 0, nullptr, &world.matrices, 0, 0);
+		d3d.deviceContext->VSSetConstantBuffers(1, 1, &cbPerObjectBuffer);
+
+		// vertex buffers
+		for (auto& mesh : world.meshes) {
+			UINT strides[] = { sizeof(VERTEX_POS), sizeof(VERTEX_OTHER) };
 			UINT offsets[] = { 0, 0 };
 			ID3D11Buffer* vertexBuffers[] = { mesh.vertexBufferPos, mesh.vertexBufferNormalUv };
 

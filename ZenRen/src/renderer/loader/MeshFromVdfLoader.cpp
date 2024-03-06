@@ -59,17 +59,17 @@ namespace renderer::loader {
         };
     }
 
-    void insert(unordered_map<Material, VEC_POS_NORMAL_UV_LMUV>& target, const ZenLoad::zCMaterialData& material, const vector<POS>& positions, const vector<NORMAL_UV_LUV>& normalsAndUvs)
+    void insert(unordered_map<Material, VEC_VERTEX_DATA>& target, const ZenLoad::zCMaterialData& material, const vector<VERTEX_POS>& positions, const vector<VERTEX_OTHER>& other)
     {
         const auto& texture = material.texture;
         if (!texture.empty()) {
             Material material = { ::util::asciiToLower(texture) };
-            insert(target, material, positions, normalsAndUvs);
+            insert(target, material, positions, other);
         }
     }
 
     void loadWorldMesh(
-        unordered_map<Material, VEC_POS_NORMAL_UV_LMUV>& target,
+        unordered_map<Material, VEC_VERTEX_DATA>& target,
         ZenLoad::zCMesh* worldMesh)
     {
         ZenLoad::PackedMesh packedMesh;
@@ -83,8 +83,8 @@ namespace renderer::loader {
                 throw std::logic_error("Expected world mesh to have lightmap information!");
             }
 
-            vector<POS> facesPos;
-            vector<NORMAL_UV_LUV> facesOther;
+            vector<VERTEX_POS> facesPos;
+            vector<VERTEX_OTHER> facesOther;
 
             int32_t faceIndex = 0;
             for (int32_t indicesIndex = 0; indicesIndex < submesh.indices.size(); indicesIndex += 3) {
@@ -97,16 +97,18 @@ namespace renderer::loader {
                     lightmap = worldMesh->getLightmapReferences()[faceLightmapIndex];
                 }
 
-                array<POS, 3> facePos;
-                array<NORMAL_UV_LUV, 3> faceOther;
+                array<VERTEX_POS, 3> facePos;
+                array<VERTEX_OTHER, 3> faceOther;
 
                 for (int32_t i = 0; i < 3; i++) {
                     const auto& zenVert = zenFace[i];
-                    POS pos;
+                    VERTEX_POS pos;
                     pos = from(zenVert.Position);
-                    NORMAL_UV_LUV other;
+                    VERTEX_OTHER other;
                     other.normal = from(zenVert.Normal);
                     other.uvDiffuse = from(zenVert.TexCoord);
+                    other.colLight = D3DXCOLOR(zenVert.Color);
+                    //other.colLight = D3DXCOLOR(1, 1, 1, 0.f);
 
                     if (faceLightmapIndex == -1) {
                         other.uvLightmap = { 0, 0, -1 };
@@ -123,6 +125,7 @@ namespace renderer::loader {
                         other.uvLightmap.i = lightmap.lightmapTextureIndex;
                     }
                     // flip faces (seems like zEngine uses counter-clockwise winding, while we use clockwise winding)
+                    // TODO use D3D11_RASTERIZER_DESC FrontCounterClockwise instead?
                     facePos.at(2 - i) = pos;
                     faceOther.at(2 - i) = other;
                 }
@@ -181,9 +184,10 @@ namespace renderer::loader {
     unordered_set<string> processedVisuals;
 
 	void loadInstanceMesh(
-        unordered_map<Material, VEC_POS_NORMAL_UV_LMUV>& target,
+        unordered_map<Material, VEC_VERTEX_DATA>& target,
         const ZenLoad::zCProgMeshProto& mesh,
         const XMMATRIX& transform,
+        const D3DXCOLOR& lightStatic,
         const string& visualname,
         bool debugChecksEnabled)
     {
@@ -204,14 +208,14 @@ namespace renderer::loader {
                 throw std::logic_error("Expected VOB mesh to NOT have lightmap information!");
             }
 
-            vector<POS> facesPos;
-            vector<NORMAL_UV_LUV> facesOther;
+            vector<VERTEX_POS> facesPos;
+            vector<VERTEX_OTHER> facesOther;
 
             for (uint32_t indicesIndex = 0; indicesIndex < submesh.indices.size(); indicesIndex += 3) {
                 
                 const array zenFace = getFaceVerts(packedMesh.vertices, submesh.indices, indicesIndex);
-                array<POS, 3> facePos;
-                array<NORMAL_UV_LUV, 3> faceOther;
+                array<VERTEX_POS, 3> facePos;
+                array<VERTEX_OTHER, 3> faceOther;
 
                 // read positions
                 array<XMVECTOR, 3> posXm;
@@ -232,14 +236,16 @@ namespace renderer::loader {
                 // transform
                 for (int32_t i = 0; i < 3; i++) {
                     const auto& zenVert = zenFace[i];
-                    POS pos;
+                    VERTEX_POS pos;
                     pos = transformPos(posXm[i], transform);
-                    NORMAL_UV_LUV other;
+                    VERTEX_OTHER other;
                     other.normal = transformDir(normalsXm[i], normalTransform, debugChecksEnabled);
                     other.uvDiffuse = from(zenVert.TexCoord);
-                    other.uvLightmap = { 0, 0 };
+                    other.uvLightmap = { 0, 0, -1 };
+                    other.colLight = lightStatic;
 
                     // flip faces (seems like zEngine uses counter-clockwise winding, while we use clockwise winding)
+                    // TODO use D3D11_RASTERIZER_DESC FrontCounterClockwise instead?
                     facePos.at(2 - i) = pos;
                     faceOther.at(2 - i) = other;
                 }

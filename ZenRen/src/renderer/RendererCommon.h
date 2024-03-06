@@ -60,7 +60,6 @@ namespace renderer
 		return os << "[POS: " << that.pos << " UV:" << that.uv << "]";
 	}
 
-	typedef VEC3 POS;
 	struct NORMAL_UV_LUV {
 		VEC3 normal;
 		UV uvDiffuse;
@@ -70,21 +69,25 @@ namespace renderer
 	{
 		return os << "[NOR:" << that.normal << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
 	}
-	struct VEC_POS_NORMAL_UV_LMUV {
-		std::vector<POS> vecPos;
-		std::vector<NORMAL_UV_LUV> vecNormalUv;
-	};
 
-	struct POS_NORMAL_UV_COL {
-		VEC3 pos;
+	struct NORMAL_CL_UV_LUV {
 		VEC3 normal;
-		UV uv;
-		D3DXCOLOR color;
+		UV uvDiffuse;
+		ARRAY_UV uvLightmap;
+		D3DXCOLOR colLight;
 	};
-	inline std::ostream& operator <<(std::ostream& os, const POS_NORMAL_UV_COL& that)
+	inline std::ostream& operator <<(std::ostream& os, const NORMAL_CL_UV_LUV& that)
 	{
-		return os << "[POS:" << that.pos << " NOR:" << that.normal << " UV:" << that.uv << " LIGHT:" << that.color << "]";
+		return os << "[NOR:" << that.normal << " LIGHT:" << that.colLight << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
 	}
+
+	typedef VEC3 VERTEX_POS;
+	typedef NORMAL_CL_UV_LUV VERTEX_OTHER;
+
+	struct VEC_VERTEX_DATA {
+		std::vector<VERTEX_POS> vecPos;
+		std::vector<VERTEX_OTHER> vecNormalUv;
+	};
 
 	struct Material {
 		std::string texBaseColor;
@@ -92,6 +95,31 @@ namespace renderer
 		bool operator==(const Material& other) const
 		{
 			return (texBaseColor == other.texBaseColor);
+		}
+	};
+}
+namespace std
+{
+	using namespace renderer;
+	template <>
+	struct hash<Material>
+	{
+		size_t operator()(const Material& key) const
+		{
+			size_t res = 17;
+			res = res * 31 + hash<string>()(key.texBaseColor);
+			return res;
+		}
+	};
+}
+namespace renderer
+{
+	struct VertKey {
+		const Material* mat;
+		const uint32_t vertIndex;
+
+		const VEC_VERTEX_DATA& get(const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData) {
+			return meshData.find(*this->mat)->second;
 		}
 	};
 
@@ -107,19 +135,4 @@ namespace renderer
 	void release(IUnknown* dx11object);
 	void release(const std::vector<IUnknown*>& dx11objects);
 	void initViewport(BufferSize& size, D3D11_VIEWPORT* viewport);
-}
-
-namespace std
-{
-	using namespace renderer;
-	template <>
-	struct hash<Material>
-	{
-		size_t operator()(const Material& key) const
-		{
-			size_t res = 17;
-			res = res * 31 + hash<string>()(key.texBaseColor);
-			return res;
-		}
-	};
 }

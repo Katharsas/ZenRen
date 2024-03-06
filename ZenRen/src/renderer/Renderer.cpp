@@ -80,7 +80,7 @@ namespace renderer
 		
 		bool diffuseTexSampler = false;
 		//bool staticVertexBuffer = false;
-		bool shaderSettingsGlobal = false;
+		bool shaderSettingsGlobal = false;// TODO remove
 
 		void onInit() {
 			backBuffer = true, backBufferQuadVerts = true,
@@ -139,9 +139,9 @@ namespace renderer
 		if (flags.diffuseTexSampler) {
 			world::initLinearSampler(d3d, settings);
 		}
-		if (flags.shaderSettingsGlobal) {
-			world::updateShaderSettings(d3d, settings);
-		}
+		//if (flags.shaderSettingsGlobal) {
+		//	world::updateShaderSettings(d3d, settings);
+		//}
 	}
 
 	void initD3D(HWND hWnd)
@@ -254,9 +254,9 @@ namespace renderer
 		if (settings.anisotropicFilter != settingsPrevious.anisotropicFilter || settings.anisotropicLevel != settingsPrevious.anisotropicFilter) {
 			renderState.diffuseTexSampler = true;
 		}
-		if (settings.shader.ambientLight != settingsPrevious.shader.ambientLight || settings.shader.mode != settingsPrevious.shader.mode) {
-			renderState.shaderSettingsGlobal = true;
-		}
+		//if (settings.shader.ambientLight != settingsPrevious.shader.ambientLight || settings.shader.mode != settingsPrevious.shader.mode) {
+		//	renderState.shaderSettingsGlobal = true;
+		//}
 		reinitRenderer(renderState);
 
 		camera::updateCamera(settings.reverseZ, renderSize);

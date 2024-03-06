@@ -12,7 +12,7 @@ namespace renderer
 		Solid,
 		Diffuse,
 		Normals,
-		Lightmap,
+		Light_Static,
 	};
 
 	struct ShaderSettings {
@@ -43,6 +43,7 @@ namespace renderer
 	struct StaticInstance {
 		std::string meshName;
 		DirectX::XMMATRIX transform;
+		D3DXCOLOR colLightStatic;
 	};
 
 	struct InMemoryTexFile {
@@ -52,8 +53,8 @@ namespace renderer
 	};
 
 	struct RenderData {
-		std::unordered_map<Material, VEC_POS_NORMAL_UV_LMUV> worldMesh;
-		std::unordered_map<Material, VEC_POS_NORMAL_UV_LMUV> staticMeshes;
+		std::unordered_map<Material, VEC_VERTEX_DATA> worldMesh;
+		std::unordered_map<Material, VEC_VERTEX_DATA> staticMeshes;
 		std::vector<InMemoryTexFile> worldMeshLightmaps;
 	};
 

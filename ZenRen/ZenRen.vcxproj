@@ -276,7 +276,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
-    <None Include="Shaders\testTriangle.hlsl">
+    <None Include="Shaders\wireframe.hlsl">
       <FileType>Document</FileType>
     </None>
     <None Include="Shaders\toneMapping.hlsl">
@@ -284,7 +284,11 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\renderer\loader\VertPosLookup.cpp" />
     <ClCompile Include="src\renderer\loader\MeshUtil.cpp" />
+    <ClInclude Include="lib\octree_attcs\octree.h" />
+    <ClInclude Include="lib\octree_attcs\octree_container.h" />
+    <ClInclude Include="src\renderer\loader\VertPosLookup.h" />
     <ClInclude Include="src\renderer\loader\MeshUtil.h" />
     <ClCompile Include="src\game\GameArgs.cpp">
       <InlineFunctionExpansion Condition="'$(Configuration)|$(Platform)'=='DebugFast|Win32'">Default</InlineFunctionExpansion>
@@ -360,6 +364,7 @@
     <ClCompile Include="src\renderer\Shader.cpp" />
     <ClCompile Include="src\renderer\ShaderManager.cpp" />
     <ClCompile Include="src\Util.cpp" />
+    <ClCompile Include="src\renderer\loader\StaticLightFromGroundFace.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='DebugFast|Win32'">Create</PrecompiledHeader>
@@ -405,6 +410,7 @@
     <ClInclude Include="src\renderer\ShaderManager.h" />
     <ClInclude Include="src\Settings.h" />
     <ClInclude Include="src\Util.h" />
+    <ClInclude Include="src\renderer\loader\StaticLightFromGroundFace.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="src\game\TimerPrecision.h" />

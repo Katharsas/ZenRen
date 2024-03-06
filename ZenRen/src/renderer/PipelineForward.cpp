@@ -15,6 +15,7 @@ namespace renderer::forward {
 	ID3D11DepthStencilView* depthView = nullptr;
 	ID3D11DepthStencilState* depthState = nullptr;
 	ID3D11RasterizerState* rasterizer = nullptr;
+	ID3D11RasterizerState* rasterizerWf = nullptr;
 	ID3D11BlendState1* blendState = nullptr;
 
 	void clean()
@@ -28,6 +29,7 @@ namespace renderer::forward {
 			depthView,
 			depthState,
 			rasterizer,
+			rasterizerWf,
 			blendState,
 		});
 	}
@@ -55,7 +57,12 @@ namespace renderer::forward {
 		if (settings.depthPrepass) {
 			world::drawPrepass(d3d, shaders);
 		}
+		world::updateShaderSettings(d3d, settings);
 		world::drawWorld(d3d, shaders);
+		if (settings.wireframe) {
+			d3d.deviceContext->RSSetState(rasterizerWf);
+			world::drawWireframe(d3d, shaders);
+		}
 
 		if (settings.multisampleCount > 1) {
 			d3d.deviceContext->ResolveSubresource(
@@ -183,16 +190,23 @@ namespace renderer::forward {
 	void initRasterizerStates(D3d d3d, uint32_t multisampleCount, bool wireframe)
 	{
 		release(rasterizer);
-
-		D3D11_RASTERIZER_DESC rasterizerDesc = CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT{});
-		if (multisampleCount > 1) {
-			rasterizerDesc.MultisampleEnable = TRUE;
-		}
-		if (wireframe) {
+		release(rasterizerWf);
+		{
+			D3D11_RASTERIZER_DESC rasterizerDesc = CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT{});
+			if (multisampleCount > 1) {
+				rasterizerDesc.MultisampleEnable = TRUE;
+			}
+			d3d.device->CreateRasterizerState(&rasterizerDesc, &rasterizer);
+		} {
+			D3D11_RASTERIZER_DESC rasterizerDesc = CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT{});
+			if (multisampleCount > 1) {
+				rasterizerDesc.MultisampleEnable = TRUE;
+			}
+			rasterizerDesc.AntialiasedLineEnable = TRUE;
 			rasterizerDesc.FillMode = D3D11_FILL_WIREFRAME;
 			rasterizerDesc.CullMode = D3D11_CULL_NONE;
+			d3d.device->CreateRasterizerState(&rasterizerDesc, &rasterizerWf);
 		}
-		d3d.device->CreateRasterizerState(&rasterizerDesc, &rasterizer);
 	}
 
 	void initBlendState(D3d d3d, uint32_t multisampleCount) {

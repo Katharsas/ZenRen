@@ -10,6 +10,8 @@
 #include "../RenderUtil.h"
 #include "MeshFromVdfLoader.h"
 #include "TexFromVdfLoader.h"
+#include "VertPosLookup.h"
+#include "StaticLightFromGroundFace.h"
 
 #include "DirectXTex.h"
 #include "zenload/zCMesh.h"
@@ -53,7 +55,7 @@ namespace renderer::loader {
         return vdf.hasFile(filename);
     }
 
-    bool loadInstanceMesh(unordered_map<Material, VEC_POS_NORMAL_UV_LMUV>& target, string& visualname, VDFS::FileIndex& vdf, XMMATRIX& transform)
+    bool loadInstanceMesh(unordered_map<Material, VEC_VERTEX_DATA>& target, string& visualname, VDFS::FileIndex& vdf, XMMATRIX& transform, const D3DXCOLOR& lightStatic)
     {
         string filename = visualname + ".MRM";
         if (!vdf.hasFile(filename)) {
@@ -62,7 +64,7 @@ namespace renderer::loader {
 
         ZenLoad::zCProgMeshProto rawMesh(filename, vdf);
 
-        loadInstanceMesh(target, rawMesh, transform, visualname);
+        loadInstanceMesh(target, rawMesh, transform, lightStatic, visualname);
         return true;
     }
 
@@ -76,11 +78,21 @@ namespace renderer::loader {
         }
     }
 
-    std::vector<StaticInstance> loadVobs(std::vector<ZenLoad::zCVobData>& rootVobs) {
+    inline std::ostream& operator <<(std::ostream& os, const D3DXCOLOR& that)
+    {
+        return os << "[R:" << that.r << " G:" << that.g << " B:" << that.b << " A:" << that.a << "]";
+    }
+
+    vector<StaticInstance> loadVobs(vector<ZenLoad::zCVobData>& rootVobs, const unordered_map<Material, VEC_VERTEX_DATA>& worldMeshData) {
         vector<StaticInstance> statics;
         vector<ZenLoad::zCVobData*> vobs;
         flattenVobTree(rootVobs, vobs);
         
+        int32_t totalDurationMicros = 0;
+        int32_t maxDurationMicros = 0;
+
+        const auto spatialCache = createSpatialCache(worldMeshData);
+
         for (auto vobPtr : vobs) {
             ZenLoad::zCVobData vob = *vobPtr;
 
@@ -96,9 +108,30 @@ namespace renderer::loader {
                 XMMATRIX translate = XMMatrixTranslationFromVector(pos);
                 instance.transform = rotate * translate;
 
+                // TODO check if would should receive static light from groundPoly (static flag in vob?)
+                // TODO is default static vob color?
+                const auto now = std::chrono::high_resolution_clock::now();
+                auto colLight = getLightStaticAtPos(pos, worldMeshData, spatialCache);
+                if (colLight.has_value()) {
+                    instance.colLightStatic = colLight.value();
+                }
+                else {
+                    // TODO set default light values
+                    instance.colLightStatic = D3DXCOLOR(0, 0, 0, 1);
+                }
+                const auto duration = std::chrono::high_resolution_clock::now() - now;
+                
+                const auto durationMicros = static_cast<int32_t> (duration / std::chrono::microseconds(1));
+                totalDurationMicros += durationMicros;
+                maxDurationMicros = std::max(maxDurationMicros, durationMicros);
+                //LOG(INFO) << "Found VobInstance GroundPoly Color (" << std::to_string(durationMicros) << " micros): " << instance.colLightStatic;
+                
                 statics.push_back(instance);
             }
         }
+
+        LOG(INFO) << "Vob StaticLight for " << statics.size() << " instances: " << std::to_string(totalDurationMicros/1000) << " ms total, " << std::to_string(maxDurationMicros) << " micros worst instance";
+
         return statics;
     }
 
@@ -126,19 +159,19 @@ namespace renderer::loader {
 
         vector<InMemoryTexFile> lightmaps = loadZenLightmaps(worldMesh);
 
-        unordered_map<Material, VEC_POS_NORMAL_UV_LMUV> worldMeshData;
+        unordered_map<Material, VEC_VERTEX_DATA> worldMeshData;
         loadWorldMesh(worldMeshData, parser.getWorldMesh());
 
-        vector<StaticInstance> vobs = loadVobs(world.rootVobs);
+        vector<StaticInstance> vobs = loadVobs(world.rootVobs, worldMeshData);
 
         LOG(INFO) << "Zen loaded!";
 
-        unordered_map<Material, VEC_POS_NORMAL_UV_LMUV> staticMeshData;
+        unordered_map<Material, VEC_VERTEX_DATA> staticMeshData;
         for (auto& vob : vobs) {
             auto& visualname = vob.meshName;
 
             if (existsInstanceMesh(visualname, *vdf)) {
-                bool loaded = loadInstanceMesh(staticMeshData, visualname, *vdf, vob.transform);
+                bool loaded = loadInstanceMesh(staticMeshData, visualname, *vdf, vob.transform, vob.colLightStatic);
             }
             else {
                 LOG(DEBUG) << "Skipping VOB " << visualname << " (visual not found)";

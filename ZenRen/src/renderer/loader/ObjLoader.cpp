@@ -16,7 +16,7 @@ namespace renderer::loader {
 	using ::util::asciiToLower;
 	using ::util::getOrCreate;
 
-	std::unordered_map<Material, VEC_POS_NORMAL_UV_LMUV> loadObj(const std::string& inputFile) {
+	std::unordered_map<Material, VEC_VERTEX_DATA> loadObj(const std::string& inputFile) {
 
 		tinyobj::ObjReaderConfig reader_config;
 		reader_config.triangulate = true;
@@ -57,7 +57,7 @@ namespace renderer::loader {
 
 		const float scale = 1.0f;
 
-		std::unordered_map<Material, VEC_POS_NORMAL_UV_LMUV> matsToVertices;
+		std::unordered_map<Material, VEC_VERTEX_DATA> matsToVertices;
 		int32_t faceCount = 0;
 		int32_t faceSkippedCount = 0;
 
@@ -69,14 +69,14 @@ namespace renderer::loader {
 				if (vertexCount != 3) {
 					LOG(FATAL) << "Only exactly 3 vertices per face are allowed!";
 				}
-				std::array<POS, 3> facePos;
-				std::array<NORMAL_UV_LUV, 3> faceOther;
+				std::array<VERTEX_POS, 3> facePos;
+				std::array<VERTEX_OTHER, 3> faceOther;
 				bool hasNormals = false;
 				for (size_t vertexIndex = 0; vertexIndex < vertexCount; vertexIndex++) {
 
 					tinyobj::index_t idx = shapes[shapeIndex].mesh.indices[indexOffset + vertexIndex];
-					POS pos;
-					NORMAL_UV_LUV other;
+					VERTEX_POS pos;
+					VERTEX_OTHER other;
 
 					tinyobj::real_t vx = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
 					tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
@@ -100,7 +100,7 @@ namespace renderer::loader {
 						other.uvDiffuse = { 0, 0 };
 					}
 
-					//vertex.colorLightmap = { 1, 1, 1, 1 };
+					other.colLight = D3DXCOLOR( 1, 1, 1, 1 );
 					other.uvLightmap = { 0, 0 };
 
 					// Wavefront .obj verts are stored counter-clockwise, so we switch to clockwise

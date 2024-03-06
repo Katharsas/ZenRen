@@ -36,7 +36,7 @@ namespace renderer::loader
     }
 
     template <typename C1, typename C2>
-    void insert(std::unordered_map<Material, VEC_POS_NORMAL_UV_LMUV>& target, const Material& material, const C1& positions, const C2& normalsAndUvs)
+    void insert(std::unordered_map<Material, VEC_VERTEX_DATA>& target, const Material& material, const C1& positions, const C2& normalsAndUvs)
     {
         auto& meshData = ::util::getOrCreate(target, material);
         meshData.vecPos.insert(meshData.vecPos.end(), positions.begin(), positions.end());
