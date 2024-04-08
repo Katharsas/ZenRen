@@ -37,7 +37,7 @@
     <None Include="Shaders\wireframe.hlsl">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="Shaders\flatBasicColorTexShader.hlsl">
+    <None Include="Shaders\mainPass.hlsl">
       <Filter>Shaders</Filter>
     </None>
     <None Include="Shaders\renderToTexture.hlsl">

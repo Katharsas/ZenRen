@@ -13,10 +13,10 @@ namespace renderer
 		Diffuse,
 		Normals,
 		Light_Static,
+		Lightmap
 	};
 
 	struct ShaderSettings {
-		float ambientLight;
 		ShaderMode mode;
 	};
 
@@ -28,14 +28,16 @@ namespace renderer
 		uint32_t anisotropicLevel = 16;
 
 		ShaderSettings shader = {
-			0.02f,
 			ShaderMode::Default,
 		};
 
 		float resolutionScaling = 1.0f;
 		bool resolutionUpscaleSmooth = true;
+		bool downsampling = false;// does not work currently, TODO implement mipmap generation for linear BB
+
 		uint32_t multisampleCount = 4;
-		bool downsampling = false;// does not work currently
+		bool multisampleTransparency = true;
+		bool distantAlphaDensityFix = true;
 		
 		bool depthPrepass = false;
 	};

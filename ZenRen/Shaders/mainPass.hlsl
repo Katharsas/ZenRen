@@ -6,9 +6,11 @@ static const uint FLAG_OUTPUT_DIRECT_SOLID = 0;
 static const uint FLAG_OUTPUT_DIRECT_DIFFUSE = 1;
 static const uint FLAG_OUTPUT_DIRECT_NORMAL = 2;
 static const uint FLAG_OUTPUT_DIRECT_LIGHT_STATIC = 3;
+static const uint FLAG_OUTPUT_DIRECT_LIGHTMAP = 4;
 
 cbuffer cbSettings : register(b0) {
-    float ambientLight;
+    bool multisampleTransparency;
+    bool distantAlphaDensityFix;
 
     bool outputDirectEnabled;
     uint outputDirectType;
@@ -93,7 +95,6 @@ VS_OUT VS_Main(VS_IN input)
         output.color = float4((float3) input.normal, 1.0f);
     }
     else {
-        // vertex color not used by PS
         output.color = input.colLight;
     }
 	return output;
@@ -102,6 +103,15 @@ VS_OUT VS_Main(VS_IN input)
 //--------------------------------------------------------------------------------------
 // Pixel Shader
 //--------------------------------------------------------------------------------------
+
+float CalcMipLevel(float2 texCoord)
+{
+    float2 dx = ddx(texCoord);
+    float2 dy = ddy(texCoord);
+    float delta_max_sqr = max(dot(dx, dx), dot(dy, dy));
+
+    return max(0.0, 0.5 * log2(delta_max_sqr));
+}
 
 Texture2D baseColor : register(s0);
 Texture2DArray lightmaps : register(s1);
@@ -129,21 +139,31 @@ float4 PS_Main(PS_IN input) : SV_TARGET
 
         // Alpha Cutoff
         // lower values will result in thinner coverage
-        float alphaCutoff = 0.6;
+        float alphaCutoff = 0.4;
 
-        // Alpha to Coverage Sharpening
-        // sharpen the multisampled alpha to remove banding and interior transparency; outputs close to 1 or 0
-        albedoColor.a = (albedoColor.a - (1 - alphaCutoff)) / max(fwidth(albedoColor.a), 0.0001) + 0.5;
+        if (distantAlphaDensityFix) {
+            // Distant Transparency Thickening
+            // since non-blended transparency fades out on higher mips more than it should (potentially leading to disappearing vegetation), correct it
+            float texWidth;
+            float texHeight;
+            baseColor.GetDimensions(texWidth, texHeight);
+            float distAlphaMipScale = 0.25f;
+            albedoColor.a *= 1 + CalcMipLevel(input.uvBaseColor * float2(texWidth, texHeight)) * distAlphaMipScale;
+        }
+
+        if (multisampleTransparency) {
+            // Alpha to Coverage Sharpening
+            // sharpen the multisampled alpha to remove banding and interior transparency; outputs close to 1 or 0
+            albedoColor.a = (albedoColor.a - alphaCutoff) / max(fwidth(albedoColor.a), 0.0001) + 0.5;
+        }
 
         // Alpha Test
         // if sharpening is used, the alphaCutoff its pretty much irrelevant here (we could just use 0.5)
         clip(albedoColor.a < alphaCutoff ? -1 : 1);
     }
-    else if (outputDirectEnabled && outputDirectType == FLAG_OUTPUT_DIRECT_LIGHT_STATIC) {
-        // this splits pixels into per face groups based on lightmap or not, which is not great (?)
-        if (input.uvLightmap.z >= 0) {
-            //albedoColor = lightmaps.Sample(SampleType, input.uvLightmap);
-            albedoColor = input.color;
+    else if (outputDirectType == FLAG_OUTPUT_DIRECT_LIGHTMAP) {
+        if (input.uvLightmap.z >= 0) /* dynamic branch */ {
+            albedoColor = lightmaps.Sample(SampleType, input.uvLightmap);
         }
         else {
             albedoColor = input.color;

@@ -157,7 +157,7 @@ namespace renderer::loader {
                     }
                     else {
                         // TODO set default light values
-                        instance.colLightStatic = D3DXCOLOR(0, 0, 0, 1);
+                        instance.colLightStatic = D3DXCOLOR(0.63f, 0.63f, 0.63f, 1);// fallback lightness of (160, 160, 160)
                     }
                     const auto duration = std::chrono::high_resolution_clock::now() - now;
 

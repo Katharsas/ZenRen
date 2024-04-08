@@ -44,7 +44,7 @@ namespace renderer {
 			};
 			shaders[shaderName] = new Shader(d3d, filePath(shaderName), layoutDesc, true);
 		} {
-			std::string shaderName("flatBasicColorTexShader");
+			std::string shaderName("mainPass");
 			std::vector<VertexInputLayoutDesc> layoutDesc =
 			{
 				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0 },

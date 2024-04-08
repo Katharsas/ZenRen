@@ -433,7 +433,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Shaders\flatBasicColorTexShader.hlsl">
+    <None Include="Shaders\mainPass.hlsl">
       <FileType>Document</FileType>
     </None>
   </ItemGroup>

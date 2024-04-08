@@ -27,11 +27,13 @@ namespace renderer::world {
 		Diffuse = 1,
 		Normal = 2,
 		Light_Static = 3,
+		Lightmap = 4,
 	};
 
 	__declspec(align(16))
 	struct CbGlobalSettings {
-		float ambientLight;
+		int32_t multisampleTransparency;
+		int32_t distantAlphaDensityFix;
 		int32_t outputDirectEnabled;
 		ShaderOutputDirect outputDirectType;
 	};
@@ -288,7 +290,8 @@ namespace renderer::world {
 	void updateShaderSettings(D3d d3d, RenderSettings& settings)
 	{
 		CbGlobalSettings cbGlobalSettings;
-		cbGlobalSettings.ambientLight = settings.shader.ambientLight;
+		cbGlobalSettings.multisampleTransparency = settings.multisampleTransparency;
+		cbGlobalSettings.distantAlphaDensityFix = settings.distantAlphaDensityFix;
 		cbGlobalSettings.outputDirectEnabled = settings.shader.mode != ShaderMode::Default;
 		
 		if (settings.shader.mode == ShaderMode::Diffuse) {
@@ -299,6 +302,9 @@ namespace renderer::world {
 		}
 		else if (settings.shader.mode == ShaderMode::Light_Static) {
 			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Light_Static;
+		}
+		else if (settings.shader.mode == ShaderMode::Lightmap) {
+			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Lightmap;
 		}
 		else if (settings.shader.mode == ShaderMode::Solid || settings.shader.mode == ShaderMode::Default) {
 			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Solid;
@@ -396,7 +402,7 @@ namespace renderer::world {
 	void drawWorld(D3d d3d, ShaderManager* shaders)
 	{
 		// set the shader objects avtive
-		Shader* shader = shaders->getShader("flatBasicColorTexShader");
+		Shader* shader = shaders->getShader("mainPass");
 		d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
 		d3d.deviceContext->VSSetShader(shader->getVertexShader(), 0, 0);
 		d3d.deviceContext->PSSetShader(shader->getPixelShader(), 0, 0);

@@ -209,12 +209,12 @@ namespace renderer::forward {
 		}
 	}
 
-	void initBlendState(D3d d3d, uint32_t multisampleCount) {
+	void initBlendState(D3d d3d, uint32_t multisampleCount, bool multisampleTransparency) {
 		release(blendState);
 
 		if (multisampleCount > 1) {
 			D3D11_BLEND_DESC1 blendStateDesc = CD3D11_BLEND_DESC1(CD3D11_DEFAULT{});
-			blendStateDesc.AlphaToCoverageEnable = TRUE;
+			blendStateDesc.AlphaToCoverageEnable = multisampleTransparency;
 			d3d.device->CreateBlendState1(&blendStateDesc, &blendState);
 		}
 		else {

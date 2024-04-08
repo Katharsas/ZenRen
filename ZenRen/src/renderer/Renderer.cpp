@@ -134,7 +134,7 @@ namespace renderer
 			forward::initRasterizerStates(d3d, settings.multisampleCount, settings.wireframe);
 		}
 		if (flags.forwardBlendState) {
-			forward::initBlendState(d3d, settings.multisampleCount);
+			forward::initBlendState(d3d, settings.multisampleCount, settings.multisampleTransparency);
 		}
 		if (flags.diffuseTexSampler) {
 			world::initLinearSampler(d3d, settings);
@@ -245,7 +245,7 @@ namespace renderer
 		if (settings.wireframe != settingsPrevious.wireframe) {
 			renderState.onChangeWireframe();
 		}
-		if (settings.multisampleCount != settingsPrevious.multisampleCount) {
+		if (settings.multisampleCount != settingsPrevious.multisampleCount || settings.multisampleTransparency != settingsPrevious.multisampleTransparency) {
 			renderState.onChangeMultisampling();
 		}
 		if (settings.reverseZ != settingsPrevious.reverseZ) {
