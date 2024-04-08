@@ -19,7 +19,7 @@ namespace renderer::loader
 	};
 
 	SpatialCache createSpatialCache(const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData);
-	std::vector<VertKey> lookupVertsAtPos(const SpatialCache& cache, const VEC3& pos, float searchSizeY);
-	std::vector<VertKey> lookupVertsAtPosNaive(const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData, const VEC3& pos);
+	std::vector<VertKey> rayDownIntersected(const SpatialCache& cache, const VEC3& pos, float searchSizeY);
+	std::vector<VertKey> rayDownIntersectedNaive(const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData, const VEC3& pos, float searchSizeY);
 }
 

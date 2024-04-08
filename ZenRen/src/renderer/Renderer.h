@@ -43,6 +43,7 @@ namespace renderer
 	struct StaticInstance {
 		std::string meshName;
 		DirectX::XMMATRIX transform;
+		std::array<VEC3, 2> bbox;// pos_min, pos_max
 		D3DXCOLOR colLightStatic;
 	};
 

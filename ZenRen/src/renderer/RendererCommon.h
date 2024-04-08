@@ -118,8 +118,11 @@ namespace renderer
 		const Material* mat;
 		const uint32_t vertIndex;
 
-		const VEC_VERTEX_DATA& get(const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData) {
+		const VEC_VERTEX_DATA& get(const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData) const {
 			return meshData.find(*this->mat)->second;
+		}
+		const VERTEX_POS& getPos(const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData) const {
+			return meshData.find(*this->mat)->second.vecPos[this->vertIndex];
 		}
 	};
 

@@ -6,6 +6,8 @@ namespace renderer::loader
     using ::std::vector;
     using ::std::unordered_map;
 
+    float rayIntersectTolerance = 0.1f;
+
     OrthoBoundingBox3D createBB3D(const vector<VERTEX_POS>& verts, uint32_t vertIndex)
     {
         float minX =  FLT_MAX, minY =  FLT_MAX, minZ =  FLT_MAX;
@@ -47,19 +49,21 @@ namespace renderer::loader
         return result;
 	}
 
-    vector<VertKey> lookupVertsAtPos(const SpatialCache& cache, const VEC3& pos, float searchSizeY)
+    vector<VertKey> rayDownIntersected(const SpatialCache& cache, const VEC3& pos, float searchSizeY)
     {
-        float searchSize = 0.1f;
         auto searchBox = OrthoBoundingBox3D{
-            { pos.x - searchSize, pos.y - searchSizeY, pos.z - searchSize },
-            { pos.x + searchSize, pos.y + searchSizeY, pos.z + searchSize }
+            { pos.x - rayIntersectTolerance, pos.y - searchSizeY, pos.z - rayIntersectTolerance },
+            { pos.x + rayIntersectTolerance, pos.y,               pos.z + rayIntersectTolerance }
         };
 
         constexpr bool shouldFullyContain = false;
-        auto insideBoxIds = cache.tree.RangeSearch<shouldFullyContain>(searchBox);
+        auto intersectedBoxesSorted = cache.tree.RangeSearch<shouldFullyContain>(searchBox);
+
+        // TODO while RayIntersectedAll should be equivalent from what i understand, it is missing most bboxes that RangeSearch finds
+        //auto intersectedBoxesSorted = cache.tree.RayIntersectedAll({ pos.x, pos.y, pos.z }, { 0, -1, 0 }, rayIntersectTolerance, searchSizeY);
 
         vector<VertKey> result;
-        for (auto id : insideBoxIds) {
+        for (auto id : intersectedBoxesSorted) {
             const auto& vertKey = cache.bboxIndexToVert.find(id)->second;
             result.push_back(vertKey);
         }
@@ -67,31 +71,43 @@ namespace renderer::loader
     }
 
     // ##############################################################################################################################
-    // Naive implementation does quadratic looping over all world faces each time, so spatial structure used. For debugging purposes.
+    // Naive implementation does quadratic looping over all world faces each time, no spatial structure used. For debugging purposes.
     // ##############################################################################################################################
 
-    __inline bool intersectsBbox2DNaive(const VEC3& pos, const vector<VERTEX_POS>& verts, const size_t vertIndex) {
+    __inline bool rayDownIntersectsFaceBB(const VEC3& pos, const vector<VERTEX_POS>& verts, const size_t vertIndex, const float searchSizeY) {
         float minX = FLT_MAX, minZ = FLT_MAX;
+        float minY = -FLT_MAX, maxY = FLT_MAX;
         float maxX = -FLT_MAX, maxZ = -FLT_MAX;
-        for (int i = vertIndex; i < vertIndex + 3; i++) {
-            auto& vert = verts[i];
+
+        for (uint32_t i = vertIndex; i < vertIndex + 3; i++) {
+            const auto& vert = verts[i];
             minX = std::min(minX, vert.x);
-            minZ = std::min(minZ, vert.z);
             maxX = std::max(maxX, vert.x);
+        }
+        if (pos.x >= (maxX + rayIntersectTolerance) || pos.x <= (minX - rayIntersectTolerance)) return false;
+
+        for (uint32_t i = vertIndex; i < vertIndex + 3; i++) {
+            const auto& vert = verts[i];
+            minZ = std::min(minZ, vert.z);
             maxZ = std::max(maxZ, vert.z);
         }
-        return true
-            && pos.x < maxX&& pos.x > minX
-            && pos.z < maxZ&& pos.z > minZ;
+        if (pos.z >= (maxZ + rayIntersectTolerance) || pos.z <= (minZ - rayIntersectTolerance)) return false;
+
+        for (uint32_t i = vertIndex; i < vertIndex + 3; i++) {
+            const auto& vert = verts[i];
+            minY = std::min(minY, vert.y);
+            maxY = std::max(maxY, vert.y);
+        }
+        return !(pos.y >= (maxY + rayIntersectTolerance + searchSizeY) || pos.y >= (minY - rayIntersectTolerance));
     }
 
-    std::vector<VertKey> lookupVertsAtPosNaive(const unordered_map<Material, VEC_VERTEX_DATA>& meshData, const VEC3& pos)
+    std::vector<VertKey> rayDownIntersectedNaive(const unordered_map<Material, VEC_VERTEX_DATA>& meshData, const VEC3& pos, float searchSizeY)
     {
         vector<VertKey> result;
         for (auto& it : meshData) {
             auto& vecPos = it.second.vecPos;
             for (uint32_t i = 0; i < vecPos.size(); i += 3) {
-                if (intersectsBbox2DNaive(pos, vecPos, i)) {
+                if (rayDownIntersectsFaceBB(pos, vecPos, i, searchSizeY)) {
                     result.push_back({ &it.first, i });
                 }
             }

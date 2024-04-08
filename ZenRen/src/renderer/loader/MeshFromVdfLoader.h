@@ -17,9 +17,7 @@ namespace renderer::loader
     void loadInstanceMesh(
         std::unordered_map<Material, VEC_VERTEX_DATA>& target,
         const ZenLib::ZenLoad::zCProgMeshProto& mesh,
-        const DirectX::XMMATRIX& transform,
-        const D3DXCOLOR& lightStatic,
-        const std::string& visualname,
+        const StaticInstance& instance,
         bool debugChecksEnabled = false);
 }
 

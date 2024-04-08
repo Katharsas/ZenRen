@@ -11,7 +11,7 @@ namespace renderer::loader
     using ::std::vector;
     using ::std::unordered_map;
 
-    const bool useNaiveSlowGroundVobSearch = false;
+    const bool useNaiveSlowGroundFaceSearch = false;
     const bool tintVobStaticLight = false;// make it possible to distinguish vobs from level
 
     __inline bool triangleXZContainsPointXZ(const VEC3& point, const VEC3& a, const VEC3& b, const VEC3& c) {
@@ -144,11 +144,11 @@ namespace renderer::loader
     {
         VEC3 pos3 = toVec3(pos);
         vector<VertKey> vertKeys;
-        if (useNaiveSlowGroundVobSearch) {
-            vertKeys = lookupVertsAtPosNaive(meshData, pos3);
+        if (useNaiveSlowGroundFaceSearch) {
+            vertKeys = rayDownIntersectedNaive(meshData, pos3, 100);
         }
         else {
-            vertKeys = lookupVertsAtPos(spatialCache, pos3, 40);
+            vertKeys = rayDownIntersected(spatialCache, pos3, 100);
         }
         vector<VERTEX_POS> belowVerts;
         for (auto& vertKey : vertKeys) {

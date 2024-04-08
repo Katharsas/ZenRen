@@ -145,12 +145,6 @@ namespace renderer::loader {
         }
     }
 
-    XMVECTOR calcFlatFaceNormal(const array<XMVECTOR, 3>& posXm) {
-        // calculate flat face normal
-        // counter-clockwise winding, flip XMVector3Cross argument order for clockwise winding
-        return  XMVector3Cross(XMVectorSubtract(posXm[2], posXm[0]), XMVectorSubtract(posXm[1], posXm[0]));
-    }
-
     uint8_t normalToXM4(const array<ZenLoad::WorldVertex, 3>& zenFace, array<XMVECTOR, 3>& target, const XMVECTOR& faceNormalXm, bool debugChecksEnabled) {
         uint8_t zeroNormals = 0;
         for (int32_t i = 0; i < 3; i++) {
@@ -181,20 +175,19 @@ namespace renderer::loader {
         return wrongNormals;
     }
 
+
     unordered_set<string> processedVisuals;
 
 	void loadInstanceMesh(
         unordered_map<Material, VEC_VERTEX_DATA>& target,
         const ZenLoad::zCProgMeshProto& mesh,
-        const XMMATRIX& transform,
-        const D3DXCOLOR& lightStatic,
-        const string& visualname,
+        const StaticInstance& instance,
         bool debugChecksEnabled)
     {
         ZenLoad::PackedMesh packedMesh;
         mesh.packMesh(packedMesh, 0.01f);
 
-        XMMATRIX normalTransform = inversedTransposed(transform);
+        XMMATRIX normalTransform = inversedTransposed(instance.transform);
 
         uint32_t totalNormals = 0;
         uint32_t zeroNormals = 0;
@@ -237,12 +230,12 @@ namespace renderer::loader {
                 for (int32_t i = 0; i < 3; i++) {
                     const auto& zenVert = zenFace[i];
                     VERTEX_POS pos;
-                    pos = transformPos(posXm[i], transform);
+                    pos = transformPos(posXm[i], instance.transform);
                     VERTEX_OTHER other;
                     other.normal = transformDir(normalsXm[i], normalTransform, debugChecksEnabled);
                     other.uvDiffuse = from(zenVert.TexCoord);
                     other.uvLightmap = { 0, 0, -1 };
-                    other.colLight = lightStatic;
+                    other.colLight = instance.colLightStatic;
 
                     // flip faces (seems like zEngine uses counter-clockwise winding, while we use clockwise winding)
                     // TODO use D3D11_RASTERIZER_DESC FrontCounterClockwise instead?
@@ -257,6 +250,7 @@ namespace renderer::loader {
         }
 
         if (debugChecksEnabled) {
+            const auto& visualname = instance.meshName;
             if (processedVisuals.find(visualname) == processedVisuals.end()) {
                 if (zeroNormals > 0) {
                     LOG(WARNING) << "Normals: " << util::leftPad("'" + std::to_string(zeroNormals) + "/" + std::to_string(totalNormals), 9) << "' are ZERO:  " << visualname;

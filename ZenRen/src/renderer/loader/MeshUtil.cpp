@@ -7,6 +7,7 @@
 
 namespace renderer::loader
 {
+    using std::array;
     using namespace DirectX;
 
     UV from(const ZenLib::ZMath::float2& source)
@@ -17,17 +18,26 @@ namespace renderer::loader
     {
         return VEC3{ source.x, source.y, source.z };
     }
-    VEC3 toVec3(const DirectX::XMVECTOR& xm4)
+    VEC3 from(const ZenLib::ZMath::float3& source, float scale)
     {
-        DirectX::XMFLOAT4 result;
-        DirectX::XMStoreFloat4(&result, xm4);
+        return VEC3{ source.x * scale, source.y * scale, source.z * scale };
+    }
+    VEC3 toVec3(const XMVECTOR& xm4)
+    {
+        XMFLOAT4 result;
+        XMStoreFloat4(&result, xm4);
         return VEC3{ result.x, result.y, result.z };
     }
-    VEC4 toVec4(const DirectX::XMVECTOR& xm4)
+    VEC4 toVec4(const XMVECTOR& xm4)
     {
-        DirectX::XMFLOAT4 result;
-        DirectX::XMStoreFloat4(&result, xm4);
+        XMFLOAT4 result;
+        XMStoreFloat4(&result, xm4);
         return VEC4{ result.x, result.y, result.z, result.w };
+    }
+
+    XMVECTOR calcFlatFaceNormal(const array<XMVECTOR, 3>& posXm) {
+        // counter-clockwise winding, flip XMVector3Cross argument order for clockwise winding
+        return  XMVector3Cross(XMVectorSubtract(posXm[2], posXm[0]), XMVectorSubtract(posXm[1], posXm[0]));
     }
 
     void warnIfNotNormalized(const XMVECTOR& source)

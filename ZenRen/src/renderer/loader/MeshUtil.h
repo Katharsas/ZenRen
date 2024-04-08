@@ -3,6 +3,7 @@
 #include <DirectXMath.h>
 
 #include "../RendererCommon.h"
+#include "../../Util.h"
 
 #include "utils/mathlib.h"
 
@@ -24,9 +25,12 @@ namespace renderer::loader
 
     UV from(const ZenLib::ZMath::float2& source);
     VEC3 from(const ZenLib::ZMath::float3& source);
+    VEC3 from(const ZenLib::ZMath::float3& source, float scale);
 
     VEC3 toVec3(const DirectX::XMVECTOR& xm4);
     VEC4 toVec4(const DirectX::XMVECTOR& xm4);
+
+    DirectX::XMVECTOR calcFlatFaceNormal(const std::array<DirectX::XMVECTOR, 3>& posXm);
 
     inline std::ostream& operator <<(std::ostream& os, const DirectX::XMVECTOR& that)
     {
