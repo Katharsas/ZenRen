@@ -29,7 +29,7 @@ namespace renderer {
 		const TexMetadata& metadata = image->GetMetadata();
 		if (metadata.width != width || metadata.height != height) {
 
-			// resize dicards any images after the first (resulting file will have no mipmaps)!
+			// resize discards any images after the first (resulting file will have no mipmaps)!
 			ScratchImage imageResized;
 			auto hr = Resize(*image->GetImage(0, 0, 0), width, height, DirectX::TEX_FILTER_DEFAULT, imageResized);
 			throwOnError(hr, name);
@@ -81,6 +81,11 @@ namespace renderer {
 	}
 
 	ID3D11ShaderResourceView* createShaderTexArray(D3d d3d, std::vector<std::vector<uint8_t>>& ddsRaws, int32_t width, int32_t height, bool sRgb, bool noMip) {
+		// SRGB:
+		// Lightmaps come in the format DXGI_FORMAT_B5G6R5_UNORM (85), which is a 16bpp format.
+		// There is not SRGB variant for this format, so if we use it as is, the CREATETEX_FORCE_SRGB flag will fail silently.
+		// To fix that, we convert all 16BPP formats to more standard formats on DDS conversion to make sRGB flag work in all cases.
+		
 		std::vector<DirectX::ScratchImage*> imageOwners;
 		std::vector<DirectX::Image> images;
 
@@ -90,27 +95,24 @@ namespace renderer {
 		for (auto& ddsRaw : ddsRaws) {
 			std::string name = "lightmap_" + std::format("{:03}", i);
 			DirectX::ScratchImage* image = new DirectX::ScratchImage();
-			auto hr = DirectX::LoadFromDDSMemory(ddsRaw.data(), ddsRaw.size(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, &metadata, *image);
+			auto hr = DirectX::LoadFromDDSMemory(ddsRaw.data(), ddsRaw.size(), DirectX::DDS_FLAGS::DDS_FLAGS_NO_16BPP, &metadata, *image);
 			throwOnError(hr, name);
 
 			resizeIfOtherSize(image, width, height, name);
 			if (!noMip) {
-				// TODO it is unclear if Mimaps are needed since the lightmaps details are extremely low frequency and much likely will never noticably alias unless running at extremely low resolution
 				createMipmapsIfMissing(image, name);
+				metadata = image->GetMetadata();// update metadata.mipLevels
 			}
 
 			imageOwners.push_back(image);
-			images.push_back(*image->GetImages());
+			for (int m = 0; m < metadata.mipLevels; m++) {
+				images.push_back(*image->GetImage(m, 0, 0));
+			}
 			i++;
 		}
+		metadata.arraySize = i;
 
-		metadata.arraySize = images.size();
-
-		// TODO
-		// It is unclear if MipMaps work here.
-		// We should instead write Image to DDS raw memory (see https://stackoverflow.com/questions/76144325/convert-any-input-dds-into-another-dds-format-in-directxtex)
-		// and then load raw memory with CreateDDSTextureFromMemory (see https://github.com/Microsoft/DirectXTK/wiki/DDSTextureLoader)
-
+		// TODO Maybe we should just create a DX Texture object and do the SRV ourselves.
 		ID3D11ShaderResourceView* resourceView;
 		auto sRgbFlag = sRgb ? DirectX::CREATETEX_FORCE_SRGB : DirectX::CREATETEX_IGNORE_SRGB;
 		auto hr = DirectX::CreateShaderResourceViewEx(
@@ -127,6 +129,7 @@ namespace renderer {
 	}
 
 	void createSetSrv(D3d d3d, const ScratchImage& image, const std::string& name, bool sRgb, ID3D11ShaderResourceView** ppSrv) {
+		// TODO Maybe we should just create a DX Texture object and do the SRV ourselves.
 		auto sRgbFlag = sRgb ? DirectX::CREATETEX_FORCE_SRGB : DirectX::CREATETEX_IGNORE_SRGB;
 		auto hr = DirectX::CreateShaderResourceViewEx(
 			d3d.device, image.GetImages(), image.GetImageCount(), image.GetMetadata(),

@@ -34,6 +34,8 @@ namespace renderer::loader {
 
     bool debugInstanceMeshBbox = false;
     bool debugInstanceMeshBboxCenter = false;
+    bool debugTintVobStaticLight = false;
+    bool debugStaticLights = false;
 
     XMVECTOR bboxCenter(const array<VEC3, 2>& bbox) {
         return 0.5f * (toXM4Pos(bbox[0]) + toXM4Pos(bbox[1]));
@@ -85,14 +87,28 @@ namespace renderer::loader {
         return true;
     }
 
-    void flattenVobTree(vector<ZenLoad::zCVobData>& vobs, vector<ZenLoad::zCVobData*>& target)
+    void flattenVobTree(const vector<ZenLoad::zCVobData>& vobs, vector<const ZenLoad::zCVobData*>& target, std::function<bool(const ZenLoad::zCVobData& vob)> filter)
     {
-        for (ZenLoad::zCVobData& vob : vobs) {
-            if (!vob.visual.empty() && vob.visual.find(".3DS") != string::npos) {
+        for (const ZenLoad::zCVobData& vob : vobs) {
+            if (filter(vob)) {
                 target.push_back(&vob);
             }
-            flattenVobTree(vob.childVobs, target);
+            flattenVobTree(vob.childVobs, target, filter);
         }
+    }
+
+    void getVobsWithVisuals(const vector<ZenLoad::zCVobData>& vobs, vector<const ZenLoad::zCVobData*>& target)
+    {
+        const auto filter = [&](const ZenLoad::zCVobData& vob) { return !vob.visual.empty() && vob.visual.find(".3DS") != string::npos; };
+        return flattenVobTree(vobs, target, filter);
+    }
+
+    void getVobStaticLights(const vector<ZenLoad::zCVobData>& vobs, vector<const ZenLoad::zCVobData*>& target)
+    {
+        const auto filter = [&](const ZenLoad::zCVobData& vob) {
+            return vob.vobType == ZenLoad::zCVobData::EVobType::VT_zCVobLight && vob.zCVobLight.lightStatic;
+        };
+        return flattenVobTree(vobs, target, filter);
     }
 
     inline std::ostream& operator <<(std::ostream& os, const D3DXCOLOR& that)
@@ -108,17 +124,88 @@ namespace renderer::loader {
         };
     }
 
-    vector<StaticInstance> loadVobs(vector<ZenLoad::zCVobData>& rootVobs, const unordered_map<Material, VEC_VERTEX_DATA>& worldMeshData) {
+    vector<Light> loadLights(vector<ZenLoad::zCVobData>& rootVobs)
+    {
+        vector<Light> lights;
+        vector<const ZenLoad::zCVobData*> vobs;
+        getVobStaticLights(rootVobs, vobs);
+
+        for (auto vobPtr : vobs) {
+            ZenLoad::zCVobData vob = *vobPtr;
+            Light light = {
+                toVec3(toXM4Pos(vob.position) * 0.01f),
+                vob.zCVobLight.lightStatic,
+                D3DXCOLOR(vob.zCVobLight.color),
+                vob.zCVobLight.range * 0.01f,
+            };
+
+            lights.push_back(light);
+        }
+        return lights;
+    }
+
+    struct LightLookupTree {
+        OrthoOctree tree;
+    };
+
+    LightLookupTree createLightLookup(const vector<Light>& lights)
+    {
+        vector<OrthoBoundingBox3D> bboxes;
+        for (auto& light : lights) {
+            auto pos = light.pos;
+            auto range = light.range;
+            bboxes.push_back({
+                {pos.x - range, pos.y - range, pos.z - range},
+                {pos.x + range, pos.y + range, pos.z + range}
+            });
+        }
+        LightLookupTree result;
+        result.tree = OrthoOctree(bboxes
+            , 8 // max depth
+            , std::nullopt // user-provided bounding Box for all
+            , 10 // max element in a node; 10 works well for us and has been observed to work well in general according to lib author (Github)
+        );
+        return result;
+    }
+
+    D3DXCOLOR getLightAtPos(XMVECTOR posXm, const vector<Light>& lights, const LightLookupTree& lightLookup) {
+        auto pos = toVec3(posXm);
+        float rayIntersectTolerance = 0.1f;
+        auto searchBox = OrthoBoundingBox3D{
+           { pos.x - rayIntersectTolerance, pos.y - rayIntersectTolerance, pos.z - rayIntersectTolerance },
+           { pos.x + rayIntersectTolerance, pos.y + rayIntersectTolerance, pos.z + rayIntersectTolerance }
+        };
+
+        constexpr bool shouldFullyContain = false;
+        auto intersectedBoxes = lightLookup.tree.RangeSearch<shouldFullyContain>(searchBox);
+
+        D3DXCOLOR color = D3DXCOLOR(0.f, 0.f, 0.f, 1.f);
+
+        for (auto boxIndex : intersectedBoxes) {
+            auto& light = lights[boxIndex];
+            XMVECTOR lightPos = toXM4Pos(light.pos);
+            float dist = XMVectorGetX(XMVector3Length(lightPos - posXm));
+            float weight = 0;
+            if (dist < light.range) {
+                weight = 1.f - (dist / light.range);// TODO this assumes linear falloff for all light types, which is very likely wrong
+                color += (light.color * weight);
+            }
+        }
+        return color;
+    }
+
+    vector<StaticInstance> loadVobs(vector<ZenLoad::zCVobData>& rootVobs, const unordered_map<Material, VEC_VERTEX_DATA>& worldMeshData, const vector<Light>& lightsStatic, const bool isOutdoorLevel) {
         vector<StaticInstance> statics;
-        vector<ZenLoad::zCVobData*> vobs;
-        flattenVobTree(rootVobs, vobs);
+        vector<const ZenLoad::zCVobData*> vobs;
+        getVobsWithVisuals(rootVobs, vobs);
         
         int32_t resolvedStaticLight = 0;
 
         int32_t totalDurationMicros = 0;
         int32_t maxDurationMicros = 0;
 
-        const auto spatialCache = createSpatialCache(worldMeshData);
+        const auto worldFaceLookup = createVertLookup(worldMeshData);
+        const auto lightStaticLookup = createLightLookup(lightsStatic);
 
         for (auto vobPtr : vobs) {
             ZenLoad::zCVobData vob = *vobPtr;
@@ -150,17 +237,43 @@ namespace renderer::loader {
                     // TODO check if would should receive static light from groundPoly (static flag in vob?)
                     // TODO is default static vob color?
                     const auto now = std::chrono::high_resolution_clock::now();
-                    auto colLight = getLightStaticAtPos(bboxCenter(instance.bbox), worldMeshData, spatialCache);
-                    if (colLight.has_value()) {
-                        instance.colLightStatic = colLight.value();
+
+                    // TODO if indoor or ground poly has lightmap, use lights, otherwise use ground face!
+                    D3DXCOLOR colLight;
+                    const XMVECTOR center = bboxCenter(instance.bbox);
+                    const std::optional<VertKey> vertKey = getGroundFaceAtPos(center, worldMeshData, worldFaceLookup);
+
+                    bool hasLightmap = false;
+                    if (!isOutdoorLevel) {
+                        hasLightmap = true;
+                    }
+                    else if (vertKey.has_value()) {
+                        const auto& other = vertKey.value().getOther(worldMeshData);
+                        if (other[0].uvLightmap.i != -1) {
+                            hasLightmap = true;
+                        }
+                    }
+
+                    if (hasLightmap) {
+                        colLight = getLightAtPos(bboxCenter(instance.bbox), lightsStatic, lightStaticLookup);
                         resolvedStaticLight++;
                     }
                     else {
-                        // TODO set default light values
-                        instance.colLightStatic = D3DXCOLOR(0.63f, 0.63f, 0.63f, 1);// fallback lightness of (160, 160, 160)
+                        if (vertKey.has_value()) {
+                            colLight = interpolateColor(toVec3(center), worldMeshData, vertKey.value());
+                            resolvedStaticLight++;
+                        }
+                        else {
+                            colLight = D3DXCOLOR(0.63f, 0.63f, 0.63f, 1);// fallback lightness of (160, 160, 160)
+                        }
                     }
-                    const auto duration = std::chrono::high_resolution_clock::now() - now;
 
+                    if (debugTintVobStaticLight) {
+                        colLight = D3DXCOLOR((colLight.r / 3.f) * 2.f, colLight.g, colLight.b, colLight.a);
+                    }
+                    instance.colLightStatic = colLight;
+
+                    const auto duration = std::chrono::high_resolution_clock::now() - now;
                     const auto durationMicros = static_cast<int32_t> (duration / std::chrono::microseconds(1));
                     totalDurationMicros += durationMicros;
                     maxDurationMicros = std::max(maxDurationMicros, durationMicros);
@@ -204,7 +317,11 @@ namespace renderer::loader {
         unordered_map<Material, VEC_VERTEX_DATA> worldMeshData;
         loadWorldMesh(worldMeshData, parser.getWorldMesh());
 
-        vector<StaticInstance> vobs = loadVobs(world.rootVobs, worldMeshData);
+        vector<Light> lightsStatic = loadLights(world.rootVobs);
+
+        auto props = world.properties;
+        bool isOutdoorLevel = world.bspTree.mode == ZenLoad::zCBspTreeData::TreeMode::Outdoor;
+        vector<StaticInstance> vobs = loadVobs(world.rootVobs, worldMeshData, lightsStatic, isOutdoorLevel);
 
         LOG(INFO) << "Zen loaded!";
 
@@ -217,6 +334,12 @@ namespace renderer::loader {
             }
             else {
                 LOG(DEBUG) << "Skipping VOB " << visualname << " (visual not found)";
+            }
+        }
+
+        if (debugStaticLights) {
+            for (auto& light : lightsStatic) {
+                loadPointDebugVisual(staticMeshData, light.pos);
             }
         }
 

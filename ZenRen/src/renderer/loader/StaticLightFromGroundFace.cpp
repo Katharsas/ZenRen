@@ -140,7 +140,7 @@ namespace renderer::loader
         return colorAverage;
     }
 
-    std::optional<D3DXCOLOR> getLightStaticAtPos(const XMVECTOR pos, const unordered_map<Material, VEC_VERTEX_DATA>& meshData, const SpatialCache& spatialCache)
+    std::optional<VertKey> getGroundFaceAtPos(const XMVECTOR pos, const unordered_map<Material, VEC_VERTEX_DATA>& meshData, const VertLookupTree& vertLookup)
     {
         VEC3 pos3 = toVec3(pos);
         vector<VertKey> vertKeys;
@@ -148,7 +148,7 @@ namespace renderer::loader
             vertKeys = rayDownIntersectedNaive(meshData, pos3, 100);
         }
         else {
-            vertKeys = rayDownIntersected(spatialCache, pos3, 100);
+            vertKeys = rayDownIntersected(vertLookup, pos3, 100);
         }
         vector<VERTEX_POS> belowVerts;
         for (auto& vertKey : vertKeys) {
@@ -162,11 +162,7 @@ namespace renderer::loader
             return std::nullopt;
         }
         else {
-            D3DXCOLOR staticLight = interpolateColor(pos3, meshData, vertKeys[closestIndex]);
-            if (tintVobStaticLight) {
-                staticLight = D3DXCOLOR((staticLight.r / 3.f) * 2.f, staticLight.g, staticLight.b, staticLight.a);
-            }
-            return staticLight;
+            return vertKeys[closestIndex];
         }
     }
 }

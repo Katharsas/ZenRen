@@ -243,8 +243,7 @@ namespace renderer::world {
 				Texture* texture = new Texture(d3d, lightmap.ddsRaw, false, "lightmap_xxx");
 				debugTextures.push_back(texture);
 			}
-			// TODO it is totally unclear if these should be loaded as sRGB or linear!
-			lightmapTexArray = createShaderTexArray(d3d, ddsRaws, 256, 256, false);
+			lightmapTexArray = createShaderTexArray(d3d, ddsRaws, 256, 256, true);
 		}
 		
 		world.meshes.clear();

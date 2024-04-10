@@ -49,6 +49,14 @@ namespace renderer
 		D3DXCOLOR colLightStatic;
 	};
 
+	struct Light {
+		// TODO falloff and type surely play a role
+		VEC3 pos;
+		bool isStatic;
+		D3DXCOLOR color;
+		float range;
+	};
+
 	struct InMemoryTexFile {
 		int32_t width;
 		int32_t height;

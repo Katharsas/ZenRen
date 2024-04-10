@@ -13,13 +13,13 @@ namespace renderer::loader
 	// we don't have to provide them separately on each search by storing them in SpatialCache.
 	using OrthoOctree = OrthoTree::TreeBoxContainerND<3, 2, float>;
 
-	struct SpatialCache {
+	struct VertLookupTree {
 		std::unordered_map<uint32_t, VertKey> bboxIndexToVert;
 		OrthoOctree tree;
 	};
 
-	SpatialCache createSpatialCache(const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData);
-	std::vector<VertKey> rayDownIntersected(const SpatialCache& cache, const VEC3& pos, float searchSizeY);
+	VertLookupTree createVertLookup(const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData);
+	std::vector<VertKey> rayDownIntersected(const VertLookupTree& lookup, const VEC3& pos, float searchSizeY);
 	std::vector<VertKey> rayDownIntersectedNaive(const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData, const VEC3& pos, float searchSizeY);
 }
 

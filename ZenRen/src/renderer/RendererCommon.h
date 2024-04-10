@@ -121,8 +121,13 @@ namespace renderer
 		const VEC_VERTEX_DATA& get(const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData) const {
 			return meshData.find(*this->mat)->second;
 		}
-		const VERTEX_POS& getPos(const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData) const {
-			return meshData.find(*this->mat)->second.vecPos[this->vertIndex];
+		const std::array<VERTEX_POS, 3> getPos(const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData) const {
+			auto& vertData = meshData.find(*this->mat)->second.vecPos;
+			return { vertData[this->vertIndex], vertData[this->vertIndex + 1], vertData[this->vertIndex + 2] };
+		}
+		const std::array<VERTEX_OTHER, 3> getOther(const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData) const {
+			auto& vertData = meshData.find(*this->mat)->second.vecNormalUv;
+			return { vertData[this->vertIndex], vertData[this->vertIndex + 1], vertData[this->vertIndex + 2] };
 		}
 	};
 

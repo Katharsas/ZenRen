@@ -37,7 +37,7 @@ struct VS_OUT
     float2 uvBaseColor : TEXCOORD0;
     float3 uvLightmap : TEXCOORD1;
     float4 color : COLOR;
-    float light : LIGHT_INTENSITY;
+    float3 light : LIGHT_INTENSITY;
     //float4 normal : NORMAL;
     float4 position : SV_POSITION;
 };
@@ -74,17 +74,17 @@ VS_OUT VS_Main(VS_IN input)
             lightReceivedRatio = (lightNormalDotProduct + lightRatioAt90) / (1 + lightRatioAt90);
         }
 
-        float ambientLight2 = 0.14f; // TODO why is ambientLight even customizable outside of shader? needs to be balanced with lightRatioAt90 anyway
-        lightReceivedRatio = (lightReceivedRatio + ambientLight2) / (1 + ambientLight2);
+        float ambientLight = 0.14f; // TODO why is ambientLight even customizable outside of shader? needs to be balanced with lightRatioAt90 anyway
+        lightReceivedRatio = (lightReceivedRatio + ambientLight) / (1 + ambientLight);
 
         //float lightReceivedRatio = max(0, lightNormalDotProduct + 0.3f) + ambientLight;
         float sunStrength = 1.7f;
         float staticStrength = 2.f;
-        float staticLightAverage = (input.colLight.r + input.colLight.g + input.colLight.b) / 3.0f;
-        output.light = ((lightReceivedRatio * sunStrength) * 0.5f) + ((staticLightAverage * staticStrength) * 0.5f);
+        //float staticLightAverage = (input.colLight.r + input.colLight.g + input.colLight.b) / 3.0f;
+        output.light = (((float3) lightReceivedRatio * sunStrength) * 0.5f) + ((input.colLight * staticStrength) * 0.5f);
     }
     else {
-        output.light = 1;
+        output.light = (float3) 1;
     }
 
     output.position = mul(viewPosition, projectionMatrix);
@@ -104,15 +104,6 @@ VS_OUT VS_Main(VS_IN input)
 // Pixel Shader
 //--------------------------------------------------------------------------------------
 
-float CalcMipLevel(float2 texCoord)
-{
-    float2 dx = ddx(texCoord);
-    float2 dy = ddy(texCoord);
-    float delta_max_sqr = max(dot(dx, dx), dot(dy, dy));
-
-    return max(0.0, 0.5 * log2(delta_max_sqr));
-}
-
 Texture2D baseColor : register(s0);
 Texture2DArray lightmaps : register(s1);
 SamplerState SampleType : register(s0);
@@ -122,19 +113,41 @@ struct PS_IN
     float2 uvBaseColor : TEXCOORD0;
     float3 uvLightmap : TEXCOORD1;
     float4 color : COLOR;
-    float light : LIGHT_INTENSITY;
+    float3 light : LIGHT_INTENSITY;
     //int indexLightmap : INDEX_LIGHTMAP;
     //float4 normal : NORMAL;
 };
 
+float CalcMipLevel(float2 texCoord)
+{
+    float2 dx = ddx(texCoord);
+    float2 dy = ddy(texCoord);
+    float delta_max_sqr = max(dot(dx, dx), dot(dy, dy));
+
+    return max(0.0, 0.5 * log2(delta_max_sqr));
+}
+
+float4 SampleLightmap(float3 uvLightmap)
+{
+    // TODO
+    // - We should probably use a LOD/mipmap bias, not a fixed mimap level, does SampleLevel do that?
+    // - How does Gothic get the smoothed look? any mipmap multisampling trickery?
+
+    //return lightmaps.Sample(SampleType, uvLightmap);
+    return lightmaps.SampleLevel(SampleType, uvLightmap, 0.5f);
+}
+
 float4 PS_Main(PS_IN input) : SV_TARGET
 {
     // light color
-    float4 lightColor = float4(float3(1, 1, 1) * input.light, 1);
+    float4 lightColor = float4(input.light, 1);
 
     // albedo color
     float4 albedoColor;
     if (!outputDirectEnabled || outputDirectType == FLAG_OUTPUT_DIRECT_DIFFUSE) {
+        if (input.uvLightmap.z >= 0) /* dynamic branch */ {
+            lightColor = SampleLightmap(input.uvLightmap);
+        }
         albedoColor = baseColor.Sample(SampleType, input.uvBaseColor);
 
         // Alpha Cutoff
@@ -146,7 +159,7 @@ float4 PS_Main(PS_IN input) : SV_TARGET
             // since non-blended transparency fades out on higher mips more than it should (potentially leading to disappearing vegetation), correct it
             float texWidth;
             float texHeight;
-            baseColor.GetDimensions(texWidth, texHeight);
+            baseColor.GetDimensions(texWidth, texHeight);// TODO this info could be passed with cb
             float distAlphaMipScale = 0.25f;
             albedoColor.a *= 1 + CalcMipLevel(input.uvBaseColor * float2(texWidth, texHeight)) * distAlphaMipScale;
         }
@@ -161,9 +174,9 @@ float4 PS_Main(PS_IN input) : SV_TARGET
         // if sharpening is used, the alphaCutoff its pretty much irrelevant here (we could just use 0.5)
         clip(albedoColor.a < alphaCutoff ? -1 : 1);
     }
-    else if (outputDirectType == FLAG_OUTPUT_DIRECT_LIGHTMAP) {
+    else if (outputDirectType == FLAG_OUTPUT_DIRECT_SOLID  || outputDirectType == FLAG_OUTPUT_DIRECT_LIGHTMAP) {
         if (input.uvLightmap.z >= 0) /* dynamic branch */ {
-            albedoColor = lightmaps.Sample(SampleType, input.uvLightmap);
+            albedoColor = SampleLightmap(input.uvLightmap);
         }
         else {
             albedoColor = input.color;

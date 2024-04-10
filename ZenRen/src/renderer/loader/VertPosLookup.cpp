@@ -23,14 +23,14 @@ namespace renderer::loader
             maxY = std::max(maxY, vert.y);
             maxZ = std::max(maxZ, vert.z);
         }
-        return  OrthoTree::BoundingBoxND<3, float>{ {minX, minY, minZ}, {maxX, maxY, maxZ} };
+        return OrthoTree::BoundingBoxND<3, float>{ {minX, minY, minZ}, {maxX, maxY, maxZ} };
     }
 
-    SpatialCache createSpatialCache(const unordered_map<Material, VEC_VERTEX_DATA>& meshData)
+    VertLookupTree createVertLookup(const unordered_map<Material, VEC_VERTEX_DATA>& meshData)
     {
         vector<OrthoBoundingBox3D> bboxes;
 
-        SpatialCache result;
+        VertLookupTree result;
         uint32_t bbIndex = 0;
         for (auto& it : meshData) {
             auto& mat = it.first;
@@ -49,7 +49,7 @@ namespace renderer::loader
         return result;
 	}
 
-    vector<VertKey> rayDownIntersected(const SpatialCache& cache, const VEC3& pos, float searchSizeY)
+    vector<VertKey> rayDownIntersected(const VertLookupTree& lookup, const VEC3& pos, float searchSizeY)
     {
         auto searchBox = OrthoBoundingBox3D{
             { pos.x - rayIntersectTolerance, pos.y - searchSizeY, pos.z - rayIntersectTolerance },
@@ -57,14 +57,14 @@ namespace renderer::loader
         };
 
         constexpr bool shouldFullyContain = false;
-        auto intersectedBoxesSorted = cache.tree.RangeSearch<shouldFullyContain>(searchBox);
+        auto intersectedBoxesSorted = lookup.tree.RangeSearch<shouldFullyContain>(searchBox);
 
         // TODO while RayIntersectedAll should be equivalent from what i understand, it is missing most bboxes that RangeSearch finds
         //auto intersectedBoxesSorted = cache.tree.RayIntersectedAll({ pos.x, pos.y, pos.z }, { 0, -1, 0 }, rayIntersectTolerance, searchSizeY);
 
         vector<VertKey> result;
         for (auto id : intersectedBoxesSorted) {
-            const auto& vertKey = cache.bboxIndexToVert.find(id)->second;
+            const auto& vertKey = lookup.bboxIndexToVert.find(id)->second;
             result.push_back(vertKey);
         }
         return result;
