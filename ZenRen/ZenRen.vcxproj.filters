@@ -99,6 +99,7 @@
     <ClCompile Include="src\renderer\loader\VertPosLookup.cpp" />
     <ClCompile Include="src\renderer\loader\StaticLightFromGroundFace.cpp" />
     <ClCompile Include="src\renderer\loader\DebugMeshes.cpp" />
+    <ClCompile Include="src\renderer\loader\StaticLightFromVobLight.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Util.h">
@@ -160,5 +161,6 @@
     <ClInclude Include="lib\octree_attcs\octree_container.h" />
     <ClInclude Include="src\renderer\loader\StaticLightFromGroundFace.h" />
     <ClInclude Include="src\renderer\loader\DebugMeshes.h" />
+    <ClInclude Include="src\renderer\loader\StaticLightFromVobLight.h" />
   </ItemGroup>
 </Project>

@@ -367,6 +367,7 @@
     <ClCompile Include="src\renderer\ShaderManager.cpp" />
     <ClCompile Include="src\Util.cpp" />
     <ClCompile Include="src\renderer\loader\StaticLightFromGroundFace.cpp" />
+    <ClCompile Include="src\renderer\loader\StaticLightFromVobLight.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='DebugFast|Win32'">Create</PrecompiledHeader>
@@ -413,6 +414,7 @@
     <ClInclude Include="src\Settings.h" />
     <ClInclude Include="src\Util.h" />
     <ClInclude Include="src\renderer\loader\StaticLightFromGroundFace.h" />
+    <ClInclude Include="src\renderer\loader\StaticLightFromVobLight.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="src\game\TimerPrecision.h" />

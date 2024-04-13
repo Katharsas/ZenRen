@@ -48,4 +48,7 @@ namespace renderer::loader
     }
 
     void warnIfNotNormalized(const DirectX::XMVECTOR& source);
+
+    inline float fromSRGB(const float channel);
+    D3DXCOLOR fromSRGB(const D3DXCOLOR color);
 }

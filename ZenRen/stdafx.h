@@ -31,5 +31,6 @@
 //#define _XM_NO_INTRINSICS_ 
 #include <DirectXMath.h>
 #include <DirectXPackedVector.h>
+#include <DirectXCollision.h>
 
 #include "g3log/g3log.hpp"

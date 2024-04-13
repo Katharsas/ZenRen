@@ -107,7 +107,7 @@ namespace renderer::loader {
                     VERTEX_OTHER other;
                     other.normal = from(zenVert.Normal);
                     other.uvDiffuse = from(zenVert.TexCoord);
-                    other.colLight = D3DXCOLOR(zenVert.Color);
+                    other.colLight = fromSRGB(D3DXCOLOR(zenVert.Color));
                     //other.colLight = D3DXCOLOR(1, 1, 1, 0.f);
 
                     if (faceLightmapIndex == -1) {

@@ -253,3 +253,4 @@ imgui.ini
 /ZenRen/data_*
 *.tlog
 *.log.txt
+/tmp/

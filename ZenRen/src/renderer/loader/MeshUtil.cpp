@@ -50,4 +50,17 @@ namespace renderer::loader
             LOG(INFO) << "Vector was not normalized! " << source << "  |  " << normalized << "  |  " << nearEqualXm;
         }
     }
+
+    inline float fromSRGB(const float channel) {
+        return (channel <= 0.04045f) ? (channel / 12.92f) : pow((channel + 0.055f) / 1.055f, 2.4f);
+    }
+
+    D3DXCOLOR fromSRGB(const D3DXCOLOR color) {
+        auto result = color;
+        const float gamma = 2.2f;
+        result.r = fromSRGB(result.r);
+        result.g = fromSRGB(result.g);
+        result.b = fromSRGB(result.b);
+        return result;
+    }
 }

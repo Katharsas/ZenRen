@@ -14,6 +14,7 @@
 #include "TexFromVdfLoader.h"
 #include "VertPosLookup.h"
 #include "StaticLightFromGroundFace.h"
+#include "StaticLightFromVobLight.h"
 
 #include "DirectXTex.h"
 #include "zenload/zCMesh.h"
@@ -36,6 +37,8 @@ namespace renderer::loader {
     bool debugInstanceMeshBboxCenter = false;
     bool debugTintVobStaticLight = false;
     bool debugStaticLights = false;
+    bool debugStaticLightRays = false;
+    float debugStaticLightRaysMaxDist = 50;
 
     XMVECTOR bboxCenter(const array<VEC3, 2>& bbox) {
         return 0.5f * (toXM4Pos(bbox[0]) + toXM4Pos(bbox[1]));
@@ -82,7 +85,7 @@ namespace renderer::loader {
         if (debugInstanceMeshBboxCenter) {
             auto center = toVec3(bboxCenter(instance.bbox));
             auto scale = toVec3(0.7f * XMVectorAbs(toXM4Pos(instance.bbox[1]) - toXM4Pos(instance.bbox[0])));
-            loadPointDebugVisual(target, center, scale);
+            loadPointDebugVisual(target, center, scale, D3DXCOLOR(0, 0, 1, 1));
         }
         return true;
     }
@@ -124,7 +127,13 @@ namespace renderer::loader {
         };
     }
 
-    vector<Light> loadLights(vector<ZenLoad::zCVobData>& rootVobs)
+    void multiplyColor(D3DXCOLOR color, const float factor) {
+        color.r *= factor;
+        color.g *= factor;
+        color.b *= factor;
+    }
+
+    vector<Light> loadLights(const vector<ZenLoad::zCVobData>& rootVobs)
     {
         vector<Light> lights;
         vector<const ZenLoad::zCVobData*> vobs;
@@ -135,12 +144,14 @@ namespace renderer::loader {
             Light light = {
                 toVec3(toXM4Pos(vob.position) * 0.01f),
                 vob.zCVobLight.lightStatic,
-                D3DXCOLOR(vob.zCVobLight.color),
+                fromSRGB(D3DXCOLOR(vob.zCVobLight.color)),
                 vob.zCVobLight.range * 0.01f,
             };
 
             lights.push_back(light);
         }
+
+        LOG(INFO) << "VOBs: Loaded " << lights.size() << " static lights.";
         return lights;
     }
 
@@ -168,7 +179,17 @@ namespace renderer::loader {
         return result;
     }
 
-    D3DXCOLOR getLightAtPos(XMVECTOR posXm, const vector<Light>& lights, const LightLookupTree& lightLookup) {
+    int32_t vobLightWorldIntersectChecks = 0;
+
+    struct DebugLine {
+        VEC3 posStart;
+        VEC3 posEnd;
+        D3DXCOLOR color;
+    };
+
+    vector<DebugLine> lightToVobRays;
+
+    D3DXCOLOR getLightAtPos(XMVECTOR posXm, const vector<Light>& lights, const LightLookupTree& lightLookup, const unordered_map<Material, VEC_VERTEX_DATA>& worldMeshData, const VertLookupTree& worldFaceLookup) {
         auto pos = toVec3(posXm);
         float rayIntersectTolerance = 0.1f;
         auto searchBox = OrthoBoundingBox3D{
@@ -179,6 +200,7 @@ namespace renderer::loader {
         constexpr bool shouldFullyContain = false;
         auto intersectedBoxes = lightLookup.tree.RangeSearch<shouldFullyContain>(searchBox);
 
+        int32_t contributingLightCount = 0;
         D3DXCOLOR color = D3DXCOLOR(0.f, 0.f, 0.f, 1.f);
 
         for (auto boxIndex : intersectedBoxes) {
@@ -186,11 +208,26 @@ namespace renderer::loader {
             XMVECTOR lightPos = toXM4Pos(light.pos);
             float dist = XMVectorGetX(XMVector3Length(lightPos - posXm));
             float weight = 0;
-            if (dist < light.range) {
-                weight = 1.f - (dist / light.range);// TODO this assumes linear falloff for all light types, which is very likely wrong
-                color += (light.color * weight);
+            if (dist < (light.range * 1.0f)) {
+                vobLightWorldIntersectChecks++;
+                bool intersectedWorld = rayIntersectsWorldFaces(lightPos, posXm, dist * 0.85f, worldMeshData, worldFaceLookup);
+                if (!intersectedWorld) {
+                    contributingLightCount++;
+                    weight = 1.f - (dist / (light.range * 1.0f));
+                    color += (light.color * fromSRGB(weight));
+                }
+                if (dist < debugStaticLightRaysMaxDist) {
+                    lightToVobRays.push_back({ light.pos, pos, intersectedWorld ? D3DXCOLOR(0.f, 0.f, 1.f, 0.5f) : D3DXCOLOR(1.f, 0.f, 0.f, 0.5f) });
+                }
             }
         }
+
+        if (debugStaticLightRays) {
+            if (contributingLightCount == 0) {
+                color = D3DXCOLOR(0.f, 1.f, 0.f, 1.f);
+            }
+        }
+
         return color;
     }
 
@@ -255,7 +292,8 @@ namespace renderer::loader {
                     }
 
                     if (hasLightmap) {
-                        colLight = getLightAtPos(bboxCenter(instance.bbox), lightsStatic, lightStaticLookup);
+                        colLight = getLightAtPos(bboxCenter(instance.bbox), lightsStatic, lightStaticLookup, worldMeshData, worldFaceLookup);
+                        multiplyColor(colLight, fromSRGB(0.71f));
                         resolvedStaticLight++;
                     }
                     else {
@@ -264,7 +302,7 @@ namespace renderer::loader {
                             resolvedStaticLight++;
                         }
                         else {
-                            colLight = D3DXCOLOR(0.63f, 0.63f, 0.63f, 1);// fallback lightness of (160, 160, 160)
+                            colLight = fromSRGB(D3DXCOLOR(0.63f, 0.63f, 0.63f, 1));// fallback lightness of (160, 160, 160)
                         }
                     }
 
@@ -286,6 +324,7 @@ namespace renderer::loader {
         LOG(INFO) << "VOBs: Loaded " << statics.size() << " instances:";
         LOG(INFO) << "    " << "Static light: Resolved for " << resolvedStaticLight << " instances.";
         LOG(INFO) << "    " << "Static light: Duration: " << std::to_string(totalDurationMicros / 1000) << " ms total (" << std::to_string(maxDurationMicros) << " micros worst instance)";
+        LOG(INFO) << "    " << "Static light: Checked VobLight visibility " << vobLightWorldIntersectChecks << " times.";
 
         return statics;
     }
@@ -339,7 +378,13 @@ namespace renderer::loader {
 
         if (debugStaticLights) {
             for (auto& light : lightsStatic) {
-                loadPointDebugVisual(staticMeshData, light.pos);
+                float scale = light.range / 10.f;
+                loadPointDebugVisual(staticMeshData, light.pos, { scale, scale, scale });
+            }
+        }
+        if (debugStaticLightRays) {
+            for (auto& ray : lightToVobRays) {
+                loadLineDebugVisual(staticMeshData, ray.posStart, ray.posEnd, ray.color);
             }
         }
 

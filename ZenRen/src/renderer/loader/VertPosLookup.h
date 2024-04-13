@@ -16,10 +16,20 @@ namespace renderer::loader
 	struct VertLookupTree {
 		std::unordered_map<uint32_t, VertKey> bboxIndexToVert;
 		OrthoOctree tree;
+
+		const std::vector<VertKey> bboxIdsToVertIds(const std::vector<size_t>& bboxIds) const  {
+			std::vector<VertKey> result;
+			for (auto id : bboxIds) {
+				const auto& vertKey = this->bboxIndexToVert.find(id)->second;
+				result.push_back(vertKey);
+			}
+			return result;
+		}
 	};
 
 	VertLookupTree createVertLookup(const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData);
 	std::vector<VertKey> rayDownIntersected(const VertLookupTree& lookup, const VEC3& pos, float searchSizeY);
 	std::vector<VertKey> rayDownIntersectedNaive(const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData, const VEC3& pos, float searchSizeY);
+	std::vector<VertKey> rayIntersected(const VertLookupTree& lookup, const VEC3& rayPosStart, const VEC3& rayPosEnd);
 }
 

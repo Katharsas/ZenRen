@@ -94,7 +94,7 @@ namespace renderer::loader
         return result;
     }
 
-    void loadPointDebugVisual(unordered_map<Material, VEC_VERTEX_DATA>& target, const VEC3& pos, const VEC3& scale)
+    void loadPointDebugVisual(unordered_map<Material, VEC_VERTEX_DATA>& target, const VEC3& pos, const VEC3& scale, const D3DXCOLOR& color)
     {
         vector<VERTEX_POS> facesPos;
         vector<VERTEX_OTHER> facesOther;
@@ -107,11 +107,49 @@ namespace renderer::loader
                     faceNormal,
                     UV { 0, 0 },
                     ARRAY_UV { 0, 0, -1 },
-                    D3DXCOLOR(1, 0, 0, 1)
+                    color
                     });
             }
         }
         const Material defaultMat = { "point.tga" };
+        insert(target, defaultMat, facesPos, facesOther);
+    }
+
+    vector<array<XMVECTOR, 3>> createDebugLineVerts(const VEC3& posStart, const VEC3& posEnd, const float width)
+    {
+        float minWidth = 0.01f;
+        float actualWidth = std::max(minWidth, width);
+        VEC3 posStartTop = { posStart.x, posStart.y + actualWidth, posStart.z };
+        VEC3 posEndTop = { posEnd.x, posEnd.y + actualWidth, posEnd.z };
+
+        vector result = {
+            posToXM4({ posStart, posEnd, posEndTop }),
+            posToXM4({ posStart, posEndTop, posStartTop }),
+            // make double sided
+            posToXM4({ posStart, posStartTop, posEndTop }),
+            posToXM4({ posStart, posEndTop, posEnd }),
+        };
+        return result;
+    }
+
+    void loadLineDebugVisual(unordered_map<Material, VEC_VERTEX_DATA>& target, const VEC3& posStart, VEC3& posEnd, const D3DXCOLOR& color)
+    {
+        vector<VERTEX_POS> facesPos;
+        vector<VERTEX_OTHER> facesOther;
+        const auto& bboxFacesXm = createDebugLineVerts(posStart, posEnd, 0.02f);
+        for (auto& posXm : bboxFacesXm) {
+            const auto faceNormal = toVec3(calcFlatFaceNormal(posXm));
+            for (int32_t i = 0; i < 3; i++) {
+                facesPos.push_back(toVec3(posXm[i]));
+                facesOther.push_back({
+                    faceNormal,
+                    UV { 0, 0 },
+                    ARRAY_UV { 0, 0, -1 },
+                    color
+                    });
+            }
+        }
+        const Material defaultMat = { "line.tga" };
         insert(target, defaultMat, facesPos, facesOther);
     }
 }
