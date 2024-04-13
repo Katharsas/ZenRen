@@ -45,5 +45,6 @@ Simple, high performance DirectX11.1 renderer for Gothic assets (VDF or single f
 </pre>
 
 ### Screenshots
-![Oldcampe](Screenshots/oldcamp.jpg)
+![Oldcamp](Screenshots/oldcamp.jpg)
 ![Swampcamp](Screenshots/swampcamp.jpg)
+![YBerions Temple](Screenshots/yberion_temple.jpg)
