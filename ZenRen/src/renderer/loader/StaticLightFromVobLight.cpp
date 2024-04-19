@@ -24,5 +24,6 @@ namespace renderer::loader
                 return true;
             }
         }
+        return false;
     }
 }
