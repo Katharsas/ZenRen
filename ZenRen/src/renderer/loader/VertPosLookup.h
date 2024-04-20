@@ -6,7 +6,8 @@
 
 namespace renderer::loader
 {
-	// BoundingBox primitive.
+	// Primitives.
+	using OrthoVector3D = OrthoTree::VectorND<3, float>;
 	using OrthoBoundingBox3D = OrthoTree::BoundingBoxND<3, float>;
 
 	// We are using container variant (TreeBoxContainerND instead of TreeBoxND) so that bounding boxes are stored directly in tree and
@@ -30,6 +31,6 @@ namespace renderer::loader
 	VertLookupTree createVertLookup(const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData);
 	std::vector<VertKey> rayDownIntersected(const VertLookupTree& lookup, const VEC3& pos, float searchSizeY);
 	std::vector<VertKey> rayDownIntersectedNaive(const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData, const VEC3& pos, float searchSizeY);
-	std::vector<VertKey> rayIntersected(const VertLookupTree& lookup, const VEC3& rayPosStart, const VEC3& rayPosEnd);
+	std::vector<VertKey> rayIntersected(const VertLookupTree& lookup, const DirectX::XMVECTOR& rayPosStart, const DirectX::XMVECTOR& rayPosEnd);
 }
 

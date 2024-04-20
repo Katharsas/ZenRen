@@ -471,10 +471,10 @@ namespace OrthoTree
           continue;
         }
 
-        minDistances[dimensionID] = ((hComp > 0.0 ? Base::GetBoxMinC(box, dimensionID) : Base::GetBoxMaxC(box, dimensionID)) - tolerance -
+        minDistances[dimensionID] = ((hComp > 0.0 ? (Base::GetBoxMinC(box, dimensionID) - tolerance) : (Base::GetBoxMaxC(box, dimensionID) + tolerance)) -
                                      Base::GetPointC(rayBasePoint, dimensionID)) /
                                     hComp;
-        maxDistances[dimensionID] = ((hComp < 0.0 ? Base::GetBoxMinC(box, dimensionID) : Base::GetBoxMaxC(box, dimensionID)) + tolerance -
+        maxDistances[dimensionID] = ((hComp < 0.0 ? (Base::GetBoxMinC(box, dimensionID) - tolerance) : (Base::GetBoxMaxC(box, dimensionID) + tolerance)) -
                                      Base::GetPointC(rayBasePoint, dimensionID)) /
                                     hComp;
       }
@@ -758,12 +758,12 @@ namespace OrthoTree
     static autoce IS_LINEAR_TREE = DIMENSION_NO < 15;
 
     // Max value: 2 ^ DIMENSION_NO
-    using ChildID = uint64_t;
+    using ChildID = std::conditional < DIMENSION_NO<4, uint32_t, uint64_t>::type;
 
     // Max value: 2 ^ nDepth ^ DIMENSION_NO * 2 (signal bit)
-    using MortonGridID =
-      typename std::conditional <
-      DIMENSION_NO<4, uint32_t, typename std::conditional<IS_LINEAR_TREE, uint64_t, bitset_arithmetic<DIMENSION_NO * 4 + 1>>::type>::type;
+    using LinearMortonGridID = ChildID;
+    using NonLinearMortonGridID = bitset_arithmetic<DIMENSION_NO * 4 + 1>;
+    using MortonGridID = typename std::conditional<IS_LINEAR_TREE, LinearMortonGridID, NonLinearMortonGridID>::type;
 
     using MortonNodeID = MortonGridID; // same as the MortonGridID, but depth is signed by a sentinel bit.
     using MortonGridIDCR = typename std::conditional<IS_LINEAR_TREE, MortonNodeID const, MortonNodeID const&>::type;
@@ -827,7 +827,7 @@ namespace OrthoTree
         });
       }
 
-      constexpr void DisableChild(MortonNodeIDCR childKey) noexcept
+      constexpr void RemoveChild(MortonNodeIDCR childKey) noexcept
       {
         auto it = std::end(m_children);
         if constexpr (IS_LINEAR_TREE)
@@ -869,8 +869,13 @@ namespace OrthoTree
     using DimArray = std::array<T, DIMENSION_NO>;
 
     template<typename TData>
-    using UnderlyingContainer =
-      typename std::conditional<IS_LINEAR_TREE, std::unordered_map<MortonNodeID, TData>, std::map<MortonNodeID, TData, bitset_arithmetic_compare>>::type;
+    using LinearUnderlyingContainer = std::unordered_map<MortonNodeID, TData>;
+
+    template<typename TData>
+    using NonLinearUnderlyingContainer = std::map<MortonNodeID, TData, bitset_arithmetic_compare>;
+
+    template<typename TData>
+    using UnderlyingContainer = typename std::conditional<IS_LINEAR_TREE, LinearUnderlyingContainer<TData>, NonLinearUnderlyingContainer<TData>>::type;
 
   protected: // Member variables
     UnderlyingContainer<Node> m_nodes;
@@ -886,13 +891,12 @@ namespace OrthoTree
 
 
   protected: // Aid functions
-    template<std::size_t N>
-    static inline ChildID convertMortonIdToChildId(bitset_arithmetic<N> const& bs) noexcept
+    static inline ChildID castMortonIdToChildId(NonLinearMortonGridID const& bs) noexcept
     {
-      assert(bs <= bitset_arithmetic<N>(std::numeric_limits<std::size_t>::max()));
+      assert(bs <= NonLinearMortonGridID(std::numeric_limits<std::size_t>::max()));
       return bs.to_ullong();
     }
-    static constexpr ChildID convertMortonIdToChildId(uint64_t morton) noexcept { return morton; }
+    static constexpr ChildID castMortonIdToChildId(LinearMortonGridID morton) noexcept { return morton; }
 
   protected: // Grid functions
     struct RasterInfo
@@ -964,11 +968,9 @@ namespace OrthoTree
       return aid;
     }
 
-
     inline Node& createChild(Node& parentNode, ChildID childID, MortonNodeIDCR childKey) noexcept
     {
       assert(childID < this->CHILD_NO);
-      parentNode.AddChild(childKey);
 
       auto& nodeChild = m_nodes[childKey];
       if constexpr (std::is_integral_v<TGeometry>)
@@ -1044,8 +1046,25 @@ namespace OrthoTree
       return nodeChild;
     }
 
-
     constexpr MortonGridID getLocationID(TVector const& point) const noexcept { return MortonEncode(this->getGridIdPoint(point)); }
+
+    constexpr std::tuple<depth_t, MortonGridID> getDepthAndLocationID(TVector const& point) const noexcept
+    {
+      return { this->m_maxDepthNo, this->getLocationID(point) };
+    }
+
+    constexpr std::tuple<depth_t, MortonGridID> getDepthAndLocationID(TBox const& box) const noexcept
+    {
+      autoc entityMinMaxGridID = this->getGridIdBox(box);
+      auto minLocationID = MortonEncode(entityMinMaxGridID[0]);
+      autoc maxLocationID = MortonEncode(entityMinMaxGridID[1]);
+
+      auto depthNo = this->m_maxDepthNo;
+      for (auto locationDiffFlag = minLocationID ^ maxLocationID; IsValidKey(locationDiffFlag); locationDiffFlag >>= DIMENSION_NO, --depthNo)
+        minLocationID >>= DIMENSION_NO;
+
+      return { depthNo, minLocationID };
+    }
 
 
     bool isEveryItemIdUnique() const noexcept
@@ -1059,12 +1078,141 @@ namespace OrthoTree
       return itEndUnique == ids.end();
     }
 
-    template<bool DO_UNIQUENESS_CHECK_TO_INDICIES>
-    bool insert(MortonNodeIDCR nodeKey, MortonNodeIDCR smallestNodeKey, std::size_t entityID, bool doInsertToLeaf) noexcept
+    static constexpr ChildID getChildIDByDepth(depth_t parentDepth, depth_t childDepth, MortonNodeIDCR childNodeKey)
     {
-      if (nodeKey == smallestNodeKey)
+      autoc depthDifference = childDepth - parentDepth;
+      assert(depthDifference > 0);
+      return getChildPartOfLocation(childNodeKey >> (DIMENSION_NO * (depthDifference - 1)));
+    }
+
+    template<typename TData, bool DO_UNIQUENESS_CHECK_TO_INDICIES>
+    bool insertWithRebalancing(
+      MortonNodeIDCR parentNodeKey,
+      depth_t parentDepth,
+      MortonNodeIDCR entitiyNodeKey,
+      depth_t entityDepth,
+      std::size_t newEntityID,
+      std::span<TData const> const& geometryCollection) noexcept
+    {
+      auto& parentNode = this->m_nodes.at(parentNodeKey);
+      autoc shouldInsertInParentNode = entitiyNodeKey == parentNodeKey;
+
+      enum class ControlFlow
       {
-        cont_at(this->m_nodes, nodeKey).Entities.emplace_back(entityID);
+        InsertInParentNode,
+        ShouldCreateOnlyOneChild,
+        FullRebalancing,
+      };
+
+      autoc cf = [&] {
+        if (parentDepth < this->m_maxDepthNo)
+        {
+          autoc isParentNotLeafNode = parentNode.IsAnyChildExist();
+          // If possible, entity should be placed in a leaf node, therefore if the parent node is not a leaf, a new child should be created.
+          if (isParentNotLeafNode && !shouldInsertInParentNode)
+            return ControlFlow::ShouldCreateOnlyOneChild;
+          else if (parentNode.Entities.size() + 1 >= this->m_maxElementNo)
+            return ControlFlow::FullRebalancing;
+        }
+        return ControlFlow::InsertInParentNode;
+      }();
+
+      switch (cf)
+      {
+      case ControlFlow::ShouldCreateOnlyOneChild: {
+        autoc childID = getChildIDByDepth(parentDepth, entityDepth, entitiyNodeKey);
+        autoc parentFlag = parentNodeKey << DIMENSION_NO;
+        autoc childNodeKey = parentFlag | MortonGridID(childID);
+
+        parentNode.AddChildInOrder(childNodeKey);
+        auto& childNode = this->createChild(parentNode, childID, childNodeKey);
+        childNode.Entities.emplace_back(newEntityID);
+
+        break;
+      }
+
+      case ControlFlow::FullRebalancing: {
+        autoce isPointSolution = std::is_same_v<TVector, TData>;
+        autoc parentFlag = parentNodeKey << DIMENSION_NO;
+
+        if (!shouldInsertInParentNode)
+        {
+          autoc childID = getChildIDByDepth(parentDepth, entityDepth, entitiyNodeKey);
+          autoc childNodeKey = parentFlag | MortonGridID(childID);
+
+          parentNode.AddChildInOrder(childNodeKey);
+          auto& childNode = this->createChild(parentNode, childID, childNodeKey);
+          childNode.Entities.emplace_back(newEntityID);
+        }
+
+        size_t remainingEntityNo = parentNode.Entities.size();
+        for (size_t i = 0; i < remainingEntityNo; ++i)
+        {
+          auto entityID = parentNode.Entities[i];
+          autoc[depthID, locationID] = this->getDepthAndLocationID(geometryCollection[entityID]);
+          if (depthID <= parentDepth)
+            continue;
+
+          autoc childID = getChildIDByDepth(parentDepth, depthID, locationID);
+          autoc childNodeKey = parentFlag | MortonGridID(childID);
+          if (parentNode.HasChild(childNodeKey))
+          {
+            autoc entitiyNodeKey_ = GetHash(depthID, locationID);
+            autoc[parentNodeKey_, parentDepthID_] = FindSmallestNodeKeyWithDepth(entitiyNodeKey_);
+            insertWithRebalancing<TData, false>(parentNodeKey_, parentDepthID_, entitiyNodeKey_, depthID, entityID, geometryCollection);
+          }
+          else
+          {
+            parentNode.AddChildInOrder(childNodeKey);
+            auto& childNode = this->createChild(parentNode, childID, childNodeKey);
+            childNode.Entities.emplace_back(entityID);
+          }
+
+          if constexpr (!isPointSolution)
+          {
+            --remainingEntityNo;
+            parentNode.Entities[i] = parentNode.Entities[remainingEntityNo];
+            --i;
+          }
+        }
+
+        if constexpr (isPointSolution)
+          parentNode.Entities = {}; // All reserved memory should be freed.
+        else
+        {
+          if (shouldInsertInParentNode)
+          {
+            if (remainingEntityNo == parentNode.Entities.size())
+              parentNode.Entities.emplace_back(newEntityID);
+            else
+            {
+              parentNode.Entities[remainingEntityNo] = newEntityID;
+              ++remainingEntityNo;
+            }
+          }
+          parentNode.Entities.resize(remainingEntityNo);
+        }
+
+        break;
+      }
+
+      case ControlFlow::InsertInParentNode:
+      default: parentNode.Entities.emplace_back(newEntityID); break;
+      }
+
+
+      if constexpr (DO_UNIQUENESS_CHECK_TO_INDICIES)
+        assert(this->isEveryItemIdUnique()); // Assert means: index is already added. Wrong input!
+
+      return true;
+    }
+
+    template<bool DO_UNIQUENESS_CHECK_TO_INDICIES>
+    bool insertWithoutRebalancing(MortonNodeIDCR parentNodeKey, MortonNodeIDCR entityNodeKey, std::size_t entityID, bool doInsertToLeaf) noexcept
+    {
+      if (entityNodeKey == parentNodeKey)
+      {
+        cont_at(this->m_nodes, entityNodeKey).Entities.emplace_back(entityID);
         if constexpr (DO_UNIQUENESS_CHECK_TO_INDICIES)
           assert(this->isEveryItemIdUnique()); // Assert means: index is already added. Wrong input!
         return true;
@@ -1072,35 +1220,39 @@ namespace OrthoTree
 
       if (doInsertToLeaf)
       {
-        auto& newNode = this->m_nodes[nodeKey];
+        auto& newNode = this->m_nodes[entityNodeKey];
         newNode.Entities.emplace_back(entityID);
-        newNode.Box = this->CalculateExtent(nodeKey);
+        newNode.Box = this->CalculateExtent(entityNodeKey);
 
-        // Create all child between the new (nodeKey) and the smallest existing one (smallestNodeKey)
-        auto parentNodeKey = nodeKey;
+        // Create all child between the new (entityNodeKey) and the smallest existing one (parentNodeKey)
+        auto newParentNodeKey = entityNodeKey;
         do
         {
-          auto childNodeKey = parentNodeKey;
-          parentNodeKey >>= DIMENSION_NO;
+          auto childNodeKey = newParentNodeKey;
+          newParentNodeKey >>= DIMENSION_NO;
           assert(IsValidKey(parentNodeKey));
-          auto& parentNode = this->m_nodes[parentNodeKey];
-          parentNode.AddChildInOrder(childNodeKey);
-          parentNode.Box = this->CalculateExtent(parentNodeKey);
-        } while (parentNodeKey != smallestNodeKey);
+          auto& newParentNode = this->m_nodes[newParentNodeKey];
+          newParentNode.AddChildInOrder(childNodeKey);
+          newParentNode.Box = this->CalculateExtent(newParentNodeKey);
+        } while (newParentNodeKey != parentNodeKey);
       }
       else
       {
-        autoc nodeIterator = this->m_nodes.find(smallestNodeKey);
-        if (nodeIterator->second.IsAnyChildExist())
+        auto& parentNode = this->m_nodes.at(parentNodeKey);
+        if (parentNode.IsAnyChildExist())
         {
-          autoc nDepth = this->GetDepthID(smallestNodeKey);
-          autoc childNodeKey = nodeKey << (DIMENSION_NO * (this->m_maxDepthNo - nDepth - 1));
-          autoc childID = getChildPartOfLocation(childNodeKey);
-          auto& nodeChild = this->createChild(nodeIterator->second, childID, childNodeKey);
+          autoc parentDepth = this->GetDepthID(parentNodeKey);
+          autoc parentFlag = parentNodeKey << DIMENSION_NO;
+
+          autoc childID = getChildIDByDepth(parentDepth, this->GetDepthID(entityNodeKey), entityNodeKey);
+          autoc childNodeKey = parentFlag | MortonGridID(childID);
+
+          parentNode.AddChildInOrder(childNodeKey);
+          auto& nodeChild = this->createChild(parentNode, childID, childNodeKey);
           nodeChild.Entities.emplace_back(entityID);
         }
         else
-          nodeIterator->second.Entities.emplace_back(entityID);
+          parentNode.Entities.emplace_back(entityID);
       }
 
       if constexpr (DO_UNIQUENESS_CHECK_TO_INDICIES)
@@ -1109,14 +1261,28 @@ namespace OrthoTree
       return true;
     }
 
-    template<typename TData = Node>
-    static void reserveContainer(std::map<MortonNodeID, TData, bitset_arithmetic_compare>&, std::size_t) noexcept {};
+    template<typename TData>
+    static void reserveContainer(NonLinearUnderlyingContainer<TData>&, std::size_t) noexcept {};
 
-    template<typename TData = Node>
-    static void reserveContainer(std::unordered_map<MortonNodeID, TData>& m, std::size_t n) noexcept
+    template<typename TData>
+    static void reserveContainer(LinearUnderlyingContainer<TData>& m, std::size_t n) noexcept
     {
       m.reserve(n);
     };
+
+    void removeNodeIfPossible(MortonNodeIDCR nodeKey, Node const& node) noexcept
+    {
+      if (nodeKey == GetRootKey())
+        return;
+
+      if (node.IsAnyChildExist() || !node.Entities.empty())
+        return;
+
+      autoc parentKey = nodeKey >> DIMENSION_NO;
+      auto& parentNode = this->m_nodes.at(parentKey);
+      parentNode.RemoveChild(nodeKey);
+      this->m_nodes.erase(nodeKey);
+    }
 
   public: // Static aid functions
     static constexpr std::size_t EstimateNodeNumber(std::size_t elementNo, depth_t maxDepthNo, std::size_t maxElementNo) noexcept
@@ -1164,13 +1330,9 @@ namespace OrthoTree
 
     static constexpr MortonNodeID GetRootKey() noexcept { return MortonNodeID{ 1 }; }
 
-    static constexpr bool IsValidKey(uint64_t key) noexcept { return key; }
+    static constexpr bool IsValidKey(LinearMortonGridID key) noexcept { return key > 0; }
 
-    template<std::size_t N>
-    static inline bool IsValidKey(bitset_arithmetic<N> const& key) noexcept
-    {
-      return !key.none();
-    }
+    static inline bool IsValidKey(NonLinearMortonGridID const& key) noexcept { return key.any(); }
 
     static depth_t GetDepthID(MortonNodeID key) noexcept
     {
@@ -1196,7 +1358,7 @@ namespace OrthoTree
       if constexpr (IS_LINEAR_TREE)
       {
         autoce maskLastBits1 = (MortonNodeID{ 1 } << DIMENSION_NO) - 1;
-        return convertMortonIdToChildId(key & maskLastBits1);
+        return castMortonIdToChildId(key & maskLastBits1);
       }
       else
       {
@@ -1204,7 +1366,7 @@ namespace OrthoTree
         for (dim_t dimensionID = 0; dimensionID < DIMENSION_NO; ++dimensionID)
           childID[dimensionID] = key[dimensionID];
 
-        return convertMortonIdToChildId(childID);
+        return castMortonIdToChildId(childID);
       }
     }
 
@@ -1296,18 +1458,26 @@ namespace OrthoTree
 
   public: // Getters
     inline auto const& GetNodes() const noexcept { return m_nodes; }
+    inline bool HasNode(MortonNodeIDCR key) const noexcept { return m_nodes.contains(key); }
     inline auto const& GetNode(MortonNodeIDCR key) const noexcept { return m_nodes.at(key); }
     inline auto const& GetBox() const noexcept { return m_boxSpace; }
     inline auto GetDepthMax() const noexcept { return m_maxDepthNo; }
     inline auto GetResolutionMax() const noexcept { return m_maxRasterResolution; }
+    inline auto GetNodeIDByEntity(std::size_t entityID) const noexcept
+    {
+      autoc it = std::ranges::find_if(m_nodes, [&](autoc& keyAndValue) {
+        return std::ranges::find(keyAndValue.second.Entities, entityID) != keyAndValue.second.Entities.end();
+      });
 
+      return it == m_nodes.end() ? MortonNodeID{} : it->first;
+    }
 
   public: // Main service functions
     // Alternative creation mode (instead of Create), Init then Insert items into leafs one by one. NOT RECOMMENDED.
     constexpr void Init(TBox const& box, depth_t maxDepthNo, std::size_t maxElementNo = 11) noexcept
     {
-      assert(this->m_nodes.empty()); // To build/setup/create the tree, use the Create() [recommended] or Init() function. If an already builded tree
-                                     // is wanted to be reset, use the Reset() function before init.
+      assert(this->m_nodes.empty()); // To build/setup/create the tree, use the Create() [recommended] or Init() function. If an already builded
+                                     // tree is wanted to be reset, use the Reset() function before init.
       assert(maxDepthNo > 1);
       assert(maxDepthNo <= MAX_THEORETICAL_DEPTH);
       assert(maxDepthNo < std::numeric_limits<uint8_t>::max());
@@ -1339,7 +1509,6 @@ namespace OrthoTree
     using FProcedureUnconditional = std::function<void(MortonNodeIDCR, Node const&, bool)>;
     using FSelector = std::function<bool(MortonNodeIDCR, Node const&)>;
     using FSelectorUnconditional = std::function<bool(MortonNodeIDCR, Node const&)>;
-
 
     // Visit nodes with special selection and procedure in breadth-first search order
     void VisitNodes(MortonNodeIDCR rootKey, FProcedure const& procedure, FSelector const& selector) const noexcept
@@ -1533,6 +1702,14 @@ namespace OrthoTree
       AD::MoveBox(this->m_boxSpace, moveVector);
     }
 
+    std::tuple<MortonNodeID, depth_t> FindSmallestNodeKeyWithDepth(MortonNodeID searchKey) const noexcept
+    {
+      for (depth_t depthID = this->m_maxDepthNo; IsValidKey(searchKey); searchKey >>= DIMENSION_NO, --depthID)
+        if (this->m_nodes.contains(searchKey))
+          return { searchKey, depthID };
+
+      return {}; // Not found
+    }
 
     MortonNodeID FindSmallestNodeKey(MortonNodeID searchKey) const noexcept
     {
@@ -1541,6 +1718,38 @@ namespace OrthoTree
           return searchKey;
 
       return MortonNodeID{}; // Not found
+    }
+
+    // Get Node ID of a point
+    MortonNodeID GetNodeID(TVector const& searchPoint) const noexcept
+    {
+      autoc locationID = this->getLocationID(searchPoint);
+      return this->GetHash(this->m_maxDepthNo, locationID);
+    }
+
+    // Get Node ID of a point
+    MortonNodeID GetNodeID(TBox const& box) const noexcept
+    {
+      autoc[depthNo, locationID] = this->getDepthAndLocationID(box);
+      return this->GetHash(depthNo, locationID);
+    }
+
+    // Find smallest node which contains the box
+    MortonNodeID FindSmallestNode(TVector const& searchPoint) const noexcept
+    {
+      if (!AD::DoesBoxContainPoint(this->m_boxSpace, searchPoint))
+        return MortonNodeID{};
+
+      return this->FindSmallestNodeKey(this->GetNodeID(searchPoint));
+    }
+
+    // Find smallest node which contains the box
+    MortonNodeID FindSmallestNode(TBox const& box) const noexcept
+    {
+      if (!AD::AreBoxesOverlapped(this->m_boxSpace, box))
+        return MortonNodeID{};
+
+      return FindSmallestNodeKey(this->GetNodeID(box));
     }
 
     MortonNodeID Find(std::size_t entityID) const noexcept
@@ -1628,8 +1837,6 @@ namespace OrthoTree
     void rangeSearch(
       TBox const& range,
       std::span<TData const> const& geometryCollection,
-      double rangeVolume,
-      double parentNodeVolume,
       Node const& currentNode,
       std::vector<std::size_t>& foundEntities,
       std::size_t minEntityID = 0) const noexcept
@@ -1637,7 +1844,6 @@ namespace OrthoTree
       rangeSearchCopy<TData, DO_RANGE_MUST_FULLY_CONTAIN, DO_COLLECT_ONLY_LARGER_THAN_MIN_ENTITY_ID>(
         range, geometryCollection, currentNode, foundEntities, minEntityID);
 
-      autoc currentNodeVolume = parentNodeVolume / this->CHILD_NO;
       for (MortonNodeIDCR keyChild : currentNode.GetChildren())
       {
         autoc& childNode = this->GetNode(keyChild);
@@ -1654,11 +1860,11 @@ namespace OrthoTree
         if (!isOverlapped)
           continue;
 
-        if (rangeVolume >= currentNodeVolume && AD::AreBoxesOverlapped(range, childNode.Box))
+        if (AD::AreBoxesOverlapped(range, childNode.Box))
           collectAllIdInDFS<DO_COLLECT_ONLY_LARGER_THAN_MIN_ENTITY_ID>(childNode, foundEntities, minEntityID);
         else
           rangeSearch<TData, DO_RANGE_MUST_FULLY_CONTAIN, DO_COLLECT_ONLY_LARGER_THAN_MIN_ENTITY_ID>(
-            range, geometryCollection, rangeVolume, currentNodeVolume, childNode, foundEntities, minEntityID);
+            range, geometryCollection, childNode, foundEntities, minEntityID);
       }
     }
 
@@ -1676,7 +1882,7 @@ namespace OrthoTree
       {
         foundEntities.resize(DO_COLLECT_ONLY_LARGER_THAN_MIN_ENTITY_ID ? entityNo - minEntityID - 1 : entityNo);
         std::iota(foundEntities.begin(), foundEntities.end(), DO_COLLECT_ONLY_LARGER_THAN_MIN_ENTITY_ID ? minEntityID + 1 : 0);
-        return entityNo;
+        return entityNo > 0;
       }
 
       // If the range has zero volume, it could stuck at any node comparison with point/side touch. It is eliminated to work node bounding box independently.
@@ -1701,14 +1907,11 @@ namespace OrthoTree
       for (dim_t dimensionID = 0; dimensionID < DIMENSION_NO; ++dimensionID)
         rangeVolume *= AD::GetBoxMaxC(range, dimensionID) - AD::GetBoxMinC(range, dimensionID);
 
-      autoc nodeVolume = this->m_volumeOfOverallSpace / static_cast<double>(1 << (DIMENSION_NO * depthNo));
-
       autoc foundEntityNoEstimation =
         this->m_volumeOfOverallSpace < 0.01 ? 10 : static_cast<std::size_t>((rangeVolume * entityNo) / this->m_volumeOfOverallSpace);
       foundEntities.reserve(foundEntityNoEstimation);
       autoc& node = this->GetNode(smallestNodeKey);
-      rangeSearch<TData, DO_RANGE_MUST_FULLY_CONTAIN, DO_COLLECT_ONLY_LARGER_THAN_MIN_ENTITY_ID>(
-        range, geometryCollection, rangeVolume, nodeVolume, node, foundEntities, minEntityID);
+      rangeSearch<TData, DO_RANGE_MUST_FULLY_CONTAIN, DO_COLLECT_ONLY_LARGER_THAN_MIN_ENTITY_ID>(range, geometryCollection, node, foundEntities, minEntityID);
 
       if constexpr (!DOES_LEAF_NODE_CONTAIN_ELEMENT_ONLY)
       {
@@ -1896,15 +2099,16 @@ namespace OrthoTree
 
       while (locationBeginIterator != locationEndIterator)
       {
-        autoc actualChildID = Base::convertMortonIdToChildId((locationBeginIterator->GridID - gridID) >> shift);
+        autoc actualChildID = Base::castMortonIdToChildId((locationBeginIterator->GridID - gridID) >> shift);
         autoc actualEndIterator = std::partition_point(locationBeginIterator, locationEndIterator, [&](autoc& location) {
-          return actualChildID == Base::convertMortonIdToChildId((location.GridID - gridID) >> shift);
+          return actualChildID == Base::castMortonIdToChildId((location.GridID - gridID) >> shift);
         });
 
         autoc actualChildGridID = MortonGridID(actualChildID);
         MortonGridID const childKey = parentKeyFlag | actualChildGridID;
         MortonGridID const beginChildGridID = gridID + actualChildGridID * stepNo;
 
+        parentNode.AddChild(childKey);
         auto& childNode = this->createChild(parentNode, actualChildID, childKey);
         this->addNodes(childNode, childKey, locationBeginIterator, actualEndIterator, beginChildGridID, remainingDepth);
       }
@@ -1960,29 +2164,50 @@ namespace OrthoTree
       tree.addNodes(nodeRoot, rootKey, beginIterator, pointLocations.end(), MortonNodeID{ 0 }, maxDepthNo);
     }
 
-
   public: // Edit functions
-    // Insert item into a node. If doInsertToLeaf is true: The smallest node will be chosen by the max depth. If doInsertToLeaf is false: The smallest existing level on the branch will be chosen.
-    bool Insert(std::size_t entityID, TVector const& point, bool doInsertToLeaf = false) noexcept
+    bool InsertWithRebalancing(std::size_t newEntityID, TVector const& newPoint, std::span<TVector const> const& points) noexcept
     {
-      if (!AD::DoesBoxContainPoint(this->m_boxSpace, point))
+      if (!AD::DoesBoxContainPoint(this->m_boxSpace, newPoint))
         return false;
 
-      autoc smallestNodeKey = FindSmallestNode(point);
+      autoc[entityDepth, entityLocation] = this->getDepthAndLocationID(newPoint);
+      autoc entityNodeKey = Base::GetHash(entityDepth, entityLocation);
+      autoc[parentNodeKey, parentDepthID] = this->FindSmallestNodeKeyWithDepth(entityNodeKey);
+      if (!Base::IsValidKey(parentNodeKey))
+        return false;
+
+      return this->template insertWithRebalancing<TVector, true>(parentNodeKey, parentDepthID, entityNodeKey, entityDepth, newEntityID, points);
+    }
+
+    // Insert item into a node. If doInsertToLeaf is true: The smallest node will be chosen by the max depth. If doInsertToLeaf is false: The smallest existing level on the branch will be chosen.
+    bool Insert(std::size_t entityID, TVector const& newPoint, bool doInsertToLeaf = false) noexcept
+    {
+      if (!AD::DoesBoxContainPoint(this->m_boxSpace, newPoint))
+        return false;
+
+      autoc entityNodeKey = this->GetNodeID(newPoint);
+      autoc smallestNodeKey = this->FindSmallestNodeKey(entityNodeKey);
       if (!Base::IsValidKey(smallestNodeKey))
         return false;
 
-      autoc idLocation = this->getLocationID(point);
-      autoc nodeKey = this->GetHash(this->m_maxDepthNo, idLocation);
-
-      return this->template insert<true>(nodeKey, smallestNodeKey, entityID, doInsertToLeaf);
+      return this->template insertWithoutRebalancing<true>(smallestNodeKey, entityNodeKey, entityID, doInsertToLeaf);
     }
 
     // Erase an id. Traverse all node if it is needed, which has major performance penalty.
     template<bool DO_UPDATE_ENTITY_IDS = true>
     constexpr bool EraseId(std::size_t entityID) noexcept
     {
-      autoc isErased = std::ranges::any_of(this->m_nodes, [&](auto& pairNode) { return erase(pairNode.second.Entities, entityID); });
+      bool isErased = false;
+      for (auto& [nodeKey, node] : this->m_nodes)
+      {
+        if (std::erase(node.Entities, entityID))
+        {
+          this->removeNodeIfPossible(nodeKey, node);
+          isErased = true;
+          break;
+        }
+      }
+
       if (!isErased)
         return false;
 
@@ -2001,16 +2226,16 @@ namespace OrthoTree
     template<bool DO_UPDATE_ENTITY_IDS = true>
     bool Erase(std::size_t entitiyID, TVector const& entityOriginalPoint) noexcept
     {
-      autoc oldKey = FindSmallestNode(entityOriginalPoint);
-      if (!Base::IsValidKey(oldKey))
+      autoc nodeKey = this->FindSmallestNode(entityOriginalPoint);
+      if (!Base::IsValidKey(nodeKey))
         return false; // old box is not in the handled space domain
 
-      auto& idList = cont_at(this->m_nodes, oldKey).Entities;
-      autoc endIteratorAfterRemove = std::remove(idList.begin(), idList.end(), entitiyID);
-      if (endIteratorAfterRemove == idList.end())
+      auto& node = this->m_nodes.at(nodeKey);
+      autoc endIteratorAfterRemove = std::remove(node.Entities.begin(), node.Entities.end(), entitiyID);
+      if (endIteratorAfterRemove == node.Entities.end())
         return false; // id was not registered previously.
 
-      idList.erase(endIteratorAfterRemove, idList.end());
+      node.Entities.erase(endIteratorAfterRemove, node.Entities.end());
 
       if constexpr (DO_UPDATE_ENTITY_IDS)
       {
@@ -2019,6 +2244,8 @@ namespace OrthoTree
             id -= entitiyID < id;
         });
       }
+
+      this->removeNodeIfPossible(nodeKey, node);
 
       return true;
     }
@@ -2050,17 +2277,32 @@ namespace OrthoTree
     }
 
 
-  public: // Search functions
-    // Find smallest node which contains the box
-    MortonNodeID FindSmallestNode(TVector const& searchPoint) const noexcept
+    // Update id with rebalancing by the new point information
+    bool Update(std::size_t entityID, TVector const& newPoint, std::span<TVector const> const& points) noexcept
     {
-      if (!AD::DoesBoxContainPoint(this->m_boxSpace, searchPoint))
-        return MortonNodeID{};
+      if (!AD::DoesBoxContainPoint(this->m_boxSpace, newPoint))
+        return false;
 
-      autoc locationID = this->getLocationID(searchPoint);
-      return this->FindSmallestNodeKey(this->GetHash(this->m_maxDepthNo, locationID));
+      if (!this->EraseId<false>(entityID))
+        return false;
+
+      return this->InsertWithRebalancing(entityID, newPoint, points);
     }
 
+
+    // Update id with rebalacing by the new point information and the erase part is aided by the old point geometry data
+    bool Update(std::size_t entityID, TVector const& oldPoint, TVector const& newPoint, std::span<TVector const> const& points) noexcept
+    {
+      if (!AD::DoesBoxContainPoint(this->m_boxSpace, newPoint))
+        return false;
+
+      if (!this->Erase<false>(entityID, oldPoint))
+        return false;
+
+      return this->InsertWithRebalancing(entityID, newPoint, points);
+    }
+
+  public: // Search functions
     bool Contains(TVector const& searchPoint, std::span<TVector const> const& points, TGeometry tolerance) const noexcept
     {
       autoc smallestNodeKey = this->FindSmallestNode(searchPoint);
@@ -2164,7 +2406,7 @@ namespace OrthoTree
     std::vector<std::size_t> GetNearestNeighbors(TVector const& searchPoint, std::size_t neighborNo, std::span<TVector const> const& points) const noexcept
     {
       auto neighborEntities = std::multiset<EntityDistance>();
-      autoc smallestNodeKey = FindSmallestNode(searchPoint);
+      autoc smallestNodeKey = this->FindSmallestNode(searchPoint);
       if (Base::IsValidKey(smallestNodeKey))
       {
         autoc& smallestNode = this->GetNode(smallestNodeKey);
@@ -2290,7 +2532,7 @@ namespace OrthoTree
     {
       assert(depthID <= location.DepthID);
       autoc gridIDOnCurrentDepth = location.MinGridID >> ((location.DepthID - depthID) * DIMENSION_NO);
-      return Base::convertMortonIdToChildId(gridIDOnCurrentDepth - nodeIDOnCurrentDepth);
+      return Base::castMortonIdToChildId(gridIDOnCurrentDepth - nodeIDOnCurrentDepth);
     }
 
 
@@ -2345,6 +2587,7 @@ namespace OrthoTree
         MortonGridID const childKey = parentFlag | actualChildID_;
         MortonGridID const firstChildLocationID = firstLocationID + actualChildID_ * locationStepNo;
 
+        parentNode.AddChild(childKey);
         auto& nodeChild = this->createChild(parentNode, actualChildID, childKey);
         this->addNodes(nodeChild, childKey, beginLocationIterator, actualEndLocationIterator, firstChildLocationID, remainingDepthNo);
       }
@@ -2534,54 +2777,46 @@ namespace OrthoTree
       }
     }
 
-
   public: // Edit functions
-    // Find smallest node which contains the box by grid id description
-    MortonNodeID FindSmallestNode(std::array<DimArray<GridID>, 2> const& entityMinMaxGridID) const noexcept
+    bool InsertWithRebalancing(std::size_t newEntityID, TBox const& newBox, std::span<TBox const> const& boxes) noexcept
     {
-      auto minLocationID = Base::MortonEncode(entityMinMaxGridID[0]);
-      auto maxLocationID = Base::MortonEncode(entityMinMaxGridID[1]);
+      if (!AD::AreBoxesOverlapped(this->m_boxSpace, newBox))
+        return false;
 
-      auto depthNo = this->m_maxDepthNo;
-      for (auto locationDiffFlag = minLocationID ^ maxLocationID; Base::IsValidKey(locationDiffFlag); locationDiffFlag >>= DIMENSION_NO, --depthNo)
-        minLocationID >>= DIMENSION_NO;
+      auto locations = std::vector<Location>(1);
+      setLocation(newBox, 0, locations);
 
-      autoc endIterator = this->m_nodes.end();
-      for (auto smallestNodeKey = this->GetHash(depthNo, minLocationID); Base::IsValidKey(smallestNodeKey); smallestNodeKey >>= DIMENSION_NO)
-        if (this->m_nodes.find(smallestNodeKey) != endIterator)
-          return smallestNodeKey;
+      for (autoc& location : locations)
+      {
+        autoc entityNodeKey = this->GetHash(location.DepthID, location.MinGridID);
+        autoc parentNodeKey = this->FindSmallestNodeKey(entityNodeKey);
 
-      return MortonNodeID{}; // Not found
-    }
+        if (!this->template insertWithRebalancing<TBox, SPLIT_DEPTH_INCREASEMENT == 0>(
+              parentNodeKey, Base::GetDepthID(parentNodeKey), entityNodeKey, location.DepthID, newEntityID, boxes))
+          return false;
+      }
 
-
-    // Find smallest node which contains the box
-    MortonNodeID FindSmallestNode(TBox const& box) const noexcept
-    {
-      if (!AD::AreBoxesOverlapped(this->m_boxSpace, box))
-        return MortonNodeID{};
-
-      return FindSmallestNode(this->getGridIdBox(box));
+      return true;
     }
 
 
     // Insert item into a node. If doInsertToLeaf is true: The smallest node will be chosen by the max depth. If doInsertToLeaf is false: The smallest existing level on the branch will be chosen.
-    bool Insert(std::size_t entityID, TBox const& box, bool doInsertToLeaf = false) noexcept
+    bool Insert(std::size_t newEntityID, TBox const& newBox, bool doInsertToLeaf = false) noexcept
     {
-      if (!AD::AreBoxesOverlapped(this->m_boxSpace, box))
+      if (!AD::AreBoxesOverlapped(this->m_boxSpace, newBox))
         return false;
 
-      autoc smallestNodeKey = FindSmallestNode(box);
+      autoc smallestNodeKey = this->FindSmallestNode(newBox);
       if (!Base::IsValidKey(smallestNodeKey))
         return false; // new box is not in the handled space domain
 
       auto locations = std::vector<Location>(1);
-      setLocation(box, 0, locations);
+      setLocation(newBox, 0, locations);
 
       for (autoc& location : locations)
       {
-        autoc nodeKey = this->GetHash(location.DepthID, location.MinGridID);
-        if (!this->template insert<SPLIT_DEPTH_INCREASEMENT == 0>(nodeKey, smallestNodeKey, entityID, doInsertToLeaf))
+        autoc entityNodeKey = this->GetHash(location.DepthID, location.MinGridID);
+        if (!this->template insertWithoutRebalancing<SPLIT_DEPTH_INCREASEMENT == 0>(smallestNodeKey, entityNodeKey, newEntityID, doInsertToLeaf))
           return false;
       }
 
@@ -2590,9 +2825,9 @@ namespace OrthoTree
 
 
   private:
-    bool doErase(MortonNodeIDCR nodeKey, std::size_t entityID) noexcept
+    bool doErase(Node& node, std::size_t entityID) noexcept
     {
-      auto& idList = cont_at(this->m_nodes, nodeKey).Entities;
+      auto& idList = node.Entities;
       autoc endIteratorAfterRemove = std::remove(idList.begin(), idList.end(), entityID);
       if (endIteratorAfterRemove == idList.end())
         return false; // id was not registered previously.
@@ -2605,13 +2840,17 @@ namespace OrthoTree
     template<depth_t REMAINING_DEPTH>
     bool doEraseRec(MortonNodeIDCR nodeKey, std::size_t entityID) noexcept
     {
-      auto ret = this->doErase(nodeKey, entityID);
+      auto& node = this->m_nodes.at(nodeKey);
+      auto ret = this->doErase(node, entityID);
       if constexpr (REMAINING_DEPTH > 0)
       {
-        autoc& node = this->GetNode(nodeKey);
-        for (MortonNodeIDCR childKey : node.GetChildren())
+        autoc children = node.GetChildren();
+        for (MortonNodeIDCR childKey : children)
           ret |= doEraseRec<REMAINING_DEPTH - 1>(childKey, entityID);
       }
+
+      this->removeNodeIfPossible(nodeKey, node);
+
       return ret;
     }
 
@@ -2621,7 +2860,7 @@ namespace OrthoTree
     template<bool DO_UPDATE_ENTITY_IDS = true>
     bool Erase(std::size_t entityIDToErase, TBox const& box) noexcept
     {
-      autoc smallestNodeKey = FindSmallestNode(box);
+      autoc smallestNodeKey = this->FindSmallestNode(box);
       if (!Base::IsValidKey(smallestNodeKey))
         return false; // old box is not in the handled space domain
 
@@ -2644,13 +2883,36 @@ namespace OrthoTree
     template<bool DO_UPDATE_ENTITY_IDS = true>
     constexpr bool EraseId(std::size_t idErase) noexcept
     {
-      bool bErased = false;
+      bool isErased = false;
       if constexpr (SPLIT_DEPTH_INCREASEMENT == 0)
-        bErased = std::ranges::any_of(this->m_nodes, [&](auto& pairNode) { return erase(pairNode.second.Entities, idErase); });
+      {
+        for (auto& [nodeKey, node] : this->m_nodes)
+        {
+          if (std::erase(node.Entities, idErase) > 0)
+          {
+            this->removeNodeIfPossible(nodeKey, node);
+            isErased = true;
+            break;
+          }
+        }
+      }
       else
-        std::ranges::for_each(this->m_nodes, [&](auto& pairNode) { bErased |= erase(pairNode.second.Entities, idErase) > 0; });
+      {
+        auto erasableNodes = std::vector<MortonNodeID>{};
+        for (auto& [nodeKey, node] : this->m_nodes)
+        {
+          autoc isErasedInCurrent = std::erase(node.Entities, idErase) > 0;
+          if (isErasedInCurrent)
+            erasableNodes.emplace_back(nodeKey);
 
-      if (!bErased)
+          isErased |= isErasedInCurrent;
+        }
+
+        for (MortonNodeIDCR nodeKey : erasableNodes)
+          this->removeNodeIfPossible(nodeKey, this->GetNode(nodeKey));
+      }
+
+      if (!isErased)
         return false;
 
       if constexpr (DO_UPDATE_ENTITY_IDS)
@@ -2676,20 +2938,50 @@ namespace OrthoTree
     }
 
 
-    // Update id by the new point information and the erase part is aided by the old bounding box geometry data
+    // Update id by the new bounding box information and the erase part is aided by the old bounding box geometry data
     bool Update(std::size_t entityID, TBox const& oldBox, TBox const& newBox, bool doInsertToLeaf = false) noexcept
     {
       if (!AD::AreBoxesOverlapped(this->m_boxSpace, newBox))
         return false;
 
       if constexpr (SPLIT_DEPTH_INCREASEMENT == 0)
-        if (FindSmallestNode(oldBox) == FindSmallestNode(newBox))
+        if (this->FindSmallestNode(oldBox) == this->FindSmallestNode(newBox))
           return true;
 
       if (!this->Erase<false>(entityID, oldBox))
         return false; // entityID was not registered previously.
 
       return this->Insert(entityID, newBox, doInsertToLeaf);
+    }
+
+
+    // Update id with rebalancing by the new bounding box information
+    bool Update(std::size_t entityID, TBox const& boxNew, std::span<TBox const> const& boxes) noexcept
+    {
+      if (!AD::AreBoxesOverlapped(this->m_boxSpace, boxNew))
+        return false;
+
+      if (!this->EraseId<false>(entityID))
+        return false;
+
+      return this->InsertWithRebalancing(entityID, boxNew, boxes);
+    }
+
+
+    // Update id with rebalancing by the new bounding box information and the erase part is aided by the old bounding box geometry data
+    bool Update(std::size_t entityID, TBox const& oldBox, TBox const& newBox, std::span<TBox const> const& boxes) noexcept
+    {
+      if (!AD::AreBoxesOverlapped(this->m_boxSpace, newBox))
+        return false;
+
+      if constexpr (SPLIT_DEPTH_INCREASEMENT == 0)
+        if (this->FindSmallestNode(oldBox) == this->FindSmallestNode(newBox))
+          return true;
+
+      if (!this->Erase<false>(entityID, oldBox))
+        return false; // entityID was not registered previously.
+
+      return this->InsertWithRebalancing(entityID, newBox, boxes);
     }
 
 
@@ -3358,7 +3650,7 @@ namespace OrthoTree
   using Point3D = OrthoTree::PointND<3, BaseGeometryType>;
   using BoundingBox1D = OrthoTree::BoundingBoxND<1, BaseGeometryType>;
   using BoundingBox2D = OrthoTree::BoundingBoxND<2, BaseGeometryType>;
-  using OrthoBoundingBox3D = OrthoTree::BoundingBoxND<3, BaseGeometryType>;
+  using BoundingBox3D = OrthoTree::BoundingBoxND<3, BaseGeometryType>;
   using Ray2D = OrthoTree::RayND<2, BaseGeometryType>;
   using Ray3D = OrthoTree::RayND<3, BaseGeometryType>;
   using Plane2D = OrthoTree::PlaneND<2, BaseGeometryType>;
@@ -3399,7 +3691,7 @@ namespace OrthoTree
   using OctreePoint = TreePointND<3, BaseGeometryType>;
 
   // Octree for bounding boxes
-  using OrthoOctree = TreeBoxND<3, 2, BaseGeometryType>;
+  using OctreeBox = TreeBoxND<3, 2, BaseGeometryType>;
 
   // Hexatree for points
   using HexatreePoint = TreePointND<4, BaseGeometryType>;

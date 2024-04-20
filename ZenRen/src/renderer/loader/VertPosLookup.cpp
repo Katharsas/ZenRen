@@ -1,13 +1,23 @@
 #include "stdafx.h"
 #include "VertPosLookup.h"
 
+#include "MeshUtil.h"
+
 namespace renderer::loader
 {
     using ::std::vector;
     using ::std::unordered_map;
     using ::std::array;
+    using DirectX::XMVECTOR;
 
-    const float rayIntersectTolerance = 0.0001f;
+    const float rayIntersectTolerance = 0.001f;
+
+    OrthoVector3D toOrthoVec3(const XMVECTOR& xm4)
+    {
+        DirectX::XMFLOAT4 result;
+        DirectX::XMStoreFloat4(&result, xm4);
+        return { result.x, result.y, result.z };
+    }
 
     OrthoBoundingBox3D createBB3D(const vector<VERTEX_POS>& verts, uint32_t vertIndex)
     {
@@ -23,22 +33,6 @@ namespace renderer::loader
             maxZ = std::max(maxZ, vert.z);
         }
         return OrthoTree::BoundingBoxND<3, float>{ {minX, minY, minZ}, {maxX, maxY, maxZ} };
-    }
-
-    OrthoBoundingBox3D createRaySearchBox(const array<VEC3, 2>& posStartEnd)
-    {
-        float minX =  FLT_MAX, minY =  FLT_MAX, minZ =  FLT_MAX;
-        float maxX = -FLT_MAX, maxY = -FLT_MAX, maxZ = -FLT_MAX;
-        for (uint32_t i = 0; i < posStartEnd.size(); i++) {
-            auto& vert = posStartEnd[i];
-            minX = std::min(minX, vert.x);
-            minY = std::min(minY, vert.y);
-            minZ = std::min(minZ, vert.z);
-            maxX = std::max(maxX, vert.x);
-            maxY = std::max(maxY, vert.y);
-            maxZ = std::max(maxZ, vert.z);
-        }
-        return OrthoTree::BoundingBoxND<3, float>{ {minX, minY, minZ}, { maxX, maxY, maxZ } };
     }
 
     VertLookupTree createVertLookup(const unordered_map<Material, VEC_VERTEX_DATA>& meshData)
@@ -66,29 +60,15 @@ namespace renderer::loader
 
     vector<VertKey> rayDownIntersected(const VertLookupTree& lookup, const VEC3& pos, float searchSizeY)
     {
-        auto searchBox = OrthoBoundingBox3D{
-            { pos.x - rayIntersectTolerance, pos.y - searchSizeY, pos.z - rayIntersectTolerance },
-            { pos.x + rayIntersectTolerance, pos.y,               pos.z + rayIntersectTolerance }
-        };
-
-        constexpr bool shouldFullyContain = false;
-        auto intersectedBoxes = lookup.tree.RangeSearch<shouldFullyContain>(searchBox);
-
-        // TODO while RayIntersectedAll should be equivalent from what i understand, it is missing most bboxes that RangeSearch finds
-        //auto intersectedBoxes = lookup.tree.RayIntersectedAll({ pos.x, pos.y, pos.z }, { 0, -100.f, 0 }, rayIntersectTolerance, searchSizeY);
-
+        auto intersectedBoxes = lookup.tree.RayIntersectedAll({ pos.x, pos.y, pos.z }, { 0, -1, 0 }, rayIntersectTolerance, searchSizeY);
         return lookup.bboxIdsToVertIds(intersectedBoxes);
     }
 
-    vector<VertKey> rayIntersected(const VertLookupTree& lookup, const VEC3& rayPosStart, const VEC3& rayPosEnd) {
-        // TODO
-        // RayIntersectedAll is not giving the expected results, until then just get all boxes that intersect the bbox of the ray.
-        // This will be very slow for long rays but we just don't to long rays for now. We could also construct multiple bboxes along the ray.
-
-        auto searchBox = createRaySearchBox({ rayPosStart, rayPosEnd });
-
-        constexpr bool shouldFullyContain = false;
-        auto intersectedBoxes = lookup.tree.RangeSearch<shouldFullyContain>(searchBox);
+    vector<VertKey> rayIntersected(const VertLookupTree& lookup, const XMVECTOR& rayPosStart, const XMVECTOR& rayPosEnd)
+    {
+        XMVECTOR dirXm = DirectX::XMVectorSubtract(rayPosEnd, rayPosStart);
+        float length = DirectX::XMVectorGetX(DirectX::XMVector3Length(dirXm));
+        auto intersectedBoxes = lookup.tree.RayIntersectedAll(toOrthoVec3(rayPosStart), toOrthoVec3(dirXm), rayIntersectTolerance, length);
 
         return lookup.bboxIdsToVertIds(intersectedBoxes);
     }
@@ -97,7 +77,8 @@ namespace renderer::loader
     // Naive implementation does quadratic looping over all world faces each time, no spatial structure used. For debugging purposes.
     // ##############################################################################################################################
 
-    __inline bool rayDownIntersectsFaceBB(const VEC3& pos, const vector<VERTEX_POS>& verts, const size_t vertIndex, const float searchSizeY) {
+    inline bool rayDownIntersectsFaceBB(const VEC3& pos, const vector<VERTEX_POS>& verts, const size_t vertIndex, const float searchSizeY)
+    {
         float minX =  FLT_MAX, minY =  FLT_MAX, minZ =  FLT_MAX;
         float maxX = -FLT_MAX, maxY = -FLT_MAX, maxZ = -FLT_MAX;
 

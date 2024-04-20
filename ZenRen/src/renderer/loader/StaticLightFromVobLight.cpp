@@ -12,7 +12,7 @@ namespace renderer::loader
     bool rayIntersectsWorldFaces(XMVECTOR rayStart, XMVECTOR rayEnd, float maxDistance, const unordered_map<Material, VEC_VERTEX_DATA>& meshData, const VertLookupTree& vertLookup)
     {
         XMVECTOR direction = DirectX::XMVector3Normalize(rayEnd - rayStart);
-        vector<VertKey> vertKeys = rayIntersected(vertLookup, toVec3(rayStart), toVec3(rayEnd));
+        vector<VertKey> vertKeys = rayIntersected(vertLookup, rayStart, rayEnd);
         for (auto& vertKey : vertKeys) {
             auto& face = vertKey.getPos(meshData);
             XMVECTOR faceA = toXM4Pos(face[0]);

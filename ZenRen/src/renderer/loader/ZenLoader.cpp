@@ -187,9 +187,15 @@ namespace renderer::loader {
         D3DXCOLOR color;
     };
 
-    vector<DebugLine> lightToVobRays;
+    vector<DebugLine> debugLightToVobRays;
 
-    D3DXCOLOR getLightAtPos(XMVECTOR posXm, const vector<Light>& lights, const LightLookupTree& lightLookup, const unordered_map<Material, VEC_VERTEX_DATA>& worldMeshData, const VertLookupTree& worldFaceLookup) {
+    struct DirectionalLight {
+        D3DXCOLOR color;
+        XMVECTOR dirInverted;
+    };
+
+    std::optional<DirectionalLight> getLightAtPos(XMVECTOR posXm, const vector<Light>& lights, const LightLookupTree& lightLookup, const unordered_map<Material, VEC_VERTEX_DATA>& worldMeshData, const VertLookupTree& worldFaceLookup)
+    {
         auto pos = toVec3(posXm);
         float rayIntersectTolerance = 0.1f;
         auto searchBox = OrthoBoundingBox3D{
@@ -202,33 +208,43 @@ namespace renderer::loader {
 
         int32_t contributingLightCount = 0;
         D3DXCOLOR color = D3DXCOLOR(0.f, 0.f, 0.f, 1.f);
+        XMVECTOR candidateLightDir = XMVectorSet(0, 0, 0, 0);// TODO this is actually not necessary, but fixes warnings
+        float candidateScore = 0;
 
         for (auto boxIndex : intersectedBoxes) {
             auto& light = lights[boxIndex];
             XMVECTOR lightPos = toXM4Pos(light.pos);
             float dist = XMVectorGetX(XMVector3Length(lightPos - posXm));
-            float weight = 0;
             if (dist < (light.range * 1.0f)) {
                 vobLightWorldIntersectChecks++;
                 bool intersectedWorld = rayIntersectsWorldFaces(lightPos, posXm, dist * 0.85f, worldMeshData, worldFaceLookup);
                 if (!intersectedWorld) {
                     contributingLightCount++;
-                    weight = 1.f - (dist / (light.range * 1.0f));
-                    color += (light.color * fromSRGB(weight));
+                    float weight = 1.f - (dist / (light.range * 1.0f));
+                    weight = fromSRGB(weight);
+                    color += (light.color * weight);
+                    float perceivedLum = (light.color.r * 0.299f + light.color.g * 0.587f + light.color.b * 0.114f);
+                    float score = weight * perceivedLum;
+                    if (score > candidateScore) {
+                        candidateLightDir = toXM4Pos(light.pos) - posXm;
+                        candidateScore = score;
+                    }
                 }
                 if (dist < debugStaticLightRaysMaxDist) {
-                    lightToVobRays.push_back({ light.pos, pos, intersectedWorld ? D3DXCOLOR(0.f, 0.f, 1.f, 0.5f) : D3DXCOLOR(1.f, 0.f, 0.f, 0.5f) });
+                    debugLightToVobRays.push_back({ light.pos, pos, intersectedWorld ? D3DXCOLOR(0.f, 0.f, 1.f, 0.5f) : D3DXCOLOR(1.f, 0.f, 0.f, 0.5f) });
                 }
             }
         }
 
-        if (debugStaticLightRays) {
-            if (contributingLightCount == 0) {
-                color = D3DXCOLOR(0.f, 1.f, 0.f, 1.f);
-            }
+        if (contributingLightCount == 0) {
+            return std::nullopt;
         }
-
-        return color;
+        else {
+            return DirectionalLight {
+                color,
+                candidateLightDir,
+            };
+        }
     }
 
     vector<StaticInstance> loadVobs(vector<ZenLoad::zCVobData>& rootVobs, const unordered_map<Material, VEC_VERTEX_DATA>& worldMeshData, const vector<Light>& lightsStatic, const bool isOutdoorLevel) {
@@ -271,11 +287,8 @@ namespace renderer::loader {
                 // Luckily it seems like the VOB instance BB is already transformed and axis-aligned.
                 instance.bbox = bboxToVec3Scaled(vob.bbox);
                 {
-                    // TODO check if would should receive static light from groundPoly (static flag in vob?)
-                    // TODO is default static vob color?
                     const auto now = std::chrono::high_resolution_clock::now();
 
-                    // TODO if indoor or ground poly has lightmap, use lights, otherwise use ground face!
                     D3DXCOLOR colLight;
                     const XMVECTOR center = bboxCenter(instance.bbox);
                     const std::optional<VertKey> vertKey = getGroundFaceAtPos(center, worldMeshData, worldFaceLookup);
@@ -292,8 +305,24 @@ namespace renderer::loader {
                     }
 
                     if (hasLightmap) {
-                        colLight = getLightAtPos(bboxCenter(instance.bbox), lightsStatic, lightStaticLookup, worldMeshData, worldFaceLookup);
-                        multiplyColor(colLight, fromSRGB(0.71f));
+                        // TODO
+                        // The more lights get summed, the bigger the SRGB summing error is. 
+                        // More light additions -> brighter in SRGB than linar; less lights -> closer brightness
+                        // The final weight (0.71f) in Vanilla Gothic might be there to counteract this error, but should lead to objects
+                        // hit by less objects to be overly dark. Maybe adjust weight to lower value? Check low hit objects.
+                        
+                        auto optLight = getLightAtPos(bboxCenter(instance.bbox), lightsStatic, lightStaticLookup, worldMeshData, worldFaceLookup);
+                        if (optLight.has_value()) {
+                            colLight = optLight.value().color;
+                            //multiplyColor(light.color, fromSRGB(0.71f));
+                            multiplyColor(colLight, fromSRGB(0.88f));
+                        }
+                        else {
+                            colLight = D3DXCOLOR(0, 0, 0, 1);// no lights reached this vob, so its black
+                            if (debugStaticLightRays) {
+                                colLight = D3DXCOLOR(0, 1, 0, 1);
+                            }
+                        }
                         resolvedStaticLight++;
                     }
                     else {
@@ -383,7 +412,7 @@ namespace renderer::loader {
             }
         }
         if (debugStaticLightRays) {
-            for (auto& ray : lightToVobRays) {
+            for (auto& ray : debugLightToVobRays) {
                 loadLineDebugVisual(staticMeshData, ray.posStart, ray.posEnd, ray.color);
             }
         }
