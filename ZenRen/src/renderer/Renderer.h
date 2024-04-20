@@ -47,6 +47,7 @@ namespace renderer
 		DirectX::XMMATRIX transform;
 		std::array<VEC3, 2> bbox;// pos_min, pos_max
 		D3DXCOLOR colLightStatic;
+		DirectX::XMVECTOR dirLightStatic;// pre-inverted
 	};
 
 	struct Light {

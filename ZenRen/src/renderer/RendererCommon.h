@@ -70,19 +70,20 @@ namespace renderer
 		return os << "[NOR:" << that.normal << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
 	}
 
-	struct NORMAL_CL_UV_LUV {
+	struct NORMAL_CL_UV_LUV_STATIC_LIGHT {
 		VEC3 normal;
 		UV uvDiffuse;
 		ARRAY_UV uvLightmap;
 		D3DXCOLOR colLight;
+		VEC3 dirLight;
 	};
-	inline std::ostream& operator <<(std::ostream& os, const NORMAL_CL_UV_LUV& that)
+	inline std::ostream& operator <<(std::ostream& os, const NORMAL_CL_UV_LUV_STATIC_LIGHT& that)
 	{
-		return os << "[NOR:" << that.normal << " LIGHT:" << that.colLight << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
+		return os << "[NOR:" << that.normal << " COL_LIGHT:" << that.colLight << " DIR_LIGHT:" << that.dirLight << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
 	}
 
 	typedef VEC3 VERTEX_POS;
-	typedef NORMAL_CL_UV_LUV VERTEX_OTHER;
+	typedef NORMAL_CL_UV_LUV_STATIC_LIGHT VERTEX_OTHER;
 
 	struct VEC_VERTEX_DATA {
 		std::vector<VERTEX_POS> vecPos;

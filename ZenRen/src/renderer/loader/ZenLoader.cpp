@@ -289,6 +289,8 @@ namespace renderer::loader {
                 {
                     const auto now = std::chrono::high_resolution_clock::now();
 
+                    instance.dirLightStatic = -1 * XMVectorSet(1, -0.5, -1.0, 0);
+
                     D3DXCOLOR colLight;
                     const XMVECTOR center = bboxCenter(instance.bbox);
                     const std::optional<VertKey> vertKey = getGroundFaceAtPos(center, worldMeshData, worldFaceLookup);
@@ -315,7 +317,9 @@ namespace renderer::loader {
                         if (optLight.has_value()) {
                             colLight = optLight.value().color;
                             //multiplyColor(light.color, fromSRGB(0.71f));
-                            multiplyColor(colLight, fromSRGB(0.88f));
+                            //multiplyColor(colLight, fromSRGB(0.88f));
+
+                            instance.dirLightStatic = optLight.value().dirInverted;
                         }
                         else {
                             colLight = D3DXCOLOR(0, 0, 0, 1);// no lights reached this vob, so its black
