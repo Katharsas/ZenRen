@@ -76,6 +76,7 @@ namespace renderer
 		ARRAY_UV uvLightmap;
 		D3DXCOLOR colLight;
 		VEC3 dirLight;
+		float lightSun;
 	};
 	inline std::ostream& operator <<(std::ostream& os, const NORMAL_CL_UV_LUV_STATIC_LIGHT& that)
 	{

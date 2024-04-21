@@ -26,8 +26,8 @@ namespace renderer::world {
 		Solid = 0,
 		Diffuse = 1,
 		Normal = 2,
-		Light_Static = 3,
-		Lightmap = 4,
+		Light_Sun = 3,
+		Light_Static = 4,
 	};
 
 	__declspec(align(16))
@@ -299,11 +299,11 @@ namespace renderer::world {
 		else if (settings.shader.mode == ShaderMode::Normals) {
 			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Normal;
 		}
+		else if (settings.shader.mode == ShaderMode::Light_Sun) {
+			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Light_Sun;
+		}
 		else if (settings.shader.mode == ShaderMode::Light_Static) {
 			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Light_Static;
-		}
-		else if (settings.shader.mode == ShaderMode::Lightmap) {
-			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Lightmap;
 		}
 		else if (settings.shader.mode == ShaderMode::Solid || settings.shader.mode == ShaderMode::Default) {
 			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Solid;

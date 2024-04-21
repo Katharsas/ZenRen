@@ -133,10 +133,11 @@ namespace renderer::loader
         float v0Contrib = 1 - (v0Distance / totalDistance);
         float v1Contrib = 1 - (v1Distance / totalDistance);
         float v2Contrib = 1 - (v2Distance / totalDistance);
+        D3DXCOLOR v0Color = others[vertIndex].colLight;
+        D3DXCOLOR v1Color = others[vertIndex + 1].colLight;
+        D3DXCOLOR v2Color = others[vertIndex + 2].colLight;
         D3DXCOLOR colorAverage =
-            ((others[vertIndex].colLight * v0Contrib)
-                + (others[vertIndex + 1].colLight * v1Contrib)
-                + (others[vertIndex + 2].colLight * v2Contrib)) / 2.f;
+            ((v0Color * v0Contrib) + (v1Color * v1Contrib) + (v2Color * v2Contrib)) / 2.f;
         return colorAverage;
     }
 

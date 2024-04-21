@@ -110,6 +110,7 @@ namespace renderer::loader {
                     other.colLight = fromSRGB(D3DXCOLOR(zenVert.Color));
                     //other.colLight = D3DXCOLOR(1, 1, 1, 0.f);
                     other.dirLight = { -100, -100, -100 };// value that is easy to check as not normalized in shader
+                    other.lightSun = faceLightmapIndex == -1 ? 1 : 0;
 
                     if (faceLightmapIndex == -1) {
                         other.uvLightmap = { 0, 0, -1 };
@@ -238,6 +239,7 @@ namespace renderer::loader {
                     other.uvLightmap = { 0, 0, -1 };
                     other.colLight = instance.colLightStatic;
                     other.dirLight = toVec3(XMVector3Normalize(instance.dirLightStatic));
+                    other.lightSun = instance.receiveLightSun ? 1 : 0;
 
                     // flip faces (seems like zEngine uses counter-clockwise winding, while we use clockwise winding)
                     // TODO use D3D11_RASTERIZER_DESC FrontCounterClockwise instead?

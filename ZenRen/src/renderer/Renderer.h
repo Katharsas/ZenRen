@@ -12,8 +12,8 @@ namespace renderer
 		Solid,
 		Diffuse,
 		Normals,
-		Light_Static,
-		Lightmap
+		Light_Sun,
+		Light_Static
 	};
 
 	struct ShaderSettings {
@@ -46,6 +46,7 @@ namespace renderer
 		std::string meshName;
 		DirectX::XMMATRIX transform;
 		std::array<VEC3, 2> bbox;// pos_min, pos_max
+		bool receiveLightSun;
 		D3DXCOLOR colLightStatic;
 		DirectX::XMVECTOR dirLightStatic;// pre-inverted
 	};

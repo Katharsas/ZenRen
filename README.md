@@ -9,6 +9,10 @@ Simple, high performance DirectX11.1 renderer for Gothic assets (VDF or single f
 ### Currently supports
 - Worldmesh (ZEN)
 - Static Objects (VOBs)
+- Static Light
+  - Lightmaps
+  - Per-Vertex Colors
+  - Per-Vob Static Light Accumulation (Color & Direction)
 
 ### Features
 - Frame Limiter
@@ -27,8 +31,6 @@ Simple, high performance DirectX11.1 renderer for Gothic assets (VDF or single f
 ### TODO
 - Sky
 - Water / Morph-Meshes
-- Per-Vertex baked shadows
-- Lightmaps
 - Time Of Day (Gothic LUT Tonemapping)
 
 ### Options

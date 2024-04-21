@@ -31,6 +31,7 @@ struct VS_IN
     float3 uvLightmap : TEXCOORD1;
     float4 colLight : COLOR;
     float3 dirLight : NORMAL1;
+    float sunLight : TEXCOORD2;
 };
 
 struct VS_OUT
@@ -66,22 +67,19 @@ float CalcLightDirectional(float3 dirLight, float3 dirNormal, float lightRatioAt
 
 float CalcLightSun(float3 dirLight, float3 dirNormal)
 {
-    float lightReceived = CalcLightDirectional(dirLight, dirNormal, 0.20f, 0.10f);
-    float strength = 2.f;
+    float lightReceived = CalcLightDirectional(dirLight, dirNormal, 0.6f, 0.3f);
+    //float strength = 2.f;
+    float strength = 1.0f;
     return lightReceived * strength;
 }
 
-float CalcLightStatic(float3 dirLight, float3 dirNormal)
+float CalcLightStaticVob(float3 dirLight, float3 dirNormal)
 {
-    float lightReceived = 1;
-    if (dirLight.x > -99) {
-        lightReceived = CalcLightDirectional(dirLight, dirNormal, 0.20f, 0.07f);
-    }
-    float strength = 2.1f;
+    float lightReceived = CalcLightDirectional(dirLight, dirNormal, 0.f, 0.f);
+    //float strength = 2.1f;
+    float strength = 5.5f;
     return lightReceived * strength;
 }
-
-static float staticLightOnlyFactor = 1.2f;
 
 VS_OUT VS_Main(VS_IN input)
 {
@@ -102,11 +100,10 @@ VS_OUT VS_Main(VS_IN input)
 
     bool enableLightSun = false;
     bool enableLightStatic = false;
+    bool isVob = (input.dirLight.x > -99);
 
     if (!debugOutput || debugOutputType == FLAG_OUTPUT_SOLID) {
-        if (input.dirLight.x <= -99) {
-            enableLightSun = true;
-        }
+        enableLightSun = true;
         enableLightStatic = true;
     }
     if (debugOutput && debugOutputType == FLAG_OUTPUT_LIGHT_SUN) {
@@ -116,21 +113,33 @@ VS_OUT VS_Main(VS_IN input)
         enableLightStatic = true;
     }
 
+    float3 lightSun = (float3) (input.sunLight * CalcLightSun(viewLight3, viewNormal3));
+    float3 lightStatic;
+    float3 lightAmbient;
+    if (isVob) {
+        lightStatic = input.colLight * CalcLightStaticVob(input.dirLight, viewNormal3);
+        lightAmbient = input.colLight * 0.16f;// original SRGB factor = 0.4f
+    }
+    else {
+        lightStatic = input.colLight;
+        lightAmbient = 0.f;
+    }
+
     output.light = (float3) 0;
-    float3 lightSun = (float3) (CalcLightSun(viewLight3, viewNormal3));
-    float3 lightStatic = input.colLight * CalcLightStatic(input.dirLight, viewNormal3);
     if (enableLightSun && enableLightStatic) {
-        output.light = (lightSun * 0.5f) + (lightStatic * 0.5f);
+        output.light = (lightSun * 0.3f) + ((lightAmbient + lightStatic) * 0.7f);
     }
     else if (enableLightSun) {
-        output.light = lightSun;
+        output.light = lightSun * 0.3f;
     }
     else if (enableLightStatic) {
-        output.light = lightStatic * staticLightOnlyFactor;
+        output.light = (lightAmbient + lightStatic) * 0.7f;
     }
     else {
         output.light = (float3) 1;
     }
+    
+    output.light *= 1.1;// TODO do this in tonemapping stage or something
 
     output.position = mul(viewPosition, projectionMatrix);
     output.uvBaseColor = input.uvBaseColor;
@@ -224,7 +233,6 @@ float4 PS_Main(PS_IN input) : SV_TARGET
             || debugOutputType == FLAG_OUTPUT_LIGHT_STATIC) {
         if (input.uvLightmap.z >= 0) /* dynamic branch */ {
             lightColor = SampleLightmap(input.uvLightmap);
-            lightColor.rgb *= staticLightOnlyFactor;
         }
     }
 

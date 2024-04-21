@@ -305,6 +305,7 @@ namespace renderer::loader {
                             hasLightmap = true;
                         }
                     }
+                    instance.receiveLightSun = !hasLightmap;
 
                     if (hasLightmap) {
                         // TODO
@@ -317,7 +318,7 @@ namespace renderer::loader {
                         if (optLight.has_value()) {
                             colLight = optLight.value().color;
                             //multiplyColor(light.color, fromSRGB(0.71f));
-                            //multiplyColor(colLight, fromSRGB(0.88f));
+                            multiplyColor(colLight, fromSRGB(0.85f));
 
                             instance.dirLightStatic = optLight.value().dirInverted;
                         }
@@ -339,9 +340,27 @@ namespace renderer::loader {
                         }
                     }
 
+                    // outdoor vobs get additional fixed ambient
+                    if (isOutdoorLevel && !hasLightmap) {
+                        // TODO
+                        // Original game knows if a ground poly is in a portal room (without lightmap, like a cave) or actually outdoors
+                        // from per-ground-face flag. Find out how this is calculated or shoot some rays towards the sky.
+                        bool isVobIndoor = false;
+                        if (isVobIndoor) {
+                            colLight = colLight * fromSRGB(0.8f) + fromSRGB(greyscale(0.2f));
+                            colLight = (colLight * 1.4f) + greyscale(0.05f);// simulate effect of SRGB addition error
+                        }
+                        else {
+                            colLight = colLight * fromSRGB(0.5f) + fromSRGB(greyscale(0.5f));
+                            colLight = (colLight * 2.5f) - greyscale(0.25f);// simulate effect of SRGB addition error
+                        }
+                    }
+
                     if (debugTintVobStaticLight) {
                         colLight = D3DXCOLOR((colLight.r / 3.f) * 2.f, colLight.g, colLight.b, colLight.a);
                     }
+
+                    colLight.a = 1;
                     instance.colLightStatic = colLight;
 
                     const auto duration = std::chrono::high_resolution_clock::now() - now;
