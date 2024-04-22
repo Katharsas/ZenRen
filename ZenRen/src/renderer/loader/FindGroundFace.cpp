@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "StaticLightFromGroundFace.h"
+#include "FindGroundFace.h"
 
 #include "MeshUtil.h"
 
@@ -119,26 +119,6 @@ namespace renderer::loader
             }
         }
         return currentBestIndex;
-    }
-
-    D3DXCOLOR interpolateColor(const VEC3& pos, const unordered_map<Material, VEC_VERTEX_DATA>& meshData, const VertKey& vertKey) {
-        auto& vecVertData = meshData.find(*vertKey.mat)->second;
-        auto& vecPos = vecVertData.vecPos;
-        auto& others = vecVertData.vecNormalUv;
-        auto vertIndex = vertKey.vertIndex;
-        float v0Distance = std::sqrt(std::pow(vecPos[vertIndex].x - pos.x, 2.f) + std::pow(vecPos[vertIndex].z - pos.z, 2.f));
-        float v1Distance = std::sqrt(std::pow(vecPos[vertIndex + 1].x - pos.x, 2.f) + std::pow(vecPos[vertIndex + 1].z - pos.z, 2.f));
-        float v2Distance = std::sqrt(std::pow(vecPos[vertIndex + 2].x - pos.x, 2.f) + std::pow(vecPos[vertIndex + 2].z - pos.z, 2.f));
-        float totalDistance = v0Distance + v1Distance + v2Distance;
-        float v0Contrib = 1 - (v0Distance / totalDistance);
-        float v1Contrib = 1 - (v1Distance / totalDistance);
-        float v2Contrib = 1 - (v2Distance / totalDistance);
-        D3DXCOLOR v0Color = others[vertIndex].colLight;
-        D3DXCOLOR v1Color = others[vertIndex + 1].colLight;
-        D3DXCOLOR v2Color = others[vertIndex + 2].colLight;
-        D3DXCOLOR colorAverage =
-            ((v0Color * v0Contrib) + (v1Color * v1Contrib) + (v2Color * v2Contrib)) / 2.f;
-        return colorAverage;
     }
 
     std::optional<VertKey> getGroundFaceAtPos(const XMVECTOR pos, const unordered_map<Material, VEC_VERTEX_DATA>& meshData, const VertLookupTree& vertLookup)

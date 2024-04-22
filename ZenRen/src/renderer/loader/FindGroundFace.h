@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../RendererCommon.h"
-#include "VertPosLookup.h"
+#include "LookupTrees.h"
 
 namespace renderer::loader
 {

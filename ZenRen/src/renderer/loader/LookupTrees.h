@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../RendererCommon.h"
+#include "../Renderer.h"
 
 #include "octree_attcs/octree.h"
 
@@ -32,5 +32,11 @@ namespace renderer::loader
 	std::vector<VertKey> rayDownIntersected(const VertLookupTree& lookup, const VEC3& pos, float searchSizeY);
 	std::vector<VertKey> rayDownIntersectedNaive(const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData, const VEC3& pos, float searchSizeY);
 	std::vector<VertKey> rayIntersected(const VertLookupTree& lookup, const DirectX::XMVECTOR& rayPosStart, const DirectX::XMVECTOR& rayPosEnd);
+
+	struct LightLookupTree {
+		OrthoOctree tree;
+	};
+
+	LightLookupTree createLightLookup(const std::vector<Light>& lights);
 }
 

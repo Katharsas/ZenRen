@@ -12,9 +12,9 @@
 #include "MeshFromVdfLoader.h"
 #include "DebugMeshes.h"
 #include "TexFromVdfLoader.h"
-#include "VertPosLookup.h"
-#include "StaticLightFromGroundFace.h"
-#include "StaticLightFromVobLight.h"
+#include "LookupTrees.h"
+#include "FindGroundFace.h"
+#include "StaticLightFromVobLights.h"
 
 #include "DirectXTex.h"
 #include "zenload/zCMesh.h"
@@ -38,9 +38,9 @@ namespace renderer::loader {
     bool debugTintVobStaticLight = false;
     bool debugStaticLights = false;
     bool debugStaticLightRays = false;
-    float debugStaticLightRaysMaxDist = 50;
 
-    XMVECTOR bboxCenter(const array<VEC3, 2>& bbox) {
+    XMVECTOR bboxCenter(const array<VEC3, 2>& bbox)
+    {
         return 0.5f * (toXM4Pos(bbox[0]) + toXM4Pos(bbox[1]));
     }
 
@@ -127,7 +127,8 @@ namespace renderer::loader {
         };
     }
 
-    void multiplyColor(D3DXCOLOR color, const float factor) {
+    void multiplyColor(D3DXCOLOR color, const float factor)
+    {
         color.r *= factor;
         color.g *= factor;
         color.b *= factor;
@@ -155,99 +156,28 @@ namespace renderer::loader {
         return lights;
     }
 
-    struct LightLookupTree {
-        OrthoOctree tree;
-    };
-
-    LightLookupTree createLightLookup(const vector<Light>& lights)
+    D3DXCOLOR interpolateColor(const VEC3& pos, const unordered_map<Material, VEC_VERTEX_DATA>& meshData, const VertKey& vertKey)
     {
-        vector<OrthoBoundingBox3D> bboxes;
-        for (auto& light : lights) {
-            auto pos = light.pos;
-            auto range = light.range;
-            bboxes.push_back({
-                {pos.x - range, pos.y - range, pos.z - range},
-                {pos.x + range, pos.y + range, pos.z + range}
-            });
-        }
-        LightLookupTree result;
-        result.tree = OrthoOctree(bboxes
-            , 8 // max depth
-            , std::nullopt // user-provided bounding Box for all
-            , 10 // max element in a node; 10 works well for us and has been observed to work well in general according to lib author (Github)
-        );
-        return result;
+        auto& vecVertData = meshData.find(*vertKey.mat)->second;
+        auto& vecPos = vecVertData.vecPos;
+        auto& others = vecVertData.vecNormalUv;
+        auto vertIndex = vertKey.vertIndex;
+        float v0Distance = std::sqrt(std::pow(vecPos[vertIndex + 0].x - pos.x, 2.f) + std::pow(vecPos[vertIndex + 0].z - pos.z, 2.f));
+        float v1Distance = std::sqrt(std::pow(vecPos[vertIndex + 1].x - pos.x, 2.f) + std::pow(vecPos[vertIndex + 1].z - pos.z, 2.f));
+        float v2Distance = std::sqrt(std::pow(vecPos[vertIndex + 2].x - pos.x, 2.f) + std::pow(vecPos[vertIndex + 2].z - pos.z, 2.f));
+        float totalDistance = v0Distance + v1Distance + v2Distance;
+        float v0Contrib = 1 - (v0Distance / totalDistance);
+        float v1Contrib = 1 - (v1Distance / totalDistance);
+        float v2Contrib = 1 - (v2Distance / totalDistance);
+        D3DXCOLOR v0Color = others[vertIndex + 0].colLight;
+        D3DXCOLOR v1Color = others[vertIndex + 1].colLight;
+        D3DXCOLOR v2Color = others[vertIndex + 2].colLight;
+        D3DXCOLOR colorAverage = ((v0Color * v0Contrib) + (v1Color * v1Contrib) + (v2Color * v2Contrib)) / 2.f;
+        return colorAverage;
     }
 
-    int32_t vobLightWorldIntersectChecks = 0;
-
-    struct DebugLine {
-        VEC3 posStart;
-        VEC3 posEnd;
-        D3DXCOLOR color;
-    };
-
-    vector<DebugLine> debugLightToVobRays;
-
-    struct DirectionalLight {
-        D3DXCOLOR color;
-        XMVECTOR dirInverted;
-    };
-
-    std::optional<DirectionalLight> getLightAtPos(XMVECTOR posXm, const vector<Light>& lights, const LightLookupTree& lightLookup, const unordered_map<Material, VEC_VERTEX_DATA>& worldMeshData, const VertLookupTree& worldFaceLookup)
+    vector<StaticInstance> loadVobs(vector<ZenLoad::zCVobData>& rootVobs, const unordered_map<Material, VEC_VERTEX_DATA>& worldMeshData, const vector<Light>& lightsStatic, const bool isOutdoorLevel)
     {
-        auto pos = toVec3(posXm);
-        float rayIntersectTolerance = 0.1f;
-        auto searchBox = OrthoBoundingBox3D{
-           { pos.x - rayIntersectTolerance, pos.y - rayIntersectTolerance, pos.z - rayIntersectTolerance },
-           { pos.x + rayIntersectTolerance, pos.y + rayIntersectTolerance, pos.z + rayIntersectTolerance }
-        };
-
-        constexpr bool shouldFullyContain = false;
-        auto intersectedBoxes = lightLookup.tree.RangeSearch<shouldFullyContain>(searchBox);
-
-        int32_t contributingLightCount = 0;
-        D3DXCOLOR color = D3DXCOLOR(0.f, 0.f, 0.f, 1.f);
-        XMVECTOR candidateLightDir = XMVectorSet(0, 0, 0, 0);// TODO this is actually not necessary, but fixes warnings
-        float candidateScore = 0;
-
-        for (auto boxIndex : intersectedBoxes) {
-            auto& light = lights[boxIndex];
-            XMVECTOR lightPos = toXM4Pos(light.pos);
-            float dist = XMVectorGetX(XMVector3Length(lightPos - posXm));
-            if (dist < (light.range * 1.0f)) {
-                vobLightWorldIntersectChecks++;
-                bool intersectedWorld = rayIntersectsWorldFaces(lightPos, posXm, dist * 0.85f, worldMeshData, worldFaceLookup);
-                if (!intersectedWorld) {
-                    contributingLightCount++;
-                    float weight = 1.f - (dist / (light.range * 1.0f));
-                    weight = fromSRGB(weight);
-                    color += (light.color * weight);
-                    float perceivedLum = (light.color.r * 0.299f + light.color.g * 0.587f + light.color.b * 0.114f);
-                    float score = weight * perceivedLum;
-                    if (score > candidateScore) {
-                        candidateLightDir = toXM4Pos(light.pos) - posXm;
-                        candidateScore = score;
-                    }
-                }
-                if (dist < debugStaticLightRaysMaxDist) {
-                    debugLightToVobRays.push_back({ light.pos, pos, intersectedWorld ? D3DXCOLOR(0.f, 0.f, 1.f, 0.5f) : D3DXCOLOR(1.f, 0.f, 0.f, 0.5f) });
-                }
-            }
-        }
-
-        if (contributingLightCount == 0) {
-            return std::nullopt;
-        }
-        else {
-            return DirectionalLight {
-                color,
-                candidateLightDir,
-            };
-        }
-    }
-
-    vector<StaticInstance> loadVobs(vector<ZenLoad::zCVobData>& rootVobs, const unordered_map<Material, VEC_VERTEX_DATA>& worldMeshData, const vector<Light>& lightsStatic, const bool isOutdoorLevel) {
         vector<StaticInstance> statics;
         vector<const ZenLoad::zCVobData*> vobs;
         getVobsWithVisuals(rootVobs, vobs);
@@ -381,7 +311,8 @@ namespace renderer::loader {
         return statics;
     }
 
-    RenderData loadZen(string& zenFilename, VDFS::FileIndex* vdf) {
+    RenderData loadZen(string& zenFilename, VDFS::FileIndex* vdf)
+    {
 
         auto parser = ZenLoad::ZenParser(zenFilename, *vdf);
         if (parser.getFileSize() == 0)

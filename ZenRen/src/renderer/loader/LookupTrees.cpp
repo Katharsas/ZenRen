@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "VertPosLookup.h"
+#include "LookupTrees.h"
 
 #include "MeshUtil.h"
 
@@ -115,6 +115,30 @@ namespace renderer::loader
                 }
             }
         }
+        return result;
+    }
+
+    // ##############################################################################################################################
+    // Lights
+    // ##############################################################################################################################
+
+    LightLookupTree createLightLookup(const vector<Light>& lights)
+    {
+        vector<OrthoBoundingBox3D> bboxes;
+        for (auto& light : lights) {
+            auto pos = light.pos;
+            auto range = light.range;
+            bboxes.push_back({
+                {pos.x - range, pos.y - range, pos.z - range},
+                {pos.x + range, pos.y + range, pos.z + range}
+                });
+        }
+        LightLookupTree result;
+        result.tree = OrthoOctree(bboxes
+            , 8 // max depth
+            , std::nullopt // user-provided bounding Box for all
+            , 10 // max element in a node; 10 works well for us and has been observed to work well in general according to lib author (Github)
+        );
         return result;
     }
 }
