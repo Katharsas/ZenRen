@@ -313,6 +313,11 @@ namespace renderer::loader {
 
     RenderData loadZen(string& zenFilename, VDFS::FileIndex* vdf)
     {
+        for (auto& name : vdf->getKnownFiles()) {
+            if (::util::endsWith(name, ".ZEN")) {
+                LOG(DEBUG) << name;
+            }
+        }
 
         auto parser = ZenLoad::ZenParser(zenFilename, *vdf);
         if (parser.getFileSize() == 0)
