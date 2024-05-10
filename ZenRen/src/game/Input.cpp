@@ -4,7 +4,7 @@
 
 namespace game::input {
 
-    bool rdpCompatMode = false;
+    bool rdpCompatMode = true;
     bool debugLogInputs = false;
 
     std::map<const uint32_t, bool> keyboardChanged;

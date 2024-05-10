@@ -10,17 +10,21 @@ namespace renderer::loader
     using std::array;
     using namespace DirectX;
 
-    UV from(const ZenLib::ZMath::float2& source)
+    UV toUv(const ZenLib::ZMath::float2& source)
     {
         return UV{ source.x, source.y };
     }
-    VEC3 from(const ZenLib::ZMath::float3& source)
+    VEC3 toVec3(const ZenLib::ZMath::float3& source)
     {
         return VEC3{ source.x, source.y, source.z };
     }
-    VEC3 from(const ZenLib::ZMath::float3& source, float scale)
+    VEC3 toVec3(const ZenLib::ZMath::float3& source, float scale)
     {
         return VEC3{ source.x * scale, source.y * scale, source.z * scale };
+    }
+    VEC3 toVec3(const VEC4& vec4)
+    {
+        return VEC3{ vec4.x, vec4.y, vec4.z };
     }
     VEC3 toVec3(const XMVECTOR& xm4)
     {

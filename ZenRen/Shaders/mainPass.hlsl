@@ -6,7 +6,14 @@ static const uint FLAG_OUTPUT_SOLID = 0;
 static const uint FLAG_OUTPUT_DIFFUSE = 1;
 static const uint FLAG_OUTPUT_NORMAL = 2;
 static const uint FLAG_OUTPUT_LIGHT_SUN = 3;
-static const uint FLAG_OUTPUT_LIGHT_STATIC = 4;
+static const uint FLAG_OUTPUT_LIGHT_DYNAMIC = 4;
+static const uint FLAG_OUTPUT_LIGHT_STATIC = 5;
+
+struct Light {
+    float3 pos;
+    float range;
+    float4 color;
+};
 
 cbuffer cbSettings : register(b0) {
     bool multisampleTransparency;
@@ -22,6 +29,8 @@ cbuffer cbPerObject : register(b1)
     float4x4 worldViewMatrixInverseTranposed;
     float4x4 projectionMatrix;
 };
+
+StructuredBuffer<Light> lightsDynamic : register(t2);
 
 struct VS_IN
 {
@@ -73,6 +82,26 @@ float CalcLightSun(float3 dirLight, float3 dirNormal)
     return lightReceived * strength;
 }
 
+float CalcLightDynamic(Light light, float3 pos, float3 dirNormal)
+{
+    float rangeReciprocal = 1.f / light.range;
+
+    float3 posToLight = light.pos - pos;
+    float distance = length(posToLight);
+    float3 dirLight = posToLight / distance;// Normalize
+    
+    // Attenuation
+    float nearness = 1.f - saturate(distance * rangeReciprocal);
+    float distanceFactor = nearness * nearness;
+
+    // Normal
+    float normalFactor = CalcLightDirectional(dirLight, dirNormal, 0.4f, 0.f);
+
+    float lightReceived = distanceFactor * normalFactor;
+    float strength = 3.0f;
+    return lightReceived * strength;
+}
+
 float CalcLightStaticVob(float3 dirLight, float3 dirNormal)
 {
     float lightReceived = CalcLightDirectional(dirLight, dirNormal, 0.f, 0.f);
@@ -99,46 +128,58 @@ VS_OUT VS_Main(VS_IN input)
     //float3 viewLight3 = normalize(mul(float3(0, 1, 0), (float3x3) worldViewMatrixInverseTranposed));
 
     bool enableLightSun = false;
+    bool enableLightDynamic = false;
     bool enableLightStatic = false;
     bool isVob = (input.dirLight.x > -99);
 
     if (!debugOutput || debugOutputType == FLAG_OUTPUT_SOLID) {
         enableLightSun = true;
+        enableLightDynamic = true;
         enableLightStatic = true;
     }
     if (debugOutput && debugOutputType == FLAG_OUTPUT_LIGHT_SUN) {
         enableLightSun = true;
+    }
+    if (debugOutput && debugOutputType == FLAG_OUTPUT_LIGHT_DYNAMIC) {
+        enableLightDynamic = true;
     }
     if (debugOutput && debugOutputType == FLAG_OUTPUT_LIGHT_STATIC) {
         enableLightStatic = true;
     }
 
     float3 lightSun = (float3) (input.sunLight * CalcLightSun(viewLight3, viewNormal3));
+    float3 lightDynamic = (float3) 0.f;
     float3 lightStatic;
     float3 lightAmbient;
     if (isVob) {
-        lightStatic = input.colLight * CalcLightStaticVob(input.dirLight, viewNormal3);
-        lightAmbient = input.colLight * 0.16f;// original SRGB factor = 0.4f
+        //lightStatic = input.colLight * CalcLightStaticVob(input.dirLight, viewNormal3);
+        //lightAmbient = input.colLight * 0.16f;// original SRGB factor = 0.4f
+        lightStatic - 0.f;
+        lightAmbient = 0.f;
     }
     else {
         lightStatic = input.colLight;
+        //lightStatic = 0.f;
         lightAmbient = 0.f;
+    }
+    for (uint i = 0; i < 123; i++) {
+        Light light = lightsDynamic[i];
+        lightDynamic += ((float3) light.color) * CalcLightDynamic(light, (float3) input.position, viewNormal3);
     }
 
     output.light = (float3) 0;
-    if (enableLightSun && enableLightStatic) {
-        output.light = (lightSun * 0.3f) + ((lightAmbient + lightStatic) * 0.7f);
+    if (enableLightSun) {
+        output.light += lightSun * 0.25f;
     }
-    else if (enableLightSun) {
-        output.light = lightSun * 0.3f;
+    if (enableLightDynamic) {
+        output.light += lightDynamic * 0.7f;
     }
-    else if (enableLightStatic) {
-        output.light = (lightAmbient + lightStatic) * 0.7f;
+    if (enableLightStatic) {
+        output.light += (lightAmbient + lightStatic) * 0.7f;
     }
-    else {
+    if (!(enableLightSun || enableLightDynamic || enableLightStatic)) {
         output.light = (float3) 1;
     }
-    
     output.light *= 1.1;// TODO do this in tonemapping stage or something
 
     output.position = mul(viewPosition, projectionMatrix);
@@ -146,7 +187,8 @@ VS_OUT VS_Main(VS_IN input)
     output.uvLightmap = input.uvLightmap;
    
     if (debugOutputType == FLAG_OUTPUT_NORMAL) {
-        output.color = float4((float3) input.normal, 1);
+        float3 normalColor = ((float3) input.normal + 1) / 2;
+        output.color = float4(normalColor * 0.75f, 1);
     }
     else {
         output.color = (float4) 1;
@@ -158,8 +200,8 @@ VS_OUT VS_Main(VS_IN input)
 // Pixel Shader
 //--------------------------------------------------------------------------------------
 
-Texture2D baseColor : register(s0);
-Texture2DArray lightmaps : register(s1);
+Texture2D baseColor : register(t0);
+Texture2DArray lightmaps : register(t1);
 SamplerState SampleType : register(s0);
 
 struct PS_IN

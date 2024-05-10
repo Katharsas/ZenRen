@@ -35,9 +35,12 @@ namespace renderer::loader {
 
     bool debugInstanceMeshBbox = false;
     bool debugInstanceMeshBboxCenter = false;
+
     bool debugTintVobStaticLight = false;
     bool debugStaticLights = false;
     bool debugStaticLightRays = false;
+
+    bool debugDynamicLights = true;
 
     XMVECTOR bboxCenter(const array<VEC3, 2>& bbox)
     {
@@ -114,6 +117,14 @@ namespace renderer::loader {
         return flattenVobTree(vobs, target, filter);
     }
 
+    void getVobDynamicLights(const vector<ZenLoad::zCVobData>& vobs, vector<const ZenLoad::zCVobData*>& target)
+    {
+        const auto filter = [&](const ZenLoad::zCVobData& vob) {
+            return vob.vobType == ZenLoad::zCVobData::EVobType::VT_zCVobLight && !vob.zCVobLight.lightStatic;
+        };
+        return flattenVobTree(vobs, target, filter);
+    }
+
     inline std::ostream& operator <<(std::ostream& os, const D3DXCOLOR& that)
     {
         return os << "[R:" << that.r << " G:" << that.g << " B:" << that.b << " A:" << that.a << "]";
@@ -122,8 +133,8 @@ namespace renderer::loader {
     array<VEC3, 2> bboxToVec3Scaled(const ZMath::float3 (& bbox)[2])
     {
         return {
-            from(bbox[0], 0.01f),
-            from(bbox[1], 0.01f)
+            toVec3(bbox[0], 0.01f),
+            toVec3(bbox[1], 0.01f)
         };
     }
 
@@ -134,25 +145,27 @@ namespace renderer::loader {
         color.b *= factor;
     }
 
-    vector<Light> loadLights(const vector<ZenLoad::zCVobData>& rootVobs)
+    vector<Light> loadLights(const vector<ZenLoad::zCVobData>& rootVobs, bool staticLights)
     {
         vector<Light> lights;
         vector<const ZenLoad::zCVobData*> vobs;
-        getVobStaticLights(rootVobs, vobs);
+        if (staticLights) {
+            getVobStaticLights(rootVobs, vobs);
+        }
+        else {
+            getVobDynamicLights(rootVobs, vobs);
+        }
 
         for (auto vobPtr : vobs) {
             ZenLoad::zCVobData vob = *vobPtr;
-            Light light = {
-                toVec3(toXM4Pos(vob.position) * 0.01f),
-                vob.zCVobLight.lightStatic,
-                fromSRGB(D3DXCOLOR(vob.zCVobLight.color)),
-                vob.zCVobLight.range * 0.01f,
-            };
-
+            Light light;
+            light.pos = toVec3(vob.position, 0.01f);
+            light.range = vob.zCVobLight.range * 0.01f;
+            light.color = fromSRGB(D3DXCOLOR(vob.zCVobLight.color));
             lights.push_back(light);
         }
 
-        LOG(INFO) << "VOBs: Loaded " << lights.size() << " static lights.";
+        LOG(INFO) << "VOBs: Loaded " << lights.size() << (staticLights ? " static" : " dynamic") << " lights.";
         return lights;
     }
 
@@ -266,7 +279,9 @@ namespace renderer::loader {
                             resolvedStaticLight++;
                         }
                         else {
-                            colLight = fromSRGB(D3DXCOLOR(0.63f, 0.63f, 0.63f, 1));// fallback lightness of (160, 160, 160)
+                            colLight = D3DXCOLOR(0, 1, 0, 1);
+                            //colLight = fromSRGB(D3DXCOLOR(0.63f, 0.63f, 0.63f, 1));// fallback lightness of (160, 160, 160)
+                            // TODO in this case we should not add fixed ambient below
                         }
                     }
 
@@ -339,7 +354,8 @@ namespace renderer::loader {
         unordered_map<Material, VEC_VERTEX_DATA> worldMeshData;
         loadWorldMesh(worldMeshData, parser.getWorldMesh());
 
-        vector<Light> lightsStatic = loadLights(world.rootVobs);
+        vector<Light> lightsStatic = loadLights(world.rootVobs, true);
+        vector<Light> lightsDynamic = loadLights(world.rootVobs, false);
 
         auto props = world.properties;
         bool isOutdoorLevel = world.bspTree.mode == ZenLoad::zCBspTreeData::TreeMode::Outdoor;
@@ -359,6 +375,12 @@ namespace renderer::loader {
             }
         }
 
+        if (debugDynamicLights) {
+            for (auto& light : lightsDynamic) {
+                float scale = light.range / 10.f;
+                loadPointDebugVisual(staticMeshData, light.pos, { scale, scale, scale }, D3DXCOLOR(0.5f, 1, 0, 1));
+            }
+        }
         if (debugStaticLights) {
             for (auto& light : lightsStatic) {
                 float scale = light.range / 10.f;
@@ -376,7 +398,8 @@ namespace renderer::loader {
         return {
             worldMeshData,
             staticMeshData,
-            lightmaps
+            lightmaps,
+            lightsDynamic,
         };
 	}
 }

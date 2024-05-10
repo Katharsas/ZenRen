@@ -10,13 +10,34 @@ namespace renderer::loader
     using std::unordered_map;
     using DirectX::XMVECTOR;
 
-    array<XMVECTOR, 3> posToXM4(const array<VEC3, 3>& face) {
+    array<XMVECTOR, 3> posToXM4(const array<VEC3, 3>& face)
+    {
         array<XMVECTOR, 3> result;
         for (int32_t i = 0; i < 3; i++) {
             const auto& vert = face[i];
             result[i] = toXM4Pos(vert);
         }
         return result;
+    }
+
+    void insertDebugFaces(unordered_map<Material, VEC_VERTEX_DATA>& target, const vector<array<XMVECTOR, 3>>& faces, const Material& mat, const D3DXCOLOR& color)
+    {
+        VEC_VERTEX_DATA faceVerts;
+        for (auto& face : faces) {
+            const auto faceNormal = toVec3(DirectX::XMVectorScale(calcFlatFaceNormal(face), -1.f));// TODO why do we need to reverse normal??
+            for (int32_t i = 0; i < 3; i++) {
+                faceVerts.vecPos.push_back(toVec3(face[i]));
+                VERTEX_OTHER other;
+                other.normal = faceNormal;
+                other.uvDiffuse = { 0, 0 };
+                other.uvLightmap = { 0, 0, -1 };
+                other.colLight = color;
+                other.dirLight = { -100, -100, -100 };
+                other.lightSun = 0;
+                faceVerts.vecNormalUv.push_back(other);
+            }
+        }
+        insert(target, mat, faceVerts.vecPos, faceVerts.vecNormalUv);
     }
 
     /**
@@ -53,23 +74,9 @@ namespace renderer::loader
 
     void loadInstanceMeshBboxDebugVisual(unordered_map<Material, VEC_VERTEX_DATA>& target, const StaticInstance& instance)
     {
-        vector<VERTEX_POS> facesPos;
-        vector<VERTEX_OTHER> facesOther;
         const auto& bboxFacesXm = createBboxVerts(instance.bbox[0], instance.bbox[1], instance.transform);
-        for (auto& posXm : bboxFacesXm) {
-            const auto faceNormal = toVec3(calcFlatFaceNormal(posXm));
-            for (int32_t i = 0; i < 3; i++) {
-                facesPos.push_back(toVec3(posXm[i]));
-                facesOther.push_back({
-                    faceNormal,
-                    UV { 0, 0 },
-                    ARRAY_UV { 0, 0, -1 },
-                    D3DXCOLOR(1, 0, 0, 1)
-                    });
-            }
-        }
-        const Material defaultMat = { "bbox.tga" };
-        insert(target, defaultMat, facesPos, facesOther);
+        const Material mat = { "bbox.tga" };
+        insertDebugFaces(target, bboxFacesXm, mat, D3DXCOLOR(1, 0, 0, 1));
     }
 
     vector<array<XMVECTOR, 3>> createDebugPointVerts(const VEC3& pos, const VEC3& scale)
@@ -96,26 +103,12 @@ namespace renderer::loader
 
     void loadPointDebugVisual(unordered_map<Material, VEC_VERTEX_DATA>& target, const VEC3& pos, const VEC3& scale, const D3DXCOLOR& color)
     {
-        vector<VERTEX_POS> facesPos;
-        vector<VERTEX_OTHER> facesOther;
         const auto& bboxFacesXm = createDebugPointVerts(pos, scale);
-        for (auto& posXm : bboxFacesXm) {
-            const auto faceNormal = toVec3(calcFlatFaceNormal(posXm));
-            for (int32_t i = 0; i < 3; i++) {
-                facesPos.push_back(toVec3(posXm[i]));
-                facesOther.push_back({
-                    faceNormal,
-                    UV { 0, 0 },
-                    ARRAY_UV { 0, 0, -1 },
-                    color
-                    });
-            }
-        }
-        const Material defaultMat = { "point.tga" };
-        insert(target, defaultMat, facesPos, facesOther);
+        const Material mat = { "point.tga" };
+        insertDebugFaces(target, bboxFacesXm, mat, color);
     }
 
-    vector<array<XMVECTOR, 3>> createDebugLineVerts(const VEC3& posStart, const VEC3& posEnd, const float width)
+    vector<array<XMVECTOR, 3>> createDebugLineFaces(const VEC3& posStart, const VEC3& posEnd, const float width)
     {
         float minWidth = 0.01f;
         float actualWidth = std::max(minWidth, width);
@@ -134,22 +127,8 @@ namespace renderer::loader
 
     void loadLineDebugVisual(unordered_map<Material, VEC_VERTEX_DATA>& target, const VEC3& posStart, VEC3& posEnd, const D3DXCOLOR& color)
     {
-        vector<VERTEX_POS> facesPos;
-        vector<VERTEX_OTHER> facesOther;
-        const auto& bboxFacesXm = createDebugLineVerts(posStart, posEnd, 0.02f);
-        for (auto& posXm : bboxFacesXm) {
-            const auto faceNormal = toVec3(calcFlatFaceNormal(posXm));
-            for (int32_t i = 0; i < 3; i++) {
-                facesPos.push_back(toVec3(posXm[i]));
-                facesOther.push_back({
-                    faceNormal,
-                    UV { 0, 0 },
-                    ARRAY_UV { 0, 0, -1 },
-                    color
-                    });
-            }
-        }
-        const Material defaultMat = { "line.tga" };
-        insert(target, defaultMat, facesPos, facesOther);
+        const auto& bboxFacesXm = createDebugLineFaces(posStart, posEnd, 0.02f);
+        const Material mat = { "line.tga" };
+        insertDebugFaces(target, bboxFacesXm, mat, color);
     }
 }

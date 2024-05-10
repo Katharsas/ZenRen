@@ -103,10 +103,10 @@ namespace renderer::loader {
                 for (int32_t i = 0; i < 3; i++) {
                     const auto& zenVert = zenFace[i];
                     VERTEX_POS pos;
-                    pos = from(zenVert.Position);
+                    pos = toVec3(zenVert.Position);
                     VERTEX_OTHER other;
-                    other.normal = from(zenVert.Normal);
-                    other.uvDiffuse = from(zenVert.TexCoord);
+                    other.normal = toVec3(zenVert.Normal);
+                    other.uvDiffuse = toUv(zenVert.TexCoord);
                     other.colLight = fromSRGB(D3DXCOLOR(zenVert.Color));
                     //other.colLight = D3DXCOLOR(1, 1, 1, 0.f);
                     other.dirLight = { -100, -100, -100 };// value that is easy to check as not normalized in shader
@@ -235,7 +235,7 @@ namespace renderer::loader {
                     pos = transformPos(posXm[i], instance.transform);
                     VERTEX_OTHER other;
                     other.normal = transformDir(normalsXm[i], normalTransform, debugChecksEnabled);
-                    other.uvDiffuse = from(zenVert.TexCoord);
+                    other.uvDiffuse = toUv(zenVert.TexCoord);
                     other.uvLightmap = { 0, 0, -1 };
                     other.colLight = instance.colLightStatic;
                     other.dirLight = toVec3(XMVector3Normalize(instance.dirLightStatic));

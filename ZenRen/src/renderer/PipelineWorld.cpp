@@ -27,7 +27,8 @@ namespace renderer::world {
 		Diffuse = 1,
 		Normal = 2,
 		Light_Sun = 3,
-		Light_Static = 4,
+		Light_Dynamic = 4,
+		Light_Static = 5,
 	};
 
 	__declspec(align(16))
@@ -75,6 +76,8 @@ namespace renderer::world {
 
 	std::vector<Texture*> debugTextures;
 	int32_t selectedDebugTexture = 0;
+
+	ID3D11ShaderResourceView* lightsDynamicSrv = nullptr;
 
 
 	void initGui() {
@@ -133,13 +136,47 @@ namespace renderer::world {
 		D3D11_BUFFER_DESC bufferDesc;
 		ZeroMemory(&bufferDesc, sizeof(bufferDesc));
 
-		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+		bufferDesc.Usage = D3D11_USAGE_IMMUTABLE;// for now
 		bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 		bufferDesc.ByteWidth = sizeof(T) * vertexData.size();
 
 		D3D11_SUBRESOURCE_DATA initialData;
 		initialData.pSysMem = vertexData.data();
 		d3d.device->CreateBuffer(&bufferDesc, &initialData, target);
+	}
+
+	ID3D11ShaderResourceView* lightSrv = nullptr;
+
+	template<typename T>
+	void createStructuredBuffer(D3d d3d, ID3D11ShaderResourceView** targetSrv, const std::vector<T>& data)
+	{
+		// https://www.gamedev.net/forums/topic/709796-working-with-structuredbuffer-in-hlsl-directx-11/
+
+		D3D11_BUFFER_DESC bufferDesc;
+		ZeroMemory(&bufferDesc, sizeof(bufferDesc));
+
+		bufferDesc.Usage = D3D11_USAGE_IMMUTABLE;// for now
+		bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+		bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+		bufferDesc.StructureByteStride = sizeof(T);
+		bufferDesc.ByteWidth = sizeof(T) * data.size();
+
+		D3D11_SUBRESOURCE_DATA initialData;
+		initialData.pSysMem = data.data();
+
+		ID3D11Buffer* buffer;
+		d3d.device->CreateBuffer(&bufferDesc, &initialData, &buffer);
+
+		D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
+		srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+		srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+		srvDesc.Buffer.FirstElement = 0;
+		srvDesc.Buffer.NumElements = data.size();
+
+		ID3D11Resource* resource = dynamic_cast<ID3D11Resource*>(buffer);
+		d3d.device->CreateShaderResourceView(resource, &srvDesc, targetSrv);
+
+		buffer->Release();
 	}
 
 	uint32_t loadPrepassData(D3d d3d, std::vector<PrepassMeshes>& target, const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData)
@@ -258,7 +295,9 @@ namespace renderer::world {
 		LOG(DEBUG) << "World Pass - World material/texture count: " << loadedCount;
 
 		loadedCount = loadVertexData(d3d, world.meshes, data.staticMeshes);
-		LOG(DEBUG) << "World Pass- StaticInstances material/texture count: " << loadedCount;
+		LOG(DEBUG) << "World Pass - StaticInstances material/texture count: " << loadedCount;
+		
+		createStructuredBuffer(d3d, &lightsDynamicSrv, data.dynamicLights);
 	}
 
 	void updateObjects()
@@ -301,6 +340,9 @@ namespace renderer::world {
 		}
 		else if (settings.shader.mode == ShaderMode::Light_Sun) {
 			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Light_Sun;
+		}
+		else if (settings.shader.mode == ShaderMode::Light_Dynamic) {
+			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Light_Dynamic;
 		}
 		else if (settings.shader.mode == ShaderMode::Light_Static) {
 			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Light_Static;
@@ -419,6 +461,9 @@ namespace renderer::world {
 
 		// lightmaps
 		d3d.deviceContext->PSSetShaderResources(1, 1, &lightmapTexArray);
+
+		// lights
+		d3d.deviceContext->VSSetShaderResources(2, 1, &lightsDynamicSrv);
 
 		// vertex buffers
 		for (auto& mesh : world.meshes) {

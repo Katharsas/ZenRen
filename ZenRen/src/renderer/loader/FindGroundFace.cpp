@@ -121,15 +121,21 @@ namespace renderer::loader
         return currentBestIndex;
     }
 
+    int32_t bboxCount = 0;
+
     std::optional<VertKey> getGroundFaceAtPos(const XMVECTOR pos, const unordered_map<Material, VEC_VERTEX_DATA>& meshData, const VertLookupTree& vertLookup)
     {
         VEC3 pos3 = toVec3(pos);
         vector<VertKey> vertKeys;
         if (useNaiveSlowGroundFaceSearch) {
             vertKeys = rayDownIntersectedNaive(meshData, pos3, 100);
+            bboxCount += vertKeys.size();
+            //LOG(DEBUG) << "Count: " << bboxCount;
         }
         else {
             vertKeys = rayDownIntersected(vertLookup, pos3, 100);
+            bboxCount += vertKeys.size();
+            //LOG(DEBUG) << "Count: " << bboxCount;
         }
         vector<VERTEX_POS> belowVerts;
         for (auto& vertKey : vertKeys) {

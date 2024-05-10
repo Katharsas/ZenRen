@@ -7,7 +7,7 @@
 namespace renderer::gui::settings {
 
 	// TODO we should have checkbox toggles for each light type so we can add them up however we want
-	const std::array<std::string, 6> shaderModeItems = { "Full", "Solid Only", "Diffuse Only", "Normals Only", "Light Sun", "Light Static" };
+	const std::array<std::string, 7> shaderModeItems = { "Full", "Solid Only", "Diffuse Only", "Normals Only", "Light Sun", "Light Dynamic", "Light Static" };
 	std::string shaderModeSelected = shaderModeItems[0];
 	const std::array<std::string, 5> filterSettingsItems = { "Trilinear", "AF  x2", "AF  x4", "AF  x8", "AF x16" };
 	std::string filterSettingsSelected = filterSettingsItems[4];

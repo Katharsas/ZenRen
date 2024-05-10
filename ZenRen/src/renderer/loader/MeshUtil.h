@@ -14,6 +14,10 @@ namespace renderer::loader
         return std::abs(vec3.x) <= threshold && std::abs(vec3.y) <= threshold && std::abs(vec3.z) <= threshold;
     }
 
+    template <typename T> DirectX::XMVECTOR toXM4Pos(const T& vec3, float scale)
+    {
+        return DirectX::XMVectorSet(vec3.x * scale, vec3.y * scale, vec3.z * scale, 1);
+    }
     template <typename T> DirectX::XMVECTOR toXM4Pos(const T& vec3)
     {
         return DirectX::XMVectorSet(vec3.x, vec3.y, vec3.z, 1);
@@ -23,10 +27,12 @@ namespace renderer::loader
         return DirectX::XMVectorSet(vec3.x, vec3.y, vec3.z, 0);
     }
 
-    UV from(const ZenLib::ZMath::float2& source);
-    VEC3 from(const ZenLib::ZMath::float3& source);
-    VEC3 from(const ZenLib::ZMath::float3& source, float scale);
+    UV toUv(const ZenLib::ZMath::float2& source);
+    VEC3 toVec3(const ZenLib::ZMath::float3& source);
+    VEC3 toVec3(const ZenLib::ZMath::float3& source, float scale);
+    //VEC4 toVec4Pos(const ZenLib::ZMath::float3& source, float scale);
 
+    VEC3 toVec3(const VEC4& vec4);
     VEC3 toVec3(const DirectX::XMVECTOR& xm4);
     VEC4 toVec4(const DirectX::XMVECTOR& xm4);
 

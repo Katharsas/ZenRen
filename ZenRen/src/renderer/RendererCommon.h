@@ -13,6 +13,19 @@ namespace renderer
 		return os << "[R:" << that.r << " G:" << that.g << " B:" << that.b << " A:" << that.a << "]";
 	}
 
+	// TODO use where we don't need alpha
+	struct RGB {
+		float r, g, b;
+	};
+	inline std::ostream& operator <<(std::ostream& os, const RGB& that)
+	{
+		return os << "[R=" << that.r << " G=" << that.g << " B=" << that.b << "]";
+	}
+	/*RGB toRgb(D3DXCOLOR color)
+	{
+		return { color.r, color.g, color.b };
+	}*/
+
 	struct VEC3 {
 		float x, y, z;
 	};
@@ -70,6 +83,7 @@ namespace renderer
 		return os << "[NOR:" << that.normal << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
 	}
 
+	// TODO move dirLight into VobBuffer and merge uvLightmap and colLight into single VEC3
 	struct NORMAL_CL_UV_LUV_STATIC_LIGHT {
 		VEC3 normal;
 		UV uvDiffuse;
@@ -98,6 +112,13 @@ namespace renderer
 		{
 			return (texBaseColor == other.texBaseColor);
 		}
+	};
+
+	struct Light {
+		// TODO falloff and type surely play a role
+		VEC3 pos;
+		float range;
+		D3DXCOLOR color;
 	};
 }
 namespace std

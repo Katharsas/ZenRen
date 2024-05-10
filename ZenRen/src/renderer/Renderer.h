@@ -13,6 +13,7 @@ namespace renderer
 		Diffuse,
 		Normals,
 		Light_Sun,
+		Light_Dynamic,
 		Light_Static
 	};
 
@@ -42,6 +43,8 @@ namespace renderer
 		bool depthPrepass = false;
 	};
 
+	//const Light NULL_LIGHT = { {0, 0}, D3DXCOLOR(0, 0, 0, 1), -1 };
+
 	struct StaticInstance {
 		std::string meshName;
 		DirectX::XMMATRIX transform;
@@ -49,14 +52,7 @@ namespace renderer
 		bool receiveLightSun;
 		D3DXCOLOR colLightStatic;
 		DirectX::XMVECTOR dirLightStatic;// pre-inverted
-	};
-
-	struct Light {
-		// TODO falloff and type surely play a role
-		VEC3 pos;
-		bool isStatic;
-		D3DXCOLOR color;
-		float range;
+		std::array<int32_t, 3> lightDynamicIndices;
 	};
 
 	struct InMemoryTexFile {
@@ -69,6 +65,7 @@ namespace renderer
 		std::unordered_map<Material, VEC_VERTEX_DATA> worldMesh;
 		std::unordered_map<Material, VEC_VERTEX_DATA> staticMeshes;
 		std::vector<InMemoryTexFile> worldMeshLightmaps;
+		std::vector<Light> dynamicLights;
 	};
 
 	struct DecalMesh
