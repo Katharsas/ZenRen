@@ -68,7 +68,6 @@ float CalcLightDirectional(float3 dirLight, float3 dirNormal, float lightRatioAt
 float CalcLightSun(float3 dirLight, float3 dirNormal)
 {
     float lightReceived = CalcLightDirectional(dirLight, dirNormal, 0.6f, 0.3f);
-    //float strength = 2.f;
     float strength = 1.0f;
     return lightReceived * strength;
 }
@@ -76,8 +75,7 @@ float CalcLightSun(float3 dirLight, float3 dirNormal)
 float CalcLightStaticVob(float3 dirLight, float3 dirNormal)
 {
     float lightReceived = CalcLightDirectional(dirLight, dirNormal, 0.f, 0.f);
-    //float strength = 2.1f;
-    float strength = 5.5f;
+    float strength = 1.2f;
     return lightReceived * strength;
 }
 
@@ -118,7 +116,7 @@ VS_OUT VS_Main(VS_IN input)
     float3 lightAmbient;
     if (isVob) {
         lightStatic = input.colLight * CalcLightStaticVob(input.dirLight, viewNormal3);
-        lightAmbient = input.colLight * 0.16f;// original SRGB factor = 0.4f
+        lightAmbient = input.colLight * 0.27f;// original SRGB factor = 0.4f
     }
     else {
         lightStatic = input.colLight;
@@ -127,19 +125,19 @@ VS_OUT VS_Main(VS_IN input)
 
     output.light = (float3) 0;
     if (enableLightSun && enableLightStatic) {
-        output.light = (lightSun * 0.3f) + ((lightAmbient + lightStatic) * 0.7f);
+        output.light = (lightSun * 0.20f) + ((lightAmbient + lightStatic) * 0.80f);
     }
     else if (enableLightSun) {
-        output.light = lightSun * 0.3f;
+        output.light = lightSun * 0.20f;
     }
     else if (enableLightStatic) {
-        output.light = (lightAmbient + lightStatic) * 0.7f;
+        output.light = (lightAmbient + lightStatic) * 0.80f;
     }
     else {
         output.light = (float3) 1;
     }
     
-    output.light *= 1.1;// TODO do this in tonemapping stage or something
+    output.light *= 1.0;// balance VOBs and non-lightmap world vs. lightmaps of world
 
     output.position = mul(viewPosition, projectionMatrix);
     output.uvBaseColor = input.uvBaseColor;

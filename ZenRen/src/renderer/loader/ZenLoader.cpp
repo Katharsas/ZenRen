@@ -264,25 +264,21 @@ namespace renderer::loader {
                         if (vertKey.has_value()) {
                             colLight = interpolateColor(toVec3(center), worldMeshData, vertKey.value());
                             resolvedStaticLight++;
+
+                            // outdoor vobs get additional fixed ambient
+                            if (isOutdoorLevel) {
+                                // TODO
+                                // Original game knows if a ground poly is in a portal room (without lightmap, like a cave) or actually outdoors
+                                // from per-ground-face flag. Find out how this is calculated or shoot some rays towards the sky.
+                                bool isVobIndoor = false;
+
+                                float minLight = isVobIndoor ? fromSRGB(0.2f) : fromSRGB(0.5f);
+                                colLight = colLight * (1.f - minLight) + greyscale(minLight);
+                                // currently this results in light values between between 0.22 and 0.99 
+                            }
                         }
                         else {
                             colLight = fromSRGB(D3DXCOLOR(0.63f, 0.63f, 0.63f, 1));// fallback lightness of (160, 160, 160)
-                        }
-                    }
-
-                    // outdoor vobs get additional fixed ambient
-                    if (isOutdoorLevel && !hasLightmap) {
-                        // TODO
-                        // Original game knows if a ground poly is in a portal room (without lightmap, like a cave) or actually outdoors
-                        // from per-ground-face flag. Find out how this is calculated or shoot some rays towards the sky.
-                        bool isVobIndoor = false;
-                        if (isVobIndoor) {
-                            colLight = colLight * fromSRGB(0.8f) + fromSRGB(greyscale(0.2f));
-                            colLight = (colLight * 1.4f) + greyscale(0.05f);// simulate effect of SRGB addition error
-                        }
-                        else {
-                            colLight = colLight * fromSRGB(0.5f) + fromSRGB(greyscale(0.5f));
-                            colLight = (colLight * 2.5f) - greyscale(0.25f);// simulate effect of SRGB addition error
                         }
                     }
 

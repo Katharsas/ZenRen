@@ -66,9 +66,10 @@ float4 PS_Main(PS_INPUT input, uint sampleIndex : SV_SAMPLEINDEX) : SV_TARGET
 	color.rgb = pow(color.rgb, float3(gammaAdjust, gammaAdjust, gammaAdjust));// TODO should this come before or after tonemapping?
 
 	// This could be calculated by luminance of the picture to get eye adjustment effect.
-	float exposure = 1.0f; 
+	float exposure = 1.3f; 
 
-	// apply tonemapping (just skip for linear mapping)
+	// apply tonemapping
+	color = float4((color.rgb * exposure), 1.0f);// no tonemapping
 	//color = float4(ReinhardTonemap(color.rgb * exposure), 1.0f);
 	//color = float4(Uncharted2Tonemap(color.rgb * exposure), 1.0f);
 
