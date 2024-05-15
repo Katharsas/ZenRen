@@ -284,9 +284,11 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\renderer\Sky.cpp" />
     <ClCompile Include="src\renderer\loader\DebugMeshes.cpp" />
     <ClCompile Include="src\renderer\loader\LookupTrees.cpp" />
     <ClCompile Include="src\renderer\loader\MeshUtil.cpp" />
+    <ClInclude Include="src\renderer\Sky.h" />
     <ClInclude Include="src\renderer\loader\DebugMeshes.h" />
     <ClInclude Include="lib\octree_attcs\octree.h" />
     <ClInclude Include="lib\octree_attcs\octree_container.h" />

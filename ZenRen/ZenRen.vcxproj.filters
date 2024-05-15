@@ -100,6 +100,7 @@
     <ClCompile Include="src\renderer\loader\FindGroundFace.cpp" />
     <ClCompile Include="src\renderer\loader\DebugMeshes.cpp" />
     <ClCompile Include="src\renderer\loader\StaticLightFromVobLights.cpp" />
+    <ClCompile Include="src\renderer\Sky.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Util.h">
@@ -162,5 +163,6 @@
     <ClInclude Include="src\renderer\loader\FindGroundFace.h" />
     <ClInclude Include="src\renderer\loader\DebugMeshes.h" />
     <ClInclude Include="src\renderer\loader\StaticLightFromVobLights.h" />
+    <ClInclude Include="src\renderer\Sky.h" />
   </ItemGroup>
 </Project>

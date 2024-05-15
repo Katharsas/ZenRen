@@ -145,4 +145,9 @@ namespace renderer
 	void release(IUnknown* dx11object);
 	void release(const std::vector<IUnknown*>& dx11objects);
 	void initViewport(BufferSize& size, D3D11_VIEWPORT* viewport);
+	
+	float fromSRGB(const float channel);
+	D3DXCOLOR fromSRGB(const D3DXCOLOR color);
+	D3DXCOLOR greyscale(const float channel);
+	D3DXCOLOR multiplyColor(D3DXCOLOR color, const float factor);
 }

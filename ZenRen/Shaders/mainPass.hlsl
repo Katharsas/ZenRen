@@ -111,6 +111,7 @@ VS_OUT VS_Main(VS_IN input)
         enableLightStatic = true;
     }
 
+    float lightSunAmount = 0.2f;
     float3 lightSun = (float3) (input.sunLight * CalcLightSun(viewLight3, viewNormal3));
     float3 lightStatic;
     float3 lightAmbient;
@@ -125,13 +126,13 @@ VS_OUT VS_Main(VS_IN input)
 
     output.light = (float3) 0;
     if (enableLightSun && enableLightStatic) {
-        output.light = (lightSun * 0.20f) + ((lightAmbient + lightStatic) * 0.80f);
+        output.light = (lightSun * lightSunAmount) + ((lightAmbient + lightStatic) * (1.f - lightSunAmount));
     }
     else if (enableLightSun) {
-        output.light = lightSun * 0.20f;
+        output.light = lightSun * lightSunAmount;
     }
     else if (enableLightStatic) {
-        output.light = (lightAmbient + lightStatic) * 0.80f;
+        output.light = (lightAmbient + lightStatic) * (1.f - lightSunAmount);
     }
     else {
         output.light = (float3) 1;

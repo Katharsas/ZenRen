@@ -2,6 +2,7 @@
 #include "PipelineForward.h"
 
 #include "PipelineWorld.h"
+#include "Sky.h"
 
 namespace renderer::forward {
 
@@ -44,6 +45,7 @@ namespace renderer::forward {
 
 		// clear the back buffer to a deep blue
 		d3d.deviceContext->ClearRenderTargetView(targetRtv, D3DXCOLOR(0.0f, 0.2f, 0.4f, 1.0f));
+		drawSky(d3d, targetRtv);
 
 		// clear depth and stencil buffer
 		const float zFar = settings.reverseZ ? 0.0 : 1.0f;

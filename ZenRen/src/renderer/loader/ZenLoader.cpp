@@ -127,13 +127,6 @@ namespace renderer::loader {
         };
     }
 
-    void multiplyColor(D3DXCOLOR color, const float factor)
-    {
-        color.r *= factor;
-        color.g *= factor;
-        color.b *= factor;
-    }
-
     vector<Light> loadLights(const vector<ZenLoad::zCVobData>& rootVobs)
     {
         vector<Light> lights;
@@ -247,8 +240,7 @@ namespace renderer::loader {
                         auto optLight = getLightAtPos(bboxCenter(instance.bbox), lightsStatic, lightStaticLookup, worldMeshData, worldFaceLookup);
                         if (optLight.has_value()) {
                             colLight = optLight.value().color;
-                            //multiplyColor(light.color, fromSRGB(0.71f));
-                            multiplyColor(colLight, fromSRGB(0.85f));
+                            colLight = multiplyColor(colLight, fromSRGB(0.85f));
 
                             instance.dirLightStatic = optLight.value().dirInverted;
                         }
