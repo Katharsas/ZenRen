@@ -2,6 +2,7 @@
 
 
 Simple, high performance DirectX11.1 renderer for Gothic assets (VDF or single files).
+<br>Attempts to closely recreate original G1/G2-AddOn look and lighting.
 
 ### Download (Windows)
 - https://github.com/Katharsas/ZenRen/releases/latest
@@ -13,6 +14,11 @@ Simple, high performance DirectX11.1 renderer for Gothic assets (VDF or single f
   - Lightmaps
   - Per-Vertex Colors
   - Per-Vob Static Light Accumulation (Color & Direction)
+- Time-Of-Day Skylight
+- Asset File Formats
+  - Level: VDF
+  - Objects: VDF
+  - Textures: VDF, TGA, PNG
 
 ### Features
 - Frame Limiter
@@ -31,7 +37,12 @@ Simple, high performance DirectX11.1 renderer for Gothic assets (VDF or single f
 ### TODO
 - Sky
 - Water / Morph-Meshes
-- Time Of Day (Gothic LUT Tonemapping)
+- Dynamic Lights
+- Dynamic Objects (MOBs)
+- Asset File Formats
+  - Level: ZEN (outside VDF), OBJ
+  - Objects: 3DS, OBJ
+- Loading single objects without level
 
 ### Options
 <pre>
