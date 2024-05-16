@@ -123,10 +123,8 @@ namespace renderer
 		return multiplyColor(sky.lightColor, intensity);
 	}
 
-	void drawSky(D3d d3d, ID3D11RenderTargetView* targetRtv, float currentTime) 
+	D3DXCOLOR getSkyColor(float currentTime)
 	{
-		// poor man's sky
-		SkyState sky = getSkyState(currentTime);
-		d3d.deviceContext->ClearRenderTargetView(targetRtv, sky.skyColor);
+		return getSkyState(currentTime).skyColor;
 	}
 }

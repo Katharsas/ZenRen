@@ -116,6 +116,6 @@ namespace renderer
 	void onWindowResize(uint32_t width, uint32_t height);
 	// Clean up DirectX and COM
 	void cleanD3D();
-	void update();
+	void update(float deltaTime);
 	void renderFrame();
 }

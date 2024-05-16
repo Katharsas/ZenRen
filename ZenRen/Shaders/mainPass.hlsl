@@ -14,6 +14,9 @@ cbuffer cbSettings : register(b0) {
 
     bool debugOutput;
     uint debugOutputType;
+
+    float4 skyLight;
+    float timeOfDay;
 };
 
 cbuffer cbPerObject : register(b1)
@@ -111,16 +114,21 @@ VS_OUT VS_Main(VS_IN input)
         enableLightStatic = true;
     }
 
-    float lightSunAmount = 0.2f;
+    // alpha indicates show much skylight should be received
+    float3 whiteOrSkyLight = lerp((float3) 1, skyLight.rgb, input.colLight.a);
+    float3 lightStaticCol = input.colLight * whiteOrSkyLight;
+
+    float sunStrengthForCurrentTime = abs(timeOfDay - 0.5f) * 2;// (0 = midnight, 1 = midday)
+    float lightSunAmount = lerp(0, 0.2f, sunStrengthForCurrentTime);
     float3 lightSun = (float3) (input.sunLight * CalcLightSun(viewLight3, viewNormal3));
     float3 lightStatic;
     float3 lightAmbient;
     if (isVob) {
-        lightStatic = input.colLight * CalcLightStaticVob(input.dirLight, viewNormal3);
-        lightAmbient = input.colLight * 0.27f;// original SRGB factor = 0.4f
+        lightStatic = lightStaticCol * CalcLightStaticVob(input.dirLight, viewNormal3);
+        lightAmbient = lightStaticCol * 0.27f;// original SRGB factor = 0.4f
     }
     else {
-        lightStatic = input.colLight;
+        lightStatic = lightStaticCol;
         lightAmbient = 0.f;
     }
 

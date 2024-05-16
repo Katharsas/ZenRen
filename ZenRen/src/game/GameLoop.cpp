@@ -68,7 +68,7 @@ namespace game
 		//LOG(DEBUG) << "DeltaTime:" << deltaTime;
 
 		processUserInput(deltaTime);
-		renderer::update();
+		renderer::update(deltaTime);
 
 		frameTime.updateEndRenderStart();
 

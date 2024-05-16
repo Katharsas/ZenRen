@@ -225,9 +225,9 @@ namespace renderer
 		d3d.deviceContext->Release();
 	}
 
-	void update()
+	void update(float deltaTime)
 	{
-		world::updateObjects();
+		world::updateObjects(deltaTime);
 	}
 
 	void renderFrame()

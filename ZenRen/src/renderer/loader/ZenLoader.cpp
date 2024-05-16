@@ -251,6 +251,7 @@ namespace renderer::loader {
                             }
                         }
                         resolvedStaticLight++;
+                        colLight.a = 0;// indicates that this VOB receives no sky light
                     }
                     else {
                         if (vertKey.has_value()) {
@@ -272,13 +273,13 @@ namespace renderer::loader {
                         else {
                             colLight = fromSRGB(D3DXCOLOR(0.63f, 0.63f, 0.63f, 1));// fallback lightness of (160, 160, 160)
                         }
+                        colLight.a = 1;// indicates that this VOB receives full sky light
                     }
 
                     if (debugTintVobStaticLight) {
                         colLight = D3DXCOLOR((colLight.r / 3.f) * 2.f, colLight.g, colLight.b, colLight.a);
                     }
 
-                    colLight.a = 1;
                     instance.colLightStatic = colLight;
 
                     const auto duration = std::chrono::high_resolution_clock::now() - now;

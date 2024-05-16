@@ -11,6 +11,7 @@
 #include "loader/ZenLoader.h";
 #include "loader/ObjLoader.h"
 #include "loader/TexFromVdfLoader.h"
+#include "Sky.h"
 
 // TODO move to RenderDebugGui
 #include "Gui.h"
@@ -36,6 +37,8 @@ namespace renderer::world {
 		int32_t distantAlphaDensityFix;
 		int32_t outputDirectEnabled;
 		ShaderOutputDirect outputDirectType;
+		D3DXCOLOR skyLight;
+		float timeOfDay;
 	};
 
 	__declspec(align(16))
@@ -60,6 +63,7 @@ namespace renderer::world {
 	float scale = 1.0f;
 	float scaleDir = 1.0f;
 
+	WorldSettings worldSettings;
 	World world;
 
 	// Texture Ownership
@@ -76,15 +80,29 @@ namespace renderer::world {
 	std::vector<Texture*> debugTextures;
 	int32_t selectedDebugTexture = 0;
 
+	void updateTimeOfDay(float timeOfDay) {
+		// clamp, wrap around if negative
+		float __;
+		worldSettings.timeOfDay = std::modf(std::modf(timeOfDay, &__) + 1, &__);
+	}
 
-	void initGui() {
+	void initGui()
+	{
+		addSettings("World", {
+			[&]()  -> void {
+				ImGui::PushItemWidth(180);
+				// Lables starting with ## are hidden
+				float timeOfDay = worldSettings.timeOfDay;
+				bool changed = ImGui::DragFloat("##TimeOfDay", &timeOfDay, .002f, 0, 0, "%.3f TimeOfDay");
+				if (changed) {
+					updateTimeOfDay(timeOfDay);
+				}
+				ImGui::SliderFloat("##TimeOfDayChangeSpeed", &worldSettings.timeOfDayChangeSpeed, 0, 1, "%.3f Time Speed", ImGuiSliderFlags_Logarithmic);
+				ImGui::PopItemWidth();
+			}
+		});
+
 		// TODO move to RenderDebugGui
-		
-		//addWindow("Debug World", {
-		//	[&]()  -> void {
-		//	}
-		//});
-
 		addWindow("Lightmaps", {
 			[&]()  -> void {
 				ImGui::PushItemWidth(60);
@@ -261,8 +279,11 @@ namespace renderer::world {
 		LOG(DEBUG) << "World Pass- StaticInstances material/texture count: " << loadedCount;
 	}
 
-	void updateObjects()
+	void updateObjects(float deltaTime)
 	{
+		updateTimeOfDay(worldSettings.timeOfDay + (worldSettings.timeOfDayChangeSpeed * deltaTime));
+
+		// TODO remove
 		rot += .015f;
 		if (rot > 6.28f) rot = 0.0f;
 
@@ -286,7 +307,7 @@ namespace renderer::world {
 		};
 	}
 
-	void updateShaderSettings(D3d d3d, RenderSettings& settings)
+	void updateShaderSettings(D3d d3d, const RenderSettings& settings)
 	{
 		CbGlobalSettings cbGlobalSettings;
 		cbGlobalSettings.multisampleTransparency = settings.multisampleTransparency;
@@ -312,7 +333,14 @@ namespace renderer::world {
 			throw std::invalid_argument("Unknown ShaderMode!");
 		}
 
+		cbGlobalSettings.timeOfDay = worldSettings.timeOfDay;
+		cbGlobalSettings.skyLight = getSkyLightFromIntensity(1, worldSettings.timeOfDay);
+
 		d3d.deviceContext->UpdateSubresource(cbGlobalSettingsBuffer, 0, nullptr, &cbGlobalSettings, 0, 0);
+	}
+
+	const WorldSettings& getWorldSettings() {
+		return worldSettings;
 	}
 
 	void initLinearSampler(D3d d3d, RenderSettings& settings)
@@ -398,8 +426,12 @@ namespace renderer::world {
 		}
 	}
 
-	void drawWorld(D3d d3d, ShaderManager* shaders)
+	void drawWorld(D3d d3d, ShaderManager* shaders, ID3D11RenderTargetView* targetRtv)
 	{
+		// poor man's sky (use fog color as background for now)
+		// TODO at some point we should extract sky drawing, maybe into PipelineSky?
+		d3d.deviceContext->ClearRenderTargetView(targetRtv, getSkyColor(worldSettings.timeOfDay));
+
 		// set the shader objects avtive
 		Shader* shader = shaders->getShader("mainPass");
 		d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
