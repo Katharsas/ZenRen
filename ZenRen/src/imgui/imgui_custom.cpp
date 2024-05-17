@@ -6,7 +6,6 @@
  * https://github.com/ocornut/imgui/issues/1496#issuecomment-655048353
  */
 
-#define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui/imgui_internal.h"
 
 static ImVector<ImRect> s_GroupPanelLabelStack;
