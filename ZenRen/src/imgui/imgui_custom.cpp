@@ -131,3 +131,7 @@ void ImGui::EndGroupPanel()
 
     ImGui::EndGroup();
 }
+
+void ImGui::PushStyleColorDebugText() {
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.f, 0.8f, 0.2f, 0.7f));
+}

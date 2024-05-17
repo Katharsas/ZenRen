@@ -152,7 +152,7 @@ namespace renderer
 		};
 		updateRenderSize();
 
-		renderer::addWindow("Info", {
+		renderer::addInfo("", {
 			[]() -> void {
 				const std::string vram = "VRAM: " + renderer::util::getVramUsage(dx12.adapter);
 				ImGui::Text(vram.c_str());

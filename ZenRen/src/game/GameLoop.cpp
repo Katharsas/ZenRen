@@ -30,11 +30,11 @@ namespace game
 		enablePreciseTimerResolution();
 		initMicrosleep();
 
-		renderer::addSettings("Graphics", {
+		renderer::addSettings("FPS Limiter", {
 			[]() -> void {
-				ImGui::Checkbox("Framelimiter", &settings.frameLimiterEnabled);
-				ImGui::PushItemWidth(40);
-				ImGui::InputInt("Frame Limit", &settings.frameLimit, 0);
+				ImGui::Checkbox("Enabled", &settings.frameLimiterEnabled);
+				ImGui::PushItemWidth(renderer::INPUT_FLOAT_WIDTH);
+				ImGui::InputInt("FPS Limit", &settings.frameLimit, 0);
 				if (settings.frameLimit < 10) {
 					settings.frameLimit = 10;
 				}

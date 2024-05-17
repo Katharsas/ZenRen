@@ -14,6 +14,7 @@ namespace renderer {
 
 	std::map<std::string, std::list<GuiComponent>> windowsToGuis;
 	std::map<std::string, std::list<GuiComponent>> settingsGroupToGuis;
+	std::map<std::string, std::list<GuiComponent>> infoGroupToGuis;
 
 	void addWindow(const std::string& windowName, GuiComponent guiComponent)
 	{
@@ -27,6 +28,12 @@ namespace renderer {
 		components.push_back(guiComponent);
 	}
 
+	void addInfo(const std::string& groupName, GuiComponent guiComponent)
+	{
+		auto& components = util::getOrCreate(infoGroupToGuis, groupName);
+		components.push_back(guiComponent);
+	}
+
 	void initGui(HWND hWnd, D3d d3d)
 	{
 		
@@ -35,7 +42,7 @@ namespace renderer {
 		ImGuiIO& io = ImGui::GetIO(); (void)io;
 		//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 
-		ImGui::StyleColorsDark();
+		ImGui::StyleColorsDark();// lookup default colors here
 
 		ImGui_ImplWin32_Init(hWnd);
 		ImGui_ImplDX11_Init(d3d.device, d3d.deviceContext);
@@ -45,28 +52,71 @@ namespace renderer {
 		io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Consola.ttf", (int)((13 * dpiScale) + 0.5f));
 	}
 
+	float drawWindowWithGroups(const std::string& windowName, std::map<std::string, std::list<GuiComponent>> groups, float posY, float sizeY = -1)
+	{
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
+		ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.7f));
+
+		ImGui::SetNextWindowPos({ 0.f, posY });
+		ImGui::SetNextWindowSize({ GUI_PANEL_WIDTH, -1 }, ImGuiCond_Once);
+		ImGui::SetNextWindowSizeConstraints({ 0.f, (sizeY < 0 ? 0.f : sizeY) }, { FLT_MAX , (sizeY < 0 ? FLT_MAX : sizeY) });
+		auto windowFlags = sizeY < 0 ?
+			ImGuiWindowFlags_AlwaysAutoResize : ImGuiWindowFlags_None; // fix window never getting auto resized
+
+		if (ImGui::Begin(windowName.c_str(), 0, windowFlags)) {
+			for (const auto& [groupName, commands] : groups) {
+				// group text
+				if (groups.size() > 1) {
+					ImGui::Dummy(ImVec2(0.0f, 8.0f));
+					ImGui::SetCursorPos({ ImGui::GetCursorPos().x + 8, ImGui::GetCursorPos().y });
+					ImGui::Text((groupName).c_str());
+				}
+				// group elements
+				// make roughly as dark as original ImGuiCol_WindowBg (when added on top of custom WindowBg)
+				ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.05f, 0.05f, 0.05f, 0.80f));
+				ImGui::BeginChild(groupName.c_str(), ImVec2(0, 0), ImGuiChildFlags_AutoResizeY);
+				ImGui::Dummy(ImVec2(0.0f, 4.0f));
+				ImGui::SetCursorPos({ ImGui::GetCursorPos().x + GUI_PANEL_PADDING, ImGui::GetCursorPos().y });
+				ImGui::BeginGroup();
+				for (const auto& command : commands) {
+					command.buildGui();
+				}
+				ImGui::EndGroup();
+				ImGui::Dummy(ImVec2(0.0f, 4.0f));
+				ImGui::EndChild();
+				ImGui::PopStyleColor();
+			}
+		}
+		float sizeX = ImGui::GetWindowSize().y;
+		ImGui::End();
+
+		ImGui::PopStyleColor();
+		ImGui::PopStyleVar();
+		return sizeX;
+	}
+
 	void drawGui()
 	{
 		ImGui_ImplDX11_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
 
-		ImGui::Begin("Settings");
-		for (const auto& [groupName, commands] : settingsGroupToGuis) {
-			ImGui::SameLine();
-			ImGui::BeginGroupPanel(groupName.c_str(), ImVec2(0, 0));
-			for (const auto& command : commands) {
-				command.buildGui();
-			}
-			ImGui::EndGroupPanel();
-		}
-		ImGui::End();
+		ImGuiViewport* viewport = ImGui::GetMainViewport();
+		auto size = viewport->Size;
 
+		float currentPosY = 0;
+		currentPosY += drawWindowWithGroups("Info", infoGroupToGuis, currentPosY, -1);
+		currentPosY += drawWindowWithGroups("Settings", settingsGroupToGuis, currentPosY, size.y - currentPosY);
+
+		currentPosY = 0;
+		// TODO place everything else on right side
 		for (auto& [windowName, commands] : windowsToGuis) {
+			ImGui::SetNextWindowPos({ GUI_PANEL_WIDTH, currentPosY });
 			ImGui::Begin(windowName.c_str());
 			for (const auto& command : commands) {
 				command.buildGui();
 			}
+			currentPosY += ImGui::GetWindowSize().y;
 			ImGui::End();
 		}
 

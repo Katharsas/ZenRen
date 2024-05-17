@@ -3,6 +3,7 @@
 #include "RenderSettings.h"
 #include "Gui.h"
 #include "imgui/imgui.h"
+#include "imgui/imgui_custom.h"
 
 namespace renderer::gui::settings {
 
@@ -20,6 +21,7 @@ namespace renderer::gui::settings {
 		addSettings("Renderer", {
 			[&]()  -> void {
 				ImGui::Checkbox("Wireframe Mode", &settings.wireframe);
+				ImGui::PushStyleColorDebugText();
 				ImGui::Checkbox("Reverse Z", &settings.reverseZ);
 
 				const auto& items = shaderModeItems;
@@ -40,20 +42,20 @@ namespace renderer::gui::settings {
 					ImGui::EndCombo();
 				}
 				ImGui::PopItemWidth();
-
 				ImGui::Checkbox("Depth Prepass", &settings.depthPrepass);
+				ImGui::PopStyleColor();
 			}
 		});
 
 		addSettings("Resolution", {
 			[&]()  -> void {
-				ImGui::PushItemWidth(60);
-				ImGui::InputFloat("Resolution Scaling", &settings.resolutionScaling, 0);
+				ImGui::PushItemWidth(INPUT_FLOAT_WIDTH);
+				ImGui::InputFloat("Resolution Scaling", &settings.resolutionScaling, 0, 0, "%.2f");
 				ImGui::PopItemWidth();
-				ImGui::PushItemWidth(120);
+				ImGui::PushStyleColorDebugText();
 				ImGui::Checkbox("Smooth Scaling", &settings.resolutionUpscaleSmooth);
 				//ImGui::Checkbox("Downsampling", &settings.downsampling);
-				ImGui::PopItemWidth();
+				ImGui::PopStyleColor();
 			}
 		});
 
@@ -76,8 +78,10 @@ namespace renderer::gui::settings {
 					}
 					ImGui::EndCombo();
 				}
+				ImGui::PushStyleColorDebugText();
 				ImGui::Checkbox("Transparency", &settings.multisampleTransparency);
 				ImGui::Checkbox("Distant Alpha", &settings.distantAlphaDensityFix);
+				ImGui::PopStyleColor();
 				ImGui::PopItemWidth();
 			}
 		});

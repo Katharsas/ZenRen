@@ -90,7 +90,7 @@ namespace renderer::world {
 	{
 		addSettings("World", {
 			[&]()  -> void {
-				ImGui::PushItemWidth(180);
+				ImGui::PushItemWidth(GUI_ELEMENT_WIDTH);
 				// Lables starting with ## are hidden
 				float timeOfDay = worldSettings.timeOfDay;
 				bool changed = ImGui::DragFloat("##TimeOfDay", &timeOfDay, .002f, 0, 0, "%.3f TimeOfDay");
@@ -492,10 +492,10 @@ namespace renderer::world {
 
 	void clean()
 	{
-		cbPerObjectBuffer->Release();
-		cbGlobalSettingsBuffer->Release();
-		lightmapTexArray->Release();
-		linearSamplerState->Release();
+		release(cbPerObjectBuffer);
+		release(cbGlobalSettingsBuffer);
+		release(lightmapTexArray);
+		release(linearSamplerState);
 
 		for (auto& tex : debugTextures) {
 			delete tex;
