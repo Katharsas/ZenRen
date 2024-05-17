@@ -44,13 +44,6 @@ namespace renderer
 		return a / 255.f;
 	}
 
-	UV add(UV uv1, UV uv2) {
-		return { uv1.u + uv2.u, uv1.v + uv2.v };
-	}
-	UV mul(UV uv1, float scalar) {
-		return { uv1.u * scalar, uv1.v * scalar };
-	}
-
 	// G1 defines an additional texture brightness color (domeColor1) in SkyState, however it is hardcoded to not be used by base night layer (star texture)
 	// and it is effectively set to 255 for any time other than night time, which means it only ever affects the night overlay (night clouds texture).
 	// G1 hardcodes re-scaling of domeColor1 to range 128 - 255.

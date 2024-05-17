@@ -35,7 +35,7 @@ namespace renderer::loader {
 
     bool debugInstanceMeshBbox = false;
     bool debugInstanceMeshBboxCenter = false;
-    bool debugTintVobStaticLight = false;
+    bool debugTintVobStaticLight = true;
     bool debugStaticLights = false;
     bool debugStaticLightRays = false;
 
@@ -64,7 +64,6 @@ namespace renderer::loader {
 
     bool existsInstanceMesh(string& visualname, VDFS::FileIndex& vdf)
     {
-        // .mrm does not exist for worldmesh parts
         string filename = visualname + ".MRM";
         return vdf.hasFile(filename);
     }
@@ -100,9 +99,50 @@ namespace renderer::loader {
         }
     }
 
-    void getVobsWithVisuals(const vector<ZenLoad::zCVobData>& vobs, vector<const ZenLoad::zCVobData*>& target)
+    /*void getVobsWithVisuals(const vector<ZenLoad::zCVobData>& vobs, vector<const ZenLoad::zCVobData*>& target)
     {
         const auto filter = [&](const ZenLoad::zCVobData& vob) { return !vob.visual.empty() && vob.visual.find(".3DS") != string::npos; };
+        return flattenVobTree(vobs, target, filter);
+    }*/
+
+    void getVobsWithVisuals(const vector<ZenLoad::zCVobData>& vobs, vector<const ZenLoad::zCVobData*>& target)
+    {
+        const auto filter = [&](const ZenLoad::zCVobData& vob) {
+            if (!vob.visual.empty() && vob.visual.find(".3DS") != string::npos) {
+                if (vob.vobName == "LEVEL-VOB") {
+                    // worldmesh parts, already loaded directly from ZEN (compiled meshes do not exist for these)
+                    return false;
+                }
+                //LOG(INFO) << vob.cdStatic << "  " << vob.cdDyn << "  " << vob.staticVob;
+                if (!vob.staticVob) {
+                    LOG(INFO) << vob.visual << "  " << vob.vobName;
+                    return true;
+                }
+
+                return false;
+            }
+            if (vob.vobType == ZenLoad::zCVobData::EVobType::VT_oCMOB)
+            {
+                // there is only one single mob (non-static) that is not VT_oCMobContainer or VT_oCMobInter, and it has a visual, so we treat it as static vob?
+                // do we treat all mobs as static for now if we can get a visual?
+                //LOG(INFO) << vob.objectClass;
+            }
+            else if (vob.vobType == ZenLoad::zCVobData::EVobType::VT_oCMobContainer) {
+               // LOG(INFO) << vob.objectClass;
+            }
+            else if (vob.vobType == ZenLoad::zCVobData::EVobType::VT_oCMobInter) {
+                if (vob.vobName == "LADDER_10") {
+                    // showVisual true
+                    // cdStatic false
+                    // cdDyn true
+                    // staticVob true
+                    // visual LADDER_10.ASC
+                    // -> file LADDER_10.MDL existis or MDH/MDM?
+                }
+                //LOG(INFO) << vob.objectClass;
+            }
+            return false;
+        };
         return flattenVobTree(vobs, target, filter);
     }
 

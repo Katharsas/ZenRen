@@ -13,8 +13,22 @@ namespace renderer
 		return os << "[R:" << that.r << " G:" << that.g << " B:" << that.b << " A:" << that.a << "]";
 	}
 
+	struct UV {
+		union {
+			struct { float u, v; };
+			float vec[2];
+		};
+	};
+	inline std::ostream& operator <<(std::ostream& os, const UV& that)
+	{
+		return os << "[U=" << that.u << " V=" << that.v << "]";
+	}
+
 	struct VEC3 {
-		float x, y, z;
+		union {
+			struct { float x, y, z; };
+			float vec[3];
+		};
 	};
 	inline std::ostream& operator <<(std::ostream& os, const VEC3& that)
 	{
@@ -22,19 +36,14 @@ namespace renderer
 	}
 
 	struct VEC4 {
-		float x, y, z, w;
+		union {
+			struct { float x, y, z, w; };
+			float vec[4];
+		};
 	};
 	inline std::ostream& operator <<(std::ostream& os, const VEC4& that)
 	{
 		return os << "[X=" << that.x << " Y=" << that.y << " Z=" << that.z << " W=" << that.w << "]";
-	}
-
-	struct UV {
-		float u, v;
-	};
-	inline std::ostream& operator <<(std::ostream& os, const UV& that)
-	{
-		return os << "[U=" << that.u << " V=" << that.v << "]";
 	}
 
 	struct ARRAY_UV {
@@ -150,4 +159,7 @@ namespace renderer
 	D3DXCOLOR fromSRGB(const D3DXCOLOR color);
 	D3DXCOLOR greyscale(const float channel);
 	D3DXCOLOR multiplyColor(D3DXCOLOR color, const float factor);
+
+	template<typename T> T add(const T& vec1, const T& vec2);
+	template<typename T> T mul(const T& vec, float scalar);
 }

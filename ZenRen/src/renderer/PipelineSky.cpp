@@ -157,13 +157,6 @@ namespace renderer::sky
         util::createVertexBuffer(d3d, &mesh.vertexBufferOther, facesOther);
     }
 
-    UV add(UV uv1, UV uv2) {
-        return { uv1.u + uv2.u, uv1.v + uv2.v };
-    }
-    UV mul(UV uv1, float scalar) {
-        return { uv1.u * scalar, uv1.v * scalar };
-    }
-
     void swapUvsIfSwapOccured(bool swapLayers) {
         bool swapUvs = lastWasSwapped != swapLayers;
         lastWasSwapped = swapLayers;
@@ -190,7 +183,7 @@ namespace renderer::sky
         for (int32_t i = 0; i < 2; i++) {
             SkyTexState state = layerStates[layerIndex[i]];
             lastUvMin[i] = add(lastUvMin[i], mul(state.uvSpeed, timeDeltaUv));
-            lastUvMax[i] = add(lastUvMin[i], mul({ 1, 1 }, state.tex.uvScale));
+            lastUvMax[i] = add(lastUvMin[i], mul(UV { 1, 1 }, state.tex.uvScale));
             for (auto tex : skyTextures) {
                 if (state.tex.name == tex.name) {
                     layerTextures[i] = tex.tex;
