@@ -5,7 +5,9 @@
 
 namespace renderer
 {
-	namespace timekeys
+	using std::array;
+
+	namespace timekey
 	{
 		const float midday = .0f;
 
@@ -38,83 +40,177 @@ namespace renderer
 			1.f);
 	}
 
-	const std::array skyStates = {
+	const D3DXCOLOR nightCloudColor = fromSRGB(55, 55, 155);
+
+	// We assume that all state arrays have same length and use same timeKeys in same order as defined here.
+	// In theory, we don't need to put time keys into every state struct, but this makes state definitions more readable.
+	const array timeKeys = {
+		timekey::midday,
+		timekey::evening_early,
+		timekey::evening,
+		timekey::evening_late,
+		timekey::midnight,
+		timekey::morning_early,
+		timekey::morning,
+		timekey::morning_late,
+	};
+
+	const array skyStates = {
 		SkyState {
-			timekeys::midday,
+			timekey::midday,
 			fromSRGB(255, 250, 235),
 			fromSRGB(120, 140, 180),
 		},
 		SkyState {
-			timekeys::evening_early,
+			timekey::evening_early,
 			fromSRGB(255, 250, 235),
 			fromSRGB(120, 140, 180),
 		},
 		SkyState {
-			timekeys::evening,
+			timekey::evening,
 			fromSRGB(255, 185, 170),
 			fromSRGB(180, 75, 60),
 		},
 		SkyState {
-			timekeys::evening_late,
+			timekey::evening_late,
 			fromSRGB(105, 105, 195),
 			fromSRGB(20, 20, 60),
 		},
 		SkyState {
-			timekeys::midnight,
+			timekey::midnight,
 			fromSRGB(40, 60, 210),
 			fromSRGB(5, 5, 20),
 		},
 		SkyState {
-			timekeys::morning_early,
+			timekey::morning_early,
 			fromSRGB(40, 60, 210),
 			fromSRGB(5, 5, 20),
 		},
 		SkyState {
-			timekeys::morning,
+			timekey::morning,
 			fromSRGB(190, 160, 255),
 			fromSRGB(80, 60, 105),
 		},
 		SkyState {
-			timekeys::morning_late,
+			timekey::morning_late,
 			fromSRGB(255, 250, 235),
 			fromSRGB(120, 140, 180),
 		},
 	};
 
-	SkyState getSkyStateInterpolated(float timeKey)
-	{
-		SkyState result;
-		result.timeKey = timeKey;
+	float fromAlpha(uint8_t a) {
+		return a / 255.f;
+	}
 
-		for (int32_t i = 0; i < skyStates.size(); i++) {
-			SkyState current = skyStates[i];
-			SkyState next = skyStates[(i+1) % skyStates.size()];
-			if (next.timeKey < current.timeKey) {
-				next.timeKey += 1.f;// wrap over
+	// each previous SkyTexType is defined to last until next timekey
+	const array skyLayerBase = {
+		SkyTexState { timekey::midday,        SkyTexType::DAY,   fromAlpha(215) },
+		SkyTexState { timekey::evening_early, SkyTexType::NIGHT, fromAlpha(  0) },
+		SkyTexState { timekey::evening,       SkyTexType::NIGHT, fromAlpha(128) },
+		SkyTexState { timekey::evening_late,  SkyTexType::NIGHT, fromAlpha(255) },
+		SkyTexState { timekey::midnight,      SkyTexType::NIGHT, fromAlpha(255) },
+		SkyTexState { timekey::morning_early, SkyTexType::NIGHT, fromAlpha(255) },
+		SkyTexState { timekey::morning,       SkyTexType::NIGHT, fromAlpha(128) },
+		SkyTexState { timekey::morning_late,  SkyTexType::DAY,   fromAlpha(215) },
+	};
+	const array skyLayerOverlay = {
+		SkyTexState { timekey::midday,        SkyTexType::DAY,   fromAlpha(128) },// TODO original alpha = 255, but ingame the overlay does not fully block base layer, so something is wrong!
+		SkyTexState { timekey::evening_early, SkyTexType::DAY,   fromAlpha(255) },// TODO check ingame
+		SkyTexState { timekey::evening,       SkyTexType::DAY,   fromAlpha(128) },
+		SkyTexState { timekey::evening_late,  SkyTexType::NIGHT, fromAlpha(  0), nightCloudColor },
+		SkyTexState { timekey::midnight,      SkyTexType::NIGHT, fromAlpha(215), nightCloudColor },
+		SkyTexState { timekey::morning_early, SkyTexType::DAY,   fromAlpha(  0), nightCloudColor },
+		SkyTexState { timekey::morning,       SkyTexType::DAY,   fromAlpha(128) },
+		SkyTexState { timekey::morning_late,  SkyTexType::DAY,   fromAlpha(255) },
+	};
+
+	struct CurrentTimeKeys {
+		float timeOfDay;// current time
+		int32_t lastTimeKeyIndex;// most recently elapsed
+		int32_t nextTimeKeyIndex;// upcoming
+		float delta;// how much time has passed from last to next, between 0 and 1
+	};
+
+	float interpolate(float last, float next, float delta) {
+		return last + (next - last) * delta;
+	}
+	D3DXCOLOR interpolate(D3DXCOLOR last, D3DXCOLOR next, float delta) {
+		return last + (next - last) * delta;
+	}
+
+	CurrentTimeKeys getTimeKeysInterpolated(float timeKey) {
+		for (int32_t i = 0; i < timeKeys.size(); i++) {
+			float last = timeKeys[i];
+			int32_t nextIndex = (i + 1) % timeKeys.size();
+			float next = timeKeys[nextIndex];
+			if (next < last) {
+				next += 1.f;// wrap over
 			}
-			if (current.timeKey <= timeKey && next.timeKey >= timeKey) {
-				float currentDiff = timeKey - current.timeKey;
-				float nextDiff = next.timeKey - timeKey;
-				float totalDiff = currentDiff + nextDiff;
-
-				float currentFactor = 1.f - (currentDiff / totalDiff);
-				float nextFactor = 1.f - (nextDiff / totalDiff);
-				result.lightColor = current.lightColor * currentFactor + next.lightColor * nextFactor;
-				result.skyColor = current.skyColor * currentFactor + next.skyColor * nextFactor;
-				return result;
+			if (last <= timeKey && next >= timeKey) {
+				float interval = next - last;
+				float delta = (timeKey - last) / interval;
+				return { timeKey, i, nextIndex, delta };
 			}
 		}
-
 		assert(false);
 	}
 
-	SkyState currentSkyState = getSkyStateInterpolated(0.f);
+	SkyState getSkyStateInterpolated(CurrentTimeKeys timeKeys)
+	{
+		SkyState result;
+		result.timeKey = timeKeys.timeOfDay;
+		SkyState last = skyStates[timeKeys.lastTimeKeyIndex];
+		SkyState next = skyStates[timeKeys.nextTimeKeyIndex];
+		float lastFactor = 1.f - timeKeys.delta;
+		float nextFactor = timeKeys.delta;
 
-	SkyState getSkyState(float timeKey) {
-		if (timeKey != currentSkyState.timeKey) {
-			currentSkyState = getSkyStateInterpolated(timeKey);
+		result.lightColor = interpolate(last.lightColor, next.lightColor, timeKeys.delta);
+		result.skyColor = interpolate(last.skyColor, next.skyColor, timeKeys.delta);
+		return result;
+	}
+
+	SkyTexState getSkyLayerInterpolated(CurrentTimeKeys timeKeys, bool isBaseLayer) {
+		const auto& layer = isBaseLayer ? skyLayerBase : skyLayerOverlay;
+		SkyTexState result;
+		result.timeKey = timeKeys.timeOfDay;
+		SkyTexState last = layer[timeKeys.lastTimeKeyIndex];
+		SkyTexState next = layer[timeKeys.nextTimeKeyIndex];
+
+		result.type = last.type;
+		result.alpha = interpolate(last.alpha, next.alpha, timeKeys.delta);
+		result.texlightColor = interpolate(last.texlightColor, next.texlightColor, timeKeys.delta);
+		return result;
+	}
+
+	// cache last-used interpolated values so we don't have to re-interpolate on each API call
+	CurrentTimeKeys currentTimeKeys = getTimeKeysInterpolated(defaultTime);
+	SkyState currentSkyState = getSkyStateInterpolated(currentTimeKeys);
+	array<SkyTexState, 2> currentLayers = {
+		getSkyLayerInterpolated(currentTimeKeys, true),
+		getSkyLayerInterpolated(currentTimeKeys, false),
+	};
+
+	SkyState getSkyState(float timeOfDay) {
+		if (timeOfDay != currentSkyState.timeKey) {
+			if (timeOfDay != currentTimeKeys.timeOfDay) {
+				currentTimeKeys = getTimeKeysInterpolated(timeOfDay);
+			}
+			currentSkyState = getSkyStateInterpolated(currentTimeKeys);
 		}
 		return currentSkyState;
+	}
+
+	array<SkyTexState, 2> getSkyLayers(float timeOfDay) {
+		if (timeOfDay != currentLayers[0].timeKey) {
+			if (timeOfDay != currentTimeKeys.timeOfDay) {
+				currentTimeKeys = getTimeKeysInterpolated(timeOfDay);
+			}
+			currentLayers = {
+				getSkyLayerInterpolated(currentTimeKeys, true),
+				getSkyLayerInterpolated(currentTimeKeys, false),
+			};
+		}
+		return currentLayers;
 	}
 
 	D3DXCOLOR getSkyLightFromIntensity(float intensity, float currentTime)

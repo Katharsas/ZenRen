@@ -10,11 +10,12 @@ namespace renderer::camera {
 	};
 
 	/* pre-transposed for HLSL usage */
-	ObjectMatrices getWorldViewMatrix(const DirectX::XMMATRIX& objectsWorldMatrix);
+	ObjectMatrices getWorldViewMatrix(const DirectX::XMMATRIX& objectsWorldMatrix = DirectX::XMMatrixIdentity());
 	/* pre-transposed for HLSL usage */
 	DirectX::XMMATRIX getProjectionMatrix();
 
 	void init();
+	DirectX::XMVECTOR getCameraPosition();
 	void updateCamera(bool reverseZ, BufferSize& viewportSize);
 	void moveCameraDepth(float amount);
 	void moveCameraHorizontal(float amount);

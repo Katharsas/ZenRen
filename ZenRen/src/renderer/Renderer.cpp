@@ -20,6 +20,7 @@ using namespace Microsoft::WRL;
 #include "PipelineForward.h"
 #include "PipelinePostProcess.h"
 #include "PipelineWorld.h"
+#include "PipelineSky.h"
 #include "ShaderManager.h"
 #include "Shader.h"
 #include "RenderUtil.h"
@@ -162,7 +163,6 @@ namespace renderer
 		});
 
 		initDeviceAndSwapChain(hWnd);
-		world::initConstantBufferPerObject(d3d);
 
 		RenderDirtyFlags flags;
 		flags.onInit();
@@ -172,9 +172,8 @@ namespace renderer
 		initGui(hWnd, d3d);
 
 		camera::init();
-
+		forward::initConstantBuffers(d3d);
 		shaders = new ShaderManager(d3d);
-		world::initConstantBufferPerObject(d3d);
 		world::init(d3d);
 
 		gui::settings::init(settings);
@@ -182,6 +181,7 @@ namespace renderer
 
 	void loadLevel(std::string& level)
 	{
+		sky::loadSky(d3d);// TODO only if indoor (by world)
 		world::loadLevel(d3d, level);
 	}
 

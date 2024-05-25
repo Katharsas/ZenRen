@@ -13,14 +13,14 @@ namespace renderer::world
 
 	void loadLevel(D3d d3d, std::string& level);
 	void updateObjects(float deltaTime);
-	void updateShaderSettings(D3d d3d, const RenderSettings& settings);
 	const WorldSettings& getWorldSettings();
 	void initLinearSampler(D3d d3d, RenderSettings& settings);
 	void init(D3d d3d);
-	void initConstantBufferPerObject(D3d d3d);
-	void drawPrepass(D3d d3d, ShaderManager* shaders);
-	void drawWorld(D3d d3d, ShaderManager* shaders, ID3D11RenderTargetView* targetRtv);
-	void drawWireframe(D3d d3d, ShaderManager* shaders);
+	D3DXCOLOR getBackgroundColor();
+	void drawSky(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs);
+	void drawPrepass(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs);
+	void drawWorld(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs, ID3D11RenderTargetView* targetRtv);
+	void drawWireframe(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs);
 	void clean();
 }
 

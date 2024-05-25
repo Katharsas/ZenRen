@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <stdexcept>
 
+#include "PipelineSky.h"
 #include "Camera.h"
 #include "Texture.h"
 #include "../Util.h"
@@ -12,6 +13,7 @@
 #include "loader/ObjLoader.h"
 #include "loader/TexFromVdfLoader.h"
 #include "Sky.h"
+#include "RenderUtil.h"
 
 // TODO move to RenderDebugGui
 #include "Gui.h"
@@ -21,47 +23,18 @@ using namespace DirectX;
 
 namespace renderer::world {
 
-	// Note: smallest type for constant buffer values is 32 bit; cannot use bool or uint_16 without packing
-
-	enum ShaderOutputDirect : uint32_t {
-		Solid = 0,
-		Diffuse = 1,
-		Normal = 2,
-		Light_Sun = 3,
-		Light_Static = 4,
-	};
-
-	__declspec(align(16))
-	struct CbGlobalSettings {
-		int32_t multisampleTransparency;
-		int32_t distantAlphaDensityFix;
-		int32_t outputDirectEnabled;
-		ShaderOutputDirect outputDirectType;
-		D3DXCOLOR skyLight;
-		float timeOfDay;
-	};
-
-	__declspec(align(16))
-	struct CbPerObject {
-		XMMATRIX worldViewMatrix;
-		XMMATRIX worldViewMatrixInverseTranposed;
-		XMMATRIX projectionMatrix;
-	};
-
 	struct World {
 		std::vector<PrepassMeshes> prepassMeshes;
 		std::vector<Mesh> meshes;
 		XMMATRIX transform;
-
-		CbPerObject matrices;
 	};
 
-	ID3D11Buffer* cbGlobalSettingsBuffer;
-	ID3D11Buffer* cbPerObjectBuffer;
 
 	float rot = 0.1f;
 	float scale = 1.0f;
 	float scaleDir = 1.0f;
+
+	bool isOutdoorLevel = true;
 
 	WorldSettings worldSettings;
 	World world;
@@ -124,12 +97,12 @@ namespace renderer::world {
 		auto optionalFilepath = loader::existsAsFile(texName);
 		if (optionalFilepath.has_value()) {
 			auto path = *optionalFilepath.value();
-			return new Texture(d3d, util::toString(path));
+			return new Texture(d3d, ::util::toString(path));
 		}
 
 		auto optionalVdfIndex = loader::getVdfIndex();
 		if (optionalVdfIndex.has_value()) {
-			std::string zTexName = util::replaceExtension(texName, "-c.tex");// compiled textures have -C suffix
+			std::string zTexName = ::util::replaceExtension(texName, "-c.tex");// compiled textures have -C suffix
 
 			if (optionalVdfIndex.value()->hasFile(zTexName)) {
 				InMemoryTexFile tex = loader::loadTex(zTexName, optionalVdfIndex.value());
@@ -137,27 +110,12 @@ namespace renderer::world {
 			}
 		}
 		
-		return new Texture(d3d, util::toString(loader::DEFAULT_TEXTURE));
+		return new Texture(d3d, ::util::toString(loader::DEFAULT_TEXTURE));
 	}
 
 	Texture* getOrCreateTexture(D3d d3d, const std::string& texName) {
 		std::function<Texture* ()> createTex = [d3d, texName]() { return createTexture(d3d, texName); };
-		return util::getOrCreate(textureCache, texName, createTex);
-	}
-
-	template<typename T>
-	void createVertexBuffer(D3d d3d, ID3D11Buffer** target, const std::vector<T>& vertexData)
-	{
-		D3D11_BUFFER_DESC bufferDesc;
-		ZeroMemory(&bufferDesc, sizeof(bufferDesc));
-
-		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-		bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-		bufferDesc.ByteWidth = sizeof(T) * vertexData.size();
-
-		D3D11_SUBRESOURCE_DATA initialData;
-		initialData.pSysMem = vertexData.data();
-		d3d.device->CreateBuffer(&bufferDesc, &initialData, target);
+		return ::util::getOrCreate(textureCache, texName, createTex);
 	}
 
 	uint32_t loadPrepassData(D3d d3d, std::vector<PrepassMeshes>& target, const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData)
@@ -177,7 +135,7 @@ namespace renderer::world {
 		}
 		PrepassMeshes mesh;
 		mesh.vertexCount = allVerts.size();
-		createVertexBuffer(d3d, &mesh.vertexBufferPos, allVerts);
+		util::createVertexBuffer(d3d, &mesh.vertexBufferPos, allVerts);
 		target.push_back(mesh);
 		return loadedCount;
 	}
@@ -198,8 +156,8 @@ namespace renderer::world {
 				Mesh mesh;
 				{
 					mesh.vertexCount = vertices.vecPos.size();
-					createVertexBuffer(d3d, &mesh.vertexBufferPos, vertices.vecPos);
-					createVertexBuffer(d3d, &mesh.vertexBufferNormalUv, vertices.vecNormalUv);
+					util::createVertexBuffer(d3d, &mesh.vertexBufferPos, vertices.vecPos);
+					util::createVertexBuffer(d3d, &mesh.vertexBufferNormalUv, vertices.vecNormalUv);
 				}
 				mesh.baseColor = texture;
 				target.push_back(mesh);
@@ -214,9 +172,9 @@ namespace renderer::world {
 	{
 		bool levelDataFound = false;
 		RenderData data;
-		util::asciiToLower(level);
+		::util::asciiToLower(level);
 
-		if (!util::endsWith(level, ".obj") && !util::endsWith(level, ".zen")) {
+		if (!::util::endsWith(level, ".obj") && !::util::endsWith(level, ".zen")) {
 			LOG(WARNING) << "Level file format not supported: " << level;
 		}
 
@@ -224,8 +182,8 @@ namespace renderer::world {
 		auto optionalVdfIndex = loader::getVdfIndex();
 
 		if (optionalFilepath.has_value()) {
-			if (util::endsWith(level, ".obj")) {
-				data = { loader::loadObj(util::toString(*optionalFilepath.value())) };
+			if (::util::endsWith(level, ".obj")) {
+				data = { true, loader::loadObj(::util::toString(*optionalFilepath.value())) };
 				levelDataFound = true;
 			}
 			else {
@@ -234,7 +192,7 @@ namespace renderer::world {
 			}
 		}
 		else if (optionalVdfIndex.has_value()) {
-			if (util::endsWith(level, ".zen")) {
+			if (::util::endsWith(level, ".zen")) {
 				data = loader::loadZen(level, optionalVdfIndex.value());
 				levelDataFound = true;
 			}
@@ -249,6 +207,8 @@ namespace renderer::world {
 		if (!levelDataFound) {
 			return;
 		}
+
+		isOutdoorLevel = data.isOutdoorLevel;
 
 		{
 			release(lightmapTexArray);
@@ -298,45 +258,6 @@ namespace renderer::world {
 		XMMATRIX scaleM = XMMatrixScaling(1, scale, 1);
 		world.transform = scaleM;
 		//world.transform = world.transform * rotation;
-
-		const auto objectMatrices = camera::getWorldViewMatrix(world.transform);
-		world.matrices = {
-			objectMatrices.worldView,
-			objectMatrices.worldViewNormal,
-			camera::getProjectionMatrix(),
-		};
-	}
-
-	void updateShaderSettings(D3d d3d, const RenderSettings& settings)
-	{
-		CbGlobalSettings cbGlobalSettings;
-		cbGlobalSettings.multisampleTransparency = settings.multisampleTransparency;
-		cbGlobalSettings.distantAlphaDensityFix = settings.distantAlphaDensityFix;
-		cbGlobalSettings.outputDirectEnabled = settings.shader.mode != ShaderMode::Default;
-		
-		if (settings.shader.mode == ShaderMode::Diffuse) {
-			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Diffuse;
-		}
-		else if (settings.shader.mode == ShaderMode::Normals) {
-			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Normal;
-		}
-		else if (settings.shader.mode == ShaderMode::Light_Sun) {
-			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Light_Sun;
-		}
-		else if (settings.shader.mode == ShaderMode::Light_Static) {
-			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Light_Static;
-		}
-		else if (settings.shader.mode == ShaderMode::Solid || settings.shader.mode == ShaderMode::Default) {
-			cbGlobalSettings.outputDirectType = ShaderOutputDirect::Solid;
-		}
-		else {
-			throw std::invalid_argument("Unknown ShaderMode!");
-		}
-
-		cbGlobalSettings.timeOfDay = worldSettings.timeOfDay;
-		cbGlobalSettings.skyLight = getSkyLightFromIntensity(1, worldSettings.timeOfDay);
-
-		d3d.deviceContext->UpdateSubresource(cbGlobalSettingsBuffer, 0, nullptr, &cbGlobalSettings, 0, 0);
 	}
 
 	const WorldSettings& getWorldSettings() {
@@ -371,49 +292,37 @@ namespace renderer::world {
 	{
 		initGui();
 
-		// select which primtive type we are using
+		// select which primtive type we are using, TODO this should be managed more centrally, because otherwise changing this affects other parts of pipeline
 		d3d.deviceContext->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+		sky::initConstantBuffers(d3d);
 	}
 
-	void initConstantBufferPerObject(D3d d3d)
-	{
-		{
-			// TODO rename or move or something
-			D3D11_BUFFER_DESC bufferDesc;
-			ZeroMemory(&bufferDesc, sizeof(D3D11_BUFFER_DESC));
-
-			bufferDesc.Usage = D3D11_USAGE_DEFAULT;// TODO this should probably be dynamic, see https://www.gamedev.net/forums/topic/673486-difference-between-d3d11-usage-default-and-d3d11-usage-dynamic/
-			bufferDesc.ByteWidth = sizeof(CbGlobalSettings);
-			bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-			bufferDesc.CPUAccessFlags = 0;
-			bufferDesc.MiscFlags = 0;
-
-			d3d.device->CreateBuffer(&bufferDesc, nullptr, &cbGlobalSettingsBuffer);
+	D3DXCOLOR getBackgroundColor() {
+		if (isOutdoorLevel) {
+			return getSkyColor(worldSettings.timeOfDay);
 		}
-		D3D11_BUFFER_DESC bufferDesc;
-		ZeroMemory(&bufferDesc, sizeof(D3D11_BUFFER_DESC));
-
-		bufferDesc.Usage = D3D11_USAGE_DEFAULT;// TODO this should probably be dynamic, see https://www.gamedev.net/forums/topic/673486-difference-between-d3d11-usage-default-and-d3d11-usage-dynamic/
-		bufferDesc.ByteWidth = sizeof(CbPerObject);
-		bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-		bufferDesc.CPUAccessFlags = 0;
-		bufferDesc.MiscFlags = 0;
-
-		d3d.device->CreateBuffer(&bufferDesc, nullptr, &cbPerObjectBuffer);
+		else {
+			return D3DXCOLOR(0.0f, 0.2f, 0.4f, 1.0f);// deep blue
+		}
 	}
 
-	void drawPrepass(D3d d3d, ShaderManager* shaders)
+	void drawSky(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs)
+	{
+		if (isOutdoorLevel) {
+			const auto layers = getSkyLayers(worldSettings.timeOfDay);
+			sky::updateSkyLayers(d3d, layers);
+			sky::drawSky(d3d, shaders, cbs, linearSamplerState, layers);
+		}
+	}
+
+	void drawPrepass(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs)
 	{
 		Shader* shader = shaders->getShader("depthPrepass");
 		d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
 		d3d.deviceContext->VSSetShader(shader->getVertexShader(), 0, 0);
 		d3d.deviceContext->PSSetShader(nullptr, 0, 0);
-
-		//d3d.deviceContext->PSSetSamplers(0, 0, nullptr);
-
-		// constant buffer (object)
-		d3d.deviceContext->UpdateSubresource(cbPerObjectBuffer, 0, nullptr, &world.matrices, 0, 0);
-		d3d.deviceContext->VSSetConstantBuffers(1, 1, &cbPerObjectBuffer);
+		d3d.deviceContext->VSSetConstantBuffers(1, 1, &cbs.cameraCb);
 
 		// vertex buffers
 		for (auto& mesh : world.prepassMeshes) {
@@ -426,12 +335,8 @@ namespace renderer::world {
 		}
 	}
 
-	void drawWorld(D3d d3d, ShaderManager* shaders, ID3D11RenderTargetView* targetRtv)
+	void drawWorld(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs, ID3D11RenderTargetView* targetRtv)
 	{
-		// poor man's sky (use fog color as background for now)
-		// TODO at some point we should extract sky drawing, maybe into PipelineSky?
-		d3d.deviceContext->ClearRenderTargetView(targetRtv, getSkyColor(worldSettings.timeOfDay));
-
 		// set the shader objects avtive
 		Shader* shader = shaders->getShader("mainPass");
 		d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
@@ -440,14 +345,11 @@ namespace renderer::world {
 
 		d3d.deviceContext->PSSetSamplers(0, 1, &linearSamplerState);
 
-		// constant buffer (object)
-		d3d.deviceContext->UpdateSubresource(cbPerObjectBuffer, 0, nullptr, &world.matrices, 0, 0);
-		d3d.deviceContext->VSSetConstantBuffers(1, 1, &cbPerObjectBuffer);
-		d3d.deviceContext->PSSetConstantBuffers(1, 1, &cbPerObjectBuffer);
-
-		// constant buffer (settings)
-		d3d.deviceContext->VSSetConstantBuffers(0, 1, &cbGlobalSettingsBuffer);
-		d3d.deviceContext->PSSetConstantBuffers(0, 1, &cbGlobalSettingsBuffer);
+		// constant buffers
+		d3d.deviceContext->VSSetConstantBuffers(0, 1, &cbs.settingsCb);
+		d3d.deviceContext->PSSetConstantBuffers(0, 1, &cbs.settingsCb);
+		d3d.deviceContext->VSSetConstantBuffers(1, 1, &cbs.cameraCb);
+		d3d.deviceContext->PSSetConstantBuffers(1, 1, &cbs.cameraCb);
 
 		// lightmaps
 		d3d.deviceContext->PSSetShaderResources(1, 1, &lightmapTexArray);
@@ -466,18 +368,13 @@ namespace renderer::world {
 		}
 	}
 
-	void drawWireframe(D3d d3d, ShaderManager* shaders)
+	void drawWireframe(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs)
 	{
 		Shader* shader = shaders->getShader("wireframe");
 		d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
 		d3d.deviceContext->VSSetShader(shader->getVertexShader(), 0, 0);
 		d3d.deviceContext->PSSetShader(shader->getPixelShader(), 0, 0);
-
-		//d3d.deviceContext->PSSetSamplers(0, 0, nullptr);
-
-		// constant buffer (object)
-		d3d.deviceContext->UpdateSubresource(cbPerObjectBuffer, 0, nullptr, &world.matrices, 0, 0);
-		d3d.deviceContext->VSSetConstantBuffers(1, 1, &cbPerObjectBuffer);
+		d3d.deviceContext->VSSetConstantBuffers(1, 1, &cbs.cameraCb);
 
 		// vertex buffers
 		for (auto& mesh : world.meshes) {
@@ -492,8 +389,6 @@ namespace renderer::world {
 
 	void clean()
 	{
-		release(cbPerObjectBuffer);
-		release(cbGlobalSettingsBuffer);
 		release(lightmapTexArray);
 		release(linearSamplerState);
 

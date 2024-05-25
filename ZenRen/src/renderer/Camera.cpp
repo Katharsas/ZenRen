@@ -16,7 +16,7 @@ namespace renderer::camera {
 
 	struct CameraLocation
 	{
-		XMVECTOR position;
+		XMVECTOR position;// TODO position should have w = 1 everywhere?
 		XMVECTOR target;
 		XMVECTOR up;// normalized
 	};
@@ -46,6 +46,10 @@ namespace renderer::camera {
 			XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
 			XMVector4Normalize(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)),
 		};
+	}
+
+	XMVECTOR getCameraPosition() {
+		return location.position;
 	}
 
 	void updateCamera(bool reverseZ, BufferSize& viewportSize) {

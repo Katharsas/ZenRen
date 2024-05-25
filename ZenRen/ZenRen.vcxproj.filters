@@ -47,6 +47,9 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="packages.config" />
+    <None Include="Shaders\sky.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Util.cpp">
@@ -101,6 +104,7 @@
     <ClCompile Include="src\renderer\loader\DebugMeshes.cpp" />
     <ClCompile Include="src\renderer\loader\StaticLightFromVobLights.cpp" />
     <ClCompile Include="src\renderer\Sky.cpp" />
+    <ClCompile Include="src\renderer\PipelineSky.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Util.h">
@@ -164,5 +168,6 @@
     <ClInclude Include="src\renderer\loader\DebugMeshes.h" />
     <ClInclude Include="src\renderer\loader\StaticLightFromVobLights.h" />
     <ClInclude Include="src\renderer\Sky.h" />
+    <ClInclude Include="src\renderer\PipelineSky.h" />
   </ItemGroup>
 </Project>

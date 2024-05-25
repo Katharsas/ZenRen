@@ -25,7 +25,7 @@ namespace util {
 		return converter.to_bytes(string);
 	}
 
-	const std::string toString(DirectX::XMVECTOR vector)
+	const std::string toString(const DirectX::XMVECTOR& vector)
 	{
 		auto x = DirectX::XMVectorGetX(vector);
 		auto y = DirectX::XMVectorGetY(vector);
@@ -39,13 +39,13 @@ namespace util {
 		return string;
 	}
 
-	bool endsWith(std::string_view str, std::string_view suffix)
+	bool endsWith(const std::string_view str, const std::string_view suffix)
 	{
 		return str.size() >= suffix.size() && 0 == str.compare(str.size() - suffix.size(), suffix.size(), suffix);
 		return true;
 	}
 
-	bool startsWith(std::string_view str, std::string_view prefix)
+	bool startsWith(const std::string_view str, const std::string_view prefix)
 	{
 		return str.size() >= prefix.size() && 0 == str.compare(0, prefix.size(), prefix);
 		return true;
@@ -73,7 +73,7 @@ namespace util {
 		return result;
 	}
 
-	std::string join(const std::vector<std::string> strings, const std::string& delimiter) {
+	std::string join(const std::vector<std::string>& strings, const std::string& delimiter) {
 		return strings.empty() ? "" : std::accumulate(
 				++strings.begin(), strings.end(), *strings.begin(),
 				[](auto&& a, auto&& b) -> auto& { a += ','; a += b; return a; }

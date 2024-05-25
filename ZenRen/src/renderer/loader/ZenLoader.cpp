@@ -363,6 +363,7 @@ namespace renderer::loader {
         LOG(INFO) << "Meshes loaded!";
 
         return {
+            isOutdoorLevel,
             worldMeshData,
             staticMeshData,
             lightmaps

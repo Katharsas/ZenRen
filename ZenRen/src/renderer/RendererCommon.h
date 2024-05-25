@@ -117,7 +117,7 @@ namespace std
 namespace renderer
 {
 	struct VertKey {
-		const Material* mat;
+		const Material* mat;// this should be ok because elements in an unordered_map never move
 		const uint32_t vertIndex;
 
 		const VEC_VERTEX_DATA& get(const std::unordered_map<Material, VEC_VERTEX_DATA>& meshData) const {

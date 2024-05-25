@@ -66,6 +66,7 @@ namespace renderer
 	};
 
 	struct RenderData {
+		bool isOutdoorLevel;
 		std::unordered_map<Material, VEC_VERTEX_DATA> worldMesh;
 		std::unordered_map<Material, VEC_VERTEX_DATA> staticMeshes;
 		std::vector<InMemoryTexFile> worldMeshLightmaps;
@@ -109,6 +110,12 @@ namespace renderer
 		{
 			renderer::release(vertexBufferPos);
 		}
+	};
+
+	struct ShaderCbs
+	{
+		ID3D11Buffer* settingsCb = nullptr;
+		ID3D11Buffer* cameraCb = nullptr;
 	};
 
 	void initD3D(HWND hWnd);
