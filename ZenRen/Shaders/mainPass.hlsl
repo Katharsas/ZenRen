@@ -17,6 +17,7 @@ cbuffer cbSettings : register(b0) {
 
     float4 skyLight;
     float timeOfDay;
+    bool skyTexBlur;
 };
 
 cbuffer cbPerObject : register(b1)

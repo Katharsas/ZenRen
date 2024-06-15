@@ -9,22 +9,26 @@ namespace renderer
 {
 	const float defaultTime = 0.0f;
 
-	enum class SkyTexType {
-		DAY, NIGHT
+	struct SkyTex {
+		std::string name;
+		float uvScale = 20;
+		bool blurDisabled = false;
 	};
 
 	struct SkyTexState {
 		float timeKey;
-		SkyTexType type;
+		SkyTex tex;
 		float alpha;
+		UV uvSpeed = { 0, 0 };
 		D3DXCOLOR texlightColor = greyscale(1);
 	};
 	inline std::ostream& operator <<(std::ostream& os, const SkyTexState& that)
 	{
-		return os << "[TIME:" << that.timeKey << " TEX:" << magic_enum::enum_name(that.type) << " ALPHA:" << that.alpha << "]";
+		return os << "[TIME:" << that.timeKey << " TEX:" << that.tex.name << " ALPHA:" << that.alpha << "]";
 	}
 
 	std::array<SkyTexState, 2> getSkyLayers(float timeOfDay);
+	boolean getSwapLayers(float timeOfDay);
 	D3DXCOLOR getSkyLightFromIntensity(float intensity, float currentTime = defaultTime);
 	D3DXCOLOR getSkyColor(float currentTime = defaultTime);
 }

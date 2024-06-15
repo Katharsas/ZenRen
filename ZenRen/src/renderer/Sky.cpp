@@ -9,17 +9,17 @@ namespace renderer
 
 	namespace timekey
 	{
-		const float midday = .0f;
+		const float day = .0f;
 
+		const float day_end = .25f;
 		const float evening = .3f;
-		const float evening_early = evening - .05f;
-		const float evening_late = evening + .05f;
+		const float night_start = .35f;
 
-		const float midnight = .5f;
+		const float night = .5f;
 
-		const float morning = .7f;
-		const float morning_early = morning - .05f;
-		const float morning_late = morning + .05f;
+		const float night_end = .65f;
+		const float dawn = .7f;
+		const float day_start = .75f;
 	}
 
 	// interpolates from black to sky light color
@@ -40,88 +40,73 @@ namespace renderer
 			1.f);
 	}
 
-	const D3DXCOLOR nightCloudColor = fromSRGB(55, 55, 155);
-
-	// We assume that all state arrays have same length and use same timeKeys in same order as defined here.
-	// In theory, we don't need to put time keys into every state struct, but this makes state definitions more readable.
-	const array timeKeys = {
-		timekey::midday,
-		timekey::evening_early,
-		timekey::evening,
-		timekey::evening_late,
-		timekey::midnight,
-		timekey::morning_early,
-		timekey::morning,
-		timekey::morning_late,
-	};
-
-	const array skyStates = {
-		SkyState {
-			timekey::midday,
-			fromSRGB(255, 250, 235),
-			fromSRGB(120, 140, 180),
-		},
-		SkyState {
-			timekey::evening_early,
-			fromSRGB(255, 250, 235),
-			fromSRGB(120, 140, 180),
-		},
-		SkyState {
-			timekey::evening,
-			fromSRGB(255, 185, 170),
-			fromSRGB(180, 75, 60),
-		},
-		SkyState {
-			timekey::evening_late,
-			fromSRGB(105, 105, 195),
-			fromSRGB(20, 20, 60),
-		},
-		SkyState {
-			timekey::midnight,
-			fromSRGB(40, 60, 210),
-			fromSRGB(5, 5, 20),
-		},
-		SkyState {
-			timekey::morning_early,
-			fromSRGB(40, 60, 210),
-			fromSRGB(5, 5, 20),
-		},
-		SkyState {
-			timekey::morning,
-			fromSRGB(190, 160, 255),
-			fromSRGB(80, 60, 105),
-		},
-		SkyState {
-			timekey::morning_late,
-			fromSRGB(255, 250, 235),
-			fromSRGB(120, 140, 180),
-		},
-	};
-
 	float fromAlpha(uint8_t a) {
 		return a / 255.f;
 	}
 
+	UV add(UV uv1, UV uv2) {
+		return { uv1.u + uv2.u, uv1.v + uv2.v };
+	}
+	UV mul(UV uv1, float scalar) {
+		return { uv1.u * scalar, uv1.v * scalar };
+	}
+
+	// G1 defines an additional texture brightness color (domeColor1) in SkyState, however it is hardcoded to not be used by base night layer (star texture)
+	// and it is effectively set to 255 for any time other than night time, which means it only ever affects the night overlay (night clouds texture).
+	// G1 hardcodes re-scaling of domeColor1 to range 128 - 255.
+	const D3DXCOLOR nightCloudColor = fromSRGB((255 + 55) / 2, (255 + 55) / 2, (255 + 155) / 2);
+
+	// We assume that all state arrays have same length and use same timeKeys in same order as defined here.
+	// In theory, we don't need to put time keys into every state struct, but this makes state definitions more readable.
+	const array timeKeys = {
+		timekey::day,
+		timekey::day_end,
+		timekey::evening,
+		timekey::night_start,
+		timekey::night,
+		timekey::night_end,
+		timekey::dawn,
+		timekey::day_start,
+	};
+
+	const array skyStates = {
+		SkyState { timekey::day,         fromSRGB(255, 250, 235), fromSRGB(120, 140, 180) },
+		SkyState { timekey::day_end,     fromSRGB(255, 250, 235), fromSRGB(120, 140, 180) },
+		SkyState { timekey::evening,     fromSRGB(255, 185, 170), fromSRGB(180,  75,  60) },
+		SkyState { timekey::night_start, fromSRGB(105, 105, 195), fromSRGB( 20,  20,  60) },
+		SkyState { timekey::night,       fromSRGB( 40,  60, 210), fromSRGB(  5,   5,  20) },
+		SkyState { timekey::night_end,   fromSRGB( 40,  60, 210), fromSRGB(  5,   5,  20) },
+		SkyState { timekey::dawn,        fromSRGB(190, 160, 255), fromSRGB( 80,  60, 105) },
+		SkyState { timekey::day_start,   fromSRGB(255, 250, 235), fromSRGB(120, 140, 180) },
+	};
+
+	const SkyTex base_DAY =   { "SKYDAY_LAYER1" };
+	const SkyTex base_NIGHT = { "SKYNIGHT_LAYER0", 20 * 4, true };
+	const SkyTex over_DAY =   { "SKYDAY_LAYER0" };
+	const SkyTex over_NIGHT = { "SKYNIGHT_LAYER1" };
+
 	// each previous SkyTexType is defined to last until next timekey
 	const array skyLayerBase = {
-		SkyTexState { timekey::midday,        SkyTexType::DAY,   fromAlpha(215) },
-		SkyTexState { timekey::evening_early, SkyTexType::NIGHT, fromAlpha(  0) },
-		SkyTexState { timekey::evening,       SkyTexType::NIGHT, fromAlpha(128) },
-		SkyTexState { timekey::evening_late,  SkyTexType::NIGHT, fromAlpha(255) },
-		SkyTexState { timekey::midnight,      SkyTexType::NIGHT, fromAlpha(255) },
-		SkyTexState { timekey::morning_early, SkyTexType::NIGHT, fromAlpha(255) },
-		SkyTexState { timekey::morning,       SkyTexType::NIGHT, fromAlpha(128) },
-		SkyTexState { timekey::morning_late,  SkyTexType::DAY,   fromAlpha(215) },
+		SkyTexState { timekey::day,         base_DAY,   fromAlpha(215) },
+		SkyTexState { timekey::day_end,     base_NIGHT, fromAlpha(  0) },
+		SkyTexState { timekey::evening,     base_NIGHT, fromAlpha(128) },
+		SkyTexState { timekey::night_start, base_NIGHT, fromAlpha(255) },
+		SkyTexState { timekey::night,       base_NIGHT, fromAlpha(255) },
+		SkyTexState { timekey::night_end,   base_NIGHT, fromAlpha(255) },
+		SkyTexState { timekey::dawn,        base_NIGHT, fromAlpha(128) },
+		SkyTexState { timekey::day_start,   base_DAY,   fromAlpha(  0) },
 	};
+	const UV speedNormal = { 0.9f, 1.1f };
+	const UV speedSlow = { speedNormal.u * 0.2, speedNormal.v * 0.2 };
 	const array skyLayerOverlay = {
-		SkyTexState { timekey::midday,        SkyTexType::DAY,   fromAlpha(128) },// TODO original alpha = 255, but ingame the overlay does not fully block base layer, so something is wrong!
-		SkyTexState { timekey::evening_early, SkyTexType::DAY,   fromAlpha(255) },// TODO check ingame
-		SkyTexState { timekey::evening,       SkyTexType::DAY,   fromAlpha(128) },
-		SkyTexState { timekey::evening_late,  SkyTexType::NIGHT, fromAlpha(  0), nightCloudColor },
-		SkyTexState { timekey::midnight,      SkyTexType::NIGHT, fromAlpha(215), nightCloudColor },
-		SkyTexState { timekey::morning_early, SkyTexType::DAY,   fromAlpha(  0), nightCloudColor },
-		SkyTexState { timekey::morning,       SkyTexType::DAY,   fromAlpha(128) },
-		SkyTexState { timekey::morning_late,  SkyTexType::DAY,   fromAlpha(255) },
+		SkyTexState { timekey::day,         over_DAY,   fromAlpha(255), speedSlow },
+		SkyTexState { timekey::day_end,     over_DAY,   fromAlpha(255), speedSlow },
+		SkyTexState { timekey::evening,     over_DAY,   fromAlpha(128), speedSlow },
+		SkyTexState { timekey::night_start, over_NIGHT, fromAlpha(  0), speedNormal, nightCloudColor },
+		SkyTexState { timekey::night,       over_NIGHT, fromAlpha(215), speedNormal, nightCloudColor },
+		SkyTexState { timekey::night_end,   over_DAY,   fromAlpha(  0), speedNormal, nightCloudColor },
+		SkyTexState { timekey::dawn,        over_DAY,   fromAlpha(128), mul(add(speedNormal, speedSlow), 0.5)}, // smoother than G1 (G1 switches from normal to slow instantly at dawn)
+		SkyTexState { timekey::day_start,   over_DAY,   fromAlpha(255), speedSlow },
 	};
 
 	struct CurrentTimeKeys {
@@ -134,11 +119,19 @@ namespace renderer
 	float interpolate(float last, float next, float delta) {
 		return last + (next - last) * delta;
 	}
+
+	// TODO all vector structs should have component mapping function so we don't need to do this (same for add/mul in PipelineSky.cpp)
+	UV interpolate(UV last, UV next, float delta) {
+		
+		return { interpolate(last.u, next.u, delta), interpolate(last.v, next.v, delta) };
+	}
+
 	D3DXCOLOR interpolate(D3DXCOLOR last, D3DXCOLOR next, float delta) {
 		return last + (next - last) * delta;
 	}
 
-	CurrentTimeKeys getTimeKeysInterpolated(float timeKey) {
+	CurrentTimeKeys getTimeKeysInterpolated(float timeKey)
+	{
 		for (int32_t i = 0; i < timeKeys.size(); i++) {
 			float last = timeKeys[i];
 			int32_t nextIndex = (i + 1) % timeKeys.size();
@@ -169,15 +162,17 @@ namespace renderer
 		return result;
 	}
 
-	SkyTexState getSkyLayerInterpolated(CurrentTimeKeys timeKeys, bool isBaseLayer) {
+	SkyTexState getSkyLayerInterpolated(CurrentTimeKeys timeKeys, bool isBaseLayer)
+	{
 		const auto& layer = isBaseLayer ? skyLayerBase : skyLayerOverlay;
 		SkyTexState result;
 		result.timeKey = timeKeys.timeOfDay;
 		SkyTexState last = layer[timeKeys.lastTimeKeyIndex];
 		SkyTexState next = layer[timeKeys.nextTimeKeyIndex];
 
-		result.type = last.type;
+		result.tex = last.tex;
 		result.alpha = interpolate(last.alpha, next.alpha, timeKeys.delta);
+		result.uvSpeed = interpolate(last.uvSpeed, next.uvSpeed, timeKeys.delta);// In original G1, uvSpeed is not interpolated which results in speed/position jump at dawn
 		result.texlightColor = interpolate(last.texlightColor, next.texlightColor, timeKeys.delta);
 		return result;
 	}
@@ -190,7 +185,8 @@ namespace renderer
 		getSkyLayerInterpolated(currentTimeKeys, false),
 	};
 
-	SkyState getSkyState(float timeOfDay) {
+	SkyState getSkyState(float timeOfDay)
+	{
 		if (timeOfDay != currentSkyState.timeKey) {
 			if (timeOfDay != currentTimeKeys.timeOfDay) {
 				currentTimeKeys = getTimeKeysInterpolated(timeOfDay);
@@ -200,7 +196,8 @@ namespace renderer
 		return currentSkyState;
 	}
 
-	array<SkyTexState, 2> getSkyLayers(float timeOfDay) {
+	array<SkyTexState, 2> getSkyLayers(float timeOfDay)
+	{
 		if (timeOfDay != currentLayers[0].timeKey) {
 			if (timeOfDay != currentTimeKeys.timeOfDay) {
 				currentTimeKeys = getTimeKeysInterpolated(timeOfDay);
@@ -211,6 +208,12 @@ namespace renderer
 			};
 		}
 		return currentLayers;
+	}
+
+	boolean getSwapLayers(float timeOfDay)
+	{
+		// TODO maybe move this bool into SkyState
+		return timeOfDay >= timekey::day_start || timeOfDay <= timekey::day_end;
 	}
 
 	D3DXCOLOR getSkyLightFromIntensity(float intensity, float currentTime)
