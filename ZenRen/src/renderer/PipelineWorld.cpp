@@ -157,7 +157,7 @@ namespace renderer::world {
 				{
 					mesh.vertexCount = vertices.vecPos.size();
 					util::createVertexBuffer(d3d, &mesh.vertexBufferPos, vertices.vecPos);
-					util::createVertexBuffer(d3d, &mesh.vertexBufferNormalUv, vertices.vecNormalUv);
+					util::createVertexBuffer(d3d, &mesh.vertexBufferOther, vertices.vecNormalUv);
 				}
 				mesh.baseColor = texture;
 				target.push_back(mesh);
@@ -311,8 +311,9 @@ namespace renderer::world {
 	{
 		if (isOutdoorLevel) {
 			const auto layers = getSkyLayers(worldSettings.timeOfDay);
-			sky::updateSkyLayers(d3d, layers);
-			sky::drawSky(d3d, shaders, cbs, linearSamplerState, layers);
+			bool swapLayers = getSwapLayers(worldSettings.timeOfDay);
+			sky::updateSkyLayers(d3d, layers, getSkyColor(worldSettings.timeOfDay), worldSettings.timeOfDay, swapLayers);
+			sky::drawSky(d3d, shaders, cbs, linearSamplerState);
 		}
 	}
 
@@ -361,7 +362,7 @@ namespace renderer::world {
 
 			UINT strides[] = { sizeof(VERTEX_POS), sizeof(VERTEX_OTHER) };
 			UINT offsets[] = { 0, 0 };
-			ID3D11Buffer* vertexBuffers[] = { mesh.vertexBufferPos, mesh.vertexBufferNormalUv };
+			ID3D11Buffer* vertexBuffers[] = { mesh.vertexBufferPos, mesh.vertexBufferOther };
 
 			d3d.deviceContext->IASetVertexBuffers(0, std::size(vertexBuffers), vertexBuffers, strides, offsets);
 			d3d.deviceContext->Draw(mesh.vertexCount, 0);
@@ -380,7 +381,7 @@ namespace renderer::world {
 		for (auto& mesh : world.meshes) {
 			UINT strides[] = { sizeof(VERTEX_POS), sizeof(VERTEX_OTHER) };
 			UINT offsets[] = { 0, 0 };
-			ID3D11Buffer* vertexBuffers[] = { mesh.vertexBufferPos, mesh.vertexBufferNormalUv };
+			ID3D11Buffer* vertexBuffers[] = { mesh.vertexBufferPos, mesh.vertexBufferOther };
 
 			d3d.deviceContext->IASetVertexBuffers(0, std::size(vertexBuffers), vertexBuffers, strides, offsets);
 			d3d.deviceContext->Draw(mesh.vertexCount, 0);

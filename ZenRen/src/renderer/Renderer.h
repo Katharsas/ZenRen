@@ -40,6 +40,8 @@ namespace renderer
 		bool distantAlphaDensityFix = true;
 		
 		bool depthPrepass = false;
+
+		bool skyTexBlur = true;
 	};
 
 	struct StaticInstance {
@@ -86,7 +88,7 @@ namespace renderer
 	struct Mesh
 	{
 		ID3D11Buffer* vertexBufferPos = nullptr;
-		ID3D11Buffer* vertexBufferNormalUv = nullptr;
+		ID3D11Buffer* vertexBufferOther = nullptr;
 		int32_t vertexCount = 0;
 
 		// Ideally, we could not create one mesh per texture, but instead have a single mesh for whole world.
@@ -97,7 +99,7 @@ namespace renderer
 		void release()
 		{
 			renderer::release(vertexBufferPos);
-			renderer::release(vertexBufferNormalUv);
+			renderer::release(vertexBufferOther);
 		}
 	};
 

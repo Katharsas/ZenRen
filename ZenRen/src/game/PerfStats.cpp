@@ -30,8 +30,8 @@ namespace game::stats {
 	};
 
 	// logging
-	const int32_t sampleSize = 500; // max number of frames before stas are averaged and logged
-	const int32_t maxDurationMillis = 1000; // max ms duration before stats are averaged and logged 
+	const int32_t sampleSize = 1000; // max number of frames before stas are averaged and logged
+	const int32_t maxDurationMillis = 4000; // max ms duration before stats are averaged and logged 
 
 	int32_t sampleIndex = 0;
 	bool isInitialized = false;

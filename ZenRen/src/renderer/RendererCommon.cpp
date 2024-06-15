@@ -1,6 +1,9 @@
 #include "stdafx.h"
 #include "RendererCommon.h"
 
+#include <algorithm>
+#include <functional>
+
 namespace renderer {
 
 	void release(IUnknown* dx11object) {
@@ -49,4 +52,34 @@ namespace renderer {
 			color.b * factor,
 			color.a);
 	}
+
+	template<typename T>
+	float* begin(T& t) {
+		return t.vec;
+	}
+	template<typename T>
+	const float* begin(const T& t) {
+		return t.vec;
+	}
+	template<typename T>
+	const float* end(const T& t) {
+		return t.vec + std::size(t.vec);
+	}
+
+	template<typename T>
+	T add(const T& vec1, const T& vec2) {
+		T result;
+		std::transform(begin(vec1), end(vec1), begin(vec2), begin(result), std::plus<float>());
+		return result;
+	}
+	template<typename T>
+	T mul(const T& vec, float scalar) {
+		T result;
+		std::transform(begin(vec), end(vec), begin(result), std::bind(std::multiplies<float>(), std::placeholders::_1, scalar));
+		return result;
+	}
+
+	// instantiate template functions for the types we want to support (needed because templates are not in header)
+	template UV add(const UV& vec1, const UV& vec2);
+	template UV mul(const UV& vec, float scalar);
 }

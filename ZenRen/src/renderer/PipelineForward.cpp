@@ -19,6 +19,7 @@ namespace renderer::forward {
 		uint32_t outputDirectType;// TODO make 0 == !outputDirectEnabled (default rendering), so we can finally use this in shader in a sane way without need for outputDirectEnabled
 		D3DXCOLOR skyLight;
 		float timeOfDay;
+		int32_t skyTexBlurEnabled;
 	};
 	
 	__declspec(align(16))
@@ -41,6 +42,7 @@ namespace renderer::forward {
 	ID3D11RasterizerState* rasterizer = nullptr;
 	ID3D11RasterizerState* rasterizerWf = nullptr;
 	ID3D11BlendState1* blendState = nullptr;
+	ID3D11BlendState1* blendStateNoAtc = nullptr;// Alpha to coverage must be disabled for transparent surfaces; always nullptr (default blendstate)
 
 	ShaderCbs shaderCbs;
 
@@ -57,6 +59,7 @@ namespace renderer::forward {
 			rasterizer,
 			rasterizerWf,
 			blendState,
+			blendStateNoAtc,
 
 			shaderCbs.settingsCb,
 			shaderCbs.cameraCb,
@@ -73,6 +76,7 @@ namespace renderer::forward {
 
 		cbGlobalSettings.timeOfDay = world::getWorldSettings().timeOfDay;
 		cbGlobalSettings.skyLight = getSkyLightFromIntensity(1, cbGlobalSettings.timeOfDay);
+		cbGlobalSettings.skyTexBlurEnabled = settings.skyTexBlur;
 
 		d3d.deviceContext->UpdateSubresource(shaderCbs.settingsCb, 0, nullptr, &cbGlobalSettings, 0, 0);
 	}
@@ -137,6 +141,7 @@ namespace renderer::forward {
 		//   - instead of using different depth state, just set z value in shader to infinity after projection matrix is applied
 		//   - this will effectively draw the sky behind all other geometry without disabling early z and reduces state changes in pipeline
 		//   - test drawing sky last (especially against trees)
+		d3d.deviceContext->OMSetBlendState(blendStateNoAtc, NULL, 0xffffffff);
 		updateCamera(d3d, true);
 		world::drawSky(d3d, shaders, shaderCbs);
 

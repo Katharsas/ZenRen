@@ -20,7 +20,7 @@ namespace renderer {
 		std::wstring sourceFileW = util::utf8ToWide(sourceFile);
 		ID3D10Blob* VS, * errVS;
 		ID3D10Blob* PS = nullptr, * errPS = nullptr;
-		UINT flags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+		UINT flags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;// TODO disable in release
 		auto hrVs = D3DX11CompileFromFileW(sourceFileW.c_str(), 0, 0, "VS_Main", "vs_5_0", flags, 0, 0, &VS, &errVS, 0);
 		auto hrPs = S_OK;
 		if (!vsOnly) {

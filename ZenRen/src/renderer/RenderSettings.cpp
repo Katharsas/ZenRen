@@ -111,6 +111,7 @@ namespace renderer::gui::settings {
 					}
 					ImGui::EndCombo();
 				}
+				ImGui::Checkbox("Cloud Blur", &settings.skyTexBlur);
 				ImGui::PopItemWidth();
 			}
 		});

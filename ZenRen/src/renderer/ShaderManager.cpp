@@ -73,13 +73,8 @@ namespace renderer {
 			std::vector<VertexInputLayoutDesc> layoutDesc =
 			{
 				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0 },
-				{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 1 },
 				{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 1 },
-				{ "TEXCOORD", 1, DXGI_FORMAT_R32G32B32_FLOAT, 1 },
-				//{ "INDEX_LIGHTMAP", 0, DXGI_FORMAT_R16_SINT, 1 },
-				{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1 },
-				{ "NORMAL", 1, DXGI_FORMAT_R32G32B32_FLOAT, 1 },
-				{ "TEXCOORD", 2, DXGI_FORMAT_R32_FLOAT, 1 },
+				{ "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT, 1 },
 			};
 			shaders[shaderName] = new Shader(d3d, filePath(shaderName), layoutDesc);
 		}
