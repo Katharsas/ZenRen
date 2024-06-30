@@ -115,8 +115,7 @@ namespace render::pass::world
 	}
 
 	Texture* getOrCreateTexture(D3d d3d, const std::string& texName) {
-		std::function<Texture* ()> createTex = [d3d, texName]() { return createTexture(d3d, texName); };
-		return ::util::getOrCreate(textureCache, texName, createTex);
+		return ::util::getOrSet(textureCache, texName, [&](Texture*& ref) { ref = createTexture(d3d, texName); });
 	}
 
 	uint32_t loadPrepassData(D3d d3d, std::vector<PrepassMeshes>& target, const BATCHED_VERTEX_DATA& meshData)

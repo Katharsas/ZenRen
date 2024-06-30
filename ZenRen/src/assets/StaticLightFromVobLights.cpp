@@ -10,7 +10,13 @@ namespace assets
     using ::std::vector;
     using ::std::unordered_map;
 
+    // debug option for faster loading
+    bool disableIntersectChecks = false;
+
+    uint32_t vobLightWorldIntersectChecks = 0;
+
     float debugStaticLightRaysMaxDist = 50;
+    vector<DebugLine> debugLightToVobRays;
 
     bool rayIntersectsWorldFaces(XMVECTOR rayStart, XMVECTOR rayEnd, float maxDistance, const unordered_map<Material, VEC_VERTEX_DATA>& meshData, const VertLookupTree& vertLookup)
     {
@@ -29,9 +35,6 @@ namespace assets
         }
         return false;
     }
-
-    int32_t vobLightWorldIntersectChecks = 0;
-    vector<DebugLine> debugLightToVobRays;
 
     std::optional<DirectionalLight> getLightAtPos(
             XMVECTOR posXm,
@@ -60,8 +63,11 @@ namespace assets
             XMVECTOR lightPos = toXM4Pos(light.pos);
             float dist = XMVectorGetX(XMVector3Length(lightPos - posXm));
             if (dist < (light.range * 1.0f)) {
-                vobLightWorldIntersectChecks++;
-                bool intersectedWorld = rayIntersectsWorldFaces(lightPos, posXm, dist * 0.85f, worldMeshData, worldFaceLookup);
+                bool intersectedWorld = false;
+                if (!disableIntersectChecks) {
+                    vobLightWorldIntersectChecks++;
+                    intersectedWorld = rayIntersectsWorldFaces(lightPos, posXm, dist * 0.85f, worldMeshData, worldFaceLookup);
+                }
                 if (!intersectedWorld) {
                     contributingLightCount++;
                     float weight = 1.f - (dist / (light.range * 1.0f));

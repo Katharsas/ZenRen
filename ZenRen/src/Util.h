@@ -26,13 +26,25 @@ namespace util
 
 	void throwError(const std::string& message);
 
+	template<typename Key, typename Value, typename Func>
+	Value& getOrSet(std::unordered_map<Key, Value>& map, const Key& key, const Func& setValue)
+	{
+		auto [it, wasInserted] = map.insert({ key, Value() });// first lookup, not sure if this is a copy
+		auto& valueRef = it->second;
+		if (wasInserted) {
+			setValue(valueRef);// copy
+		}
+		return valueRef;
+	}
+
 	template<typename Key, typename Value>
+	[[deprecated("Use getOrSet variant instead!")]]
 	Value& getOrCreate(std::unordered_map<Key, Value>& map, const Key& key, std::function<Value()>& createValue)
 	{
-		auto it = map.find(key);
+		auto it = map.find(key);// first lookup
 		if (it == map.end()) {
-			Value value = createValue();
-			const auto [insertedIt, __] = map.insert(std::make_pair(key, value));
+			const Value value = createValue();// first copy
+			const auto [insertedIt, __] = map.insert(std::make_pair(key, value));// second lookup, second copy
 			return insertedIt->second;
 		}
 		else {

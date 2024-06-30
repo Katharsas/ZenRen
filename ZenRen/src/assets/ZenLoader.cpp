@@ -9,6 +9,7 @@
 #include "../Util.h"
 #include "render/RenderUtil.h"
 #include "render/MeshUtil.h"
+#include "AssetCache.h"
 #include "MeshFromVdfLoader.h"
 #include "DebugMeshes.h"
 #include "TexFromVdfLoader.h"
@@ -21,6 +22,7 @@
 #include "zenload/zenParser.h"
 #include "zenload/ztex2dds.h"
 #include "zenload/zCProgMeshProto.h"
+#include "zenload/zCModelMeshLib.h"
 
 namespace assets
 {
@@ -33,6 +35,7 @@ namespace assets
     using ::std::unordered_map;
     //using ::util::asciiToLowercase;
     using ::util::getOrCreate;
+    using ::util::endsWith;
 
     bool debugInstanceMeshBbox = false;
     bool debugInstanceMeshBboxCenter = false;
@@ -40,55 +43,47 @@ namespace assets
     bool debugStaticLights = false;
     bool debugStaticLightRays = false;
 
+
     XMVECTOR bboxCenter(const array<VEC3, 2>& bbox)
     {
         return 0.5f * (toXM4Pos(bbox[0]) + toXM4Pos(bbox[1]));
     }
 
-    /**
-     * Recursive function to list some data about the zen-file
-     */
-    void listVobInformation(const vector<ZenLoad::zCVobData>& vobs)
+    bool loadInstanceMesh(unordered_map<Material, VEC_VERTEX_DATA>& target, VDFS::FileIndex& vdf, const StaticInstance& instance)
     {
-        for (const ZenLoad::zCVobData& v : vobs)
-        {
-            if (!v.visual.empty())
-            {
-                // More information about what a vob stores can be found in the zTypes.h-File
-                LOG(INFO) << "Vob at " << v.position.toString() << ", Visual: " << v.visual;
+        bool isMRM = endsWith(instance.meshName, ".MRM");
+        bool isMDL = endsWith(instance.meshName, ".MDL");
+
+        if (vdf.hasFile(instance.meshName)) {
+            // load meshes
+            if (isMRM) {
+                const auto& mesh = getOrParseMesh(vdf, instance.meshName, true);
+                loadInstanceMesh(target, mesh.mesh, mesh.packed, instance);
+            }
+            else if (isMDL) {
+                const auto& meshLib = getOrParseMeshLib(vdf, instance.meshName, true);
+                loadInstanceMeshLib(target, meshLib, instance);
+            }
+            else {
+                LOG(DEBUG) << "Skipping VOB " << instance.meshName << " (visual type not supported)";
+                return false;
             }
 
-            // List the information about the children as well
-            //listVobInformation(v.childVobs);
+            if (debugInstanceMeshBbox) {
+                loadInstanceMeshBboxDebugVisual(target, instance);
+            }
+            if (debugInstanceMeshBboxCenter) {
+                auto center = toVec3(bboxCenter(instance.bbox));
+                auto scale = toVec3(0.7f * XMVectorAbs(toXM4Pos(instance.bbox[1]) - toXM4Pos(instance.bbox[0])));
+                loadPointDebugVisual(target, center, scale, D3DXCOLOR(0, 0, 1, 1));
+            }
+
+            return true;
         }
-    }
-
-    bool existsInstanceMesh(string& visualname, VDFS::FileIndex& vdf)
-    {
-        // .mrm does not exist for worldmesh parts
-        string filename = visualname + ".MRM";
-        return vdf.hasFile(filename);
-    }
-
-    bool loadInstanceMesh(BATCHED_VERTEX_DATA& target, VDFS::FileIndex& vdf, const StaticInstance& instance)
-    {
-        string filename = instance.meshName + ".MRM";
-        if (!vdf.hasFile(filename)) {
+        else {
+            LOG(DEBUG) << "Skipping VOB " << instance.meshName << " (visual not found)";
             return false;
         }
-
-        ZenLoad::zCProgMeshProto rawMesh(filename, vdf);
-
-        loadInstanceMesh(target, rawMesh, instance);
-        if (debugInstanceMeshBbox) {
-            loadInstanceMeshBboxDebugVisual(target, instance);
-        }
-        if (debugInstanceMeshBboxCenter) {
-            auto center = toVec3(bboxCenter(instance.bbox));
-            auto scale = toVec3(0.7f * XMVectorAbs(toXM4Pos(instance.bbox[1]) - toXM4Pos(instance.bbox[0])));
-            loadPointDebugVisual(target, center, scale, D3DXCOLOR(0, 0, 1, 1));
-        }
-        return true;
     }
 
     void flattenVobTree(const vector<ZenLoad::zCVobData>& vobs, vector<const ZenLoad::zCVobData*>& target, std::function<bool(const ZenLoad::zCVobData& vob)> filter)
@@ -103,7 +98,24 @@ namespace assets
 
     void getVobsWithVisuals(const vector<ZenLoad::zCVobData>& vobs, vector<const ZenLoad::zCVobData*>& target)
     {
-        const auto filter = [&](const ZenLoad::zCVobData& vob) { return !vob.visual.empty() && vob.visual.find(".3DS") != string::npos; };
+        const auto filter = [&](const ZenLoad::zCVobData& vob) {
+            if (false
+                //|| vob.vobType == ZenLoad::zCVobData::EVobType::VT_oCMOB
+                //|| vob.vobType == ZenLoad::zCVobData::EVobType::VT_oCMobContainer
+                //|| vob.vobType == ZenLoad::zCVobData::EVobType::VT_oCMobInter
+                ) {
+            }
+
+            if (vob.showVisual && !vob.visual.empty()) {
+                if (endsWith(vob.visual, ".3DS") || endsWith(vob.visual, ".ASC")) {
+                    return true;
+                }
+                else {
+                    //LOG(INFO) << "Visual not supported: " << vob.visual;
+                }
+            }
+            return false;
+        };
         return flattenVobTree(vobs, target, filter);
     }
 
@@ -123,8 +135,8 @@ namespace assets
     array<VEC3, 2> bboxToVec3Scaled(const ZMath::float3 (& bbox)[2])
     {
         return {
-            from(bbox[0], 0.01f),
-            from(bbox[1], 0.01f)
+            from(bbox[0], G_ASSET_RESCALE),
+            from(bbox[1], G_ASSET_RESCALE)
         };
     }
 
@@ -137,10 +149,10 @@ namespace assets
         for (auto vobPtr : vobs) {
             ZenLoad::zCVobData vob = *vobPtr;
             Light light = {
-                toVec3(toXM4Pos(vob.position) * 0.01f),
+                toVec3(toXM4Pos(vob.position) * G_ASSET_RESCALE),
                 vob.zCVobLight.lightStatic,
                 fromSRGB(D3DXCOLOR(vob.zCVobLight.color)),
-                vob.zCVobLight.range * 0.01f,
+                vob.zCVobLight.range * G_ASSET_RESCALE,
             };
 
             lights.push_back(light);
@@ -187,15 +199,22 @@ namespace assets
         for (auto vobPtr : vobs) {
             ZenLoad::zCVobData vob = *vobPtr;
 
-            bool isVisible = !vob.visual.empty() && (vob.visual.find(".3DS") != string::npos);
+            bool is3DS = endsWith(vob.visual, ".3DS");
+            bool isASC = endsWith(vob.visual, ".ASC");
+            bool isVisible = vob.showVisual && !vob.visual.empty() && (is3DS || isASC);
+
             if (isVisible) {
-                auto visualname = vob.visual.substr(0, vob.visual.find_last_of('.'));
+                // TODO
+                // There should be a dedicated function to determine visual files before this method is called.
+                // MOBs' ASC files should be parsed and executed in Deadalus VM to get actual visuals.
+                auto visualName = vob.visual.substr(0, vob.visual.find_last_of('.'));
+                auto visualType = is3DS ? ".MRM" : ".MDL"; 
                 StaticInstance instance;
-                instance.meshName = visualname;
+                instance.meshName = visualName + visualType;
 
                 {
-                    XMVECTOR pos = XMVectorSet(vob.position.x, vob.position.y, vob.position.z, 100.0f);
-                    pos = pos / 100;
+                    XMVECTOR pos = XMVectorSet(vob.position.x, vob.position.y, vob.position.z, 1.f / G_ASSET_RESCALE);
+                    pos = pos * G_ASSET_RESCALE;
                     XMMATRIX rotate = XMMATRIX(vob.rotationMatrix.mv);
                     XMMATRIX translate = XMMatrixTranslationFromVector(pos);
                     instance.transform = rotate * translate;
@@ -303,6 +322,7 @@ namespace assets
 
     RenderData loadZen(string& zenFilename, VDFS::FileIndex* vdf)
     {
+        const auto now = std::chrono::high_resolution_clock::now();
 
         auto parser = ZenLoad::ZenParser(zenFilename, *vdf);
         if (parser.getFileSize() == 0)
@@ -329,23 +349,23 @@ namespace assets
         BATCHED_VERTEX_DATA worldMeshData;
         loadWorldMesh(worldMeshData, parser.getWorldMesh());
 
+        LOG(INFO) << "Zen parsed!";
+
         vector<Light> lightsStatic = loadLights(world.rootVobs);
 
         auto props = world.properties;
         bool isOutdoorLevel = world.bspTree.mode == ZenLoad::zCBspTreeData::TreeMode::Outdoor;
         vector<StaticInstance> vobs = loadVobs(world.rootVobs, worldMeshData, lightsStatic, isOutdoorLevel);
 
-        LOG(INFO) << "Zen loaded!";
+        LOG(INFO) << "VOBs loaded!";
 
         BATCHED_VERTEX_DATA staticMeshData;
         for (auto& vob : vobs) {
             auto& visualname = vob.meshName;
 
-            if (existsInstanceMesh(visualname, *vdf)) {
-                bool loaded = loadInstanceMesh(staticMeshData, *vdf, vob);
-            }
-            else {
-                LOG(DEBUG) << "Skipping VOB " << visualname << " (visual not found)";
+            bool loaded = loadInstanceMesh(staticMeshData, *vdf, vob);
+            if (!loaded) {
+                LOG(DEBUG) << "Skipping VOB " << visualname << " (visual not found/supported)";
             }
         }
 
@@ -362,6 +382,9 @@ namespace assets
         }
 
         LOG(INFO) << "Meshes loaded!";
+
+        const auto duration = std::chrono::high_resolution_clock::now() - now;
+        LOG(INFO) << "Loading finished in: " << duration / std::chrono::milliseconds(1) << " ms.";
 
         return {
             isOutdoorLevel,

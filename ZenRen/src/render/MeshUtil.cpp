@@ -10,6 +10,11 @@ namespace render
     using namespace DirectX;
     using std::array;
 
+    XMMATRIX toXMM(const ZenLib::ZMath::Matrix& matrix)
+    {
+        return XMMATRIX(matrix.mv);
+    }
+
     UV from(const ZenLib::ZMath::float2& source)
     {
         return UV{ source.x, source.y };

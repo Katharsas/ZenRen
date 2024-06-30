@@ -4,7 +4,8 @@
 #include "DebugTextures.h"
 #include "../Util.h"
 
-namespace assets {
+namespace assets
+{
 	namespace fs = std::filesystem;
 	using namespace ::ZenLib;
 	using std::string;
