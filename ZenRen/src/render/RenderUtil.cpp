@@ -20,9 +20,9 @@ namespace render::util {
 
 	std::string getVramUsage(IDXGIAdapter3* adapter) {
 		const auto vramInfo = getVramInfo(adapter);
-		uint32_t currentMb = vramInfo.CurrentUsage / 1024 / 1024;
-		uint32_t totalMb = vramInfo.Budget / 1024 / 1024;
-		uint32_t percentage = ((float) currentMb / totalMb) * 100;
+		uint32_t currentMb = (uint32_t) (vramInfo.CurrentUsage / 1024 / 1024);
+		uint32_t totalMb = (uint32_t) (vramInfo.Budget / 1024 / 1024);
+		uint32_t percentage = (uint32_t) ((float) currentMb / totalMb) * 100;
 		std::ostringstream buffer;
 		buffer << percentage << " %% (" << currentMb << " / " << totalMb << " MB)";
 		return buffer.str();

@@ -38,9 +38,9 @@ namespace render
 
 		bool skyTexBlur = true;
 
-		float contrast = 1;
-		float brightness = 0;
-		float gamma = 0.87;
+		float contrast = 1.f;
+		float brightness = 0.f;
+		float gamma = 0.87f;
 	};
 }
 

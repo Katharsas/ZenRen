@@ -99,6 +99,7 @@ namespace viewer::input
             }
             return delta;
         }
+        return 0;
     }
 
     std::string getKeyname(const LPARAM scancode) {
@@ -119,7 +120,7 @@ namespace viewer::input
 
     uint32_t getVk(wchar_t keyboardChar) {
         short vk = VkKeyScanW(keyboardChar);
-        uint8_t keyCode = vk; // returns the virtual-key code in the low-order byte and the shift state in the high-byte
+        uint32_t keyCode = (uint8_t) vk; // returns the virtual-key code in the low-order byte and the shift state in the high-byte
         return keyCode;
     }
 

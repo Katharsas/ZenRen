@@ -251,7 +251,7 @@ namespace render
 		if (settings.reverseZ != settingsPrevious.reverseZ) {
 			renderState.onChangeReverseZ();
 		}
-		if (settings.anisotropicFilter != settingsPrevious.anisotropicFilter || settings.anisotropicLevel != settingsPrevious.anisotropicFilter) {
+		if (settings.anisotropicFilter != settingsPrevious.anisotropicFilter || settings.anisotropicLevel != settingsPrevious.anisotropicLevel) {
 			renderState.diffuseTexSampler = true;
 		}
 		//if (settings.shader.ambientLight != settingsPrevious.shader.ambientLight || settings.shader.mode != settingsPrevious.shader.mode) {

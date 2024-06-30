@@ -67,13 +67,13 @@ namespace render::gui::settings {
 				ImGui::PushItemWidth(120);
 				if (ImGui::BeginCombo("MSAA", selected.c_str()))
 				{
-					for (int n = 0; n < items.size(); n++)
+					for (uint32_t n = 0; n < items.size(); n++)
 					{
 						auto current = items[n].c_str();
 						bool isSelected = (selected == current);
 						if (ImGui::Selectable(current, isSelected)) {
 							selected = items[n];
-							settings.multisampleCount = std::pow(2, n);
+							settings.multisampleCount = 1 << n; // 2^n
 						}
 					}
 					ImGui::EndCombo();
@@ -94,7 +94,7 @@ namespace render::gui::settings {
 				ImGui::PushItemWidth(120);
 				if (ImGui::BeginCombo("Filter", selected.c_str()))
 				{
-					for (int n = 0; n < items.size(); n++)
+					for (uint32_t n = 0; n < items.size(); n++)
 					{
 						auto current = items[n].c_str();
 						bool isSelected = (selected == current);
@@ -105,7 +105,7 @@ namespace render::gui::settings {
 							}
 							else {
 								settings.anisotropicFilter = true;
-								settings.anisotropicLevel = std::pow(2, n);
+								settings.anisotropicLevel = 1 << n; // 2^n
 							}
 						}
 					}

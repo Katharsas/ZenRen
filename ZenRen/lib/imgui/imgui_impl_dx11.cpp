@@ -1,3 +1,6 @@
+// TODO ON UPDATE!
+// Disable pragma warning C4005, see #pragma warning(..) around <d3d11.h>
+
 // dear imgui: Renderer Backend for DirectX11
 // This needs to be used along with a Platform Backend (e.g. Win32)
 
@@ -39,7 +42,12 @@
 
 // DirectX
 #include <stdio.h>
+
+#pragma warning(push)
+#pragma warning(disable : 4005)
 #include <d3d11.h>
+#pragma warning(pop)
+
 #include <d3dcompiler.h>
 #ifdef _MSC_VER
 #pragma comment(lib, "d3dcompiler") // Automatically link with d3dcompiler.lib as we are using D3DCompile() below.
