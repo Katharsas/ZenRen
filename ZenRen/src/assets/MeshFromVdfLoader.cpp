@@ -74,7 +74,7 @@ namespace assets
         ZenLoad::zCMesh* worldMesh)
     {
         ZenLoad::PackedMesh packedMesh;
-        worldMesh->packMesh(packedMesh, 0.01f);
+        worldMesh->packMesh(packedMesh, G_ASSET_RESCALE);
 
         for (const auto& submesh : packedMesh.subMeshes) {
             if (submesh.indices.empty()) {
@@ -84,11 +84,13 @@ namespace assets
                 throw std::logic_error("Expected world mesh to have lightmap information!");
             }
 
-            vector<VERTEX_POS> facesPos;
-            vector<VERTEX_OTHER> facesOther;
+            // at least in debug, resize & at-assignment is much faster than reserve & insert/copy, and we don't need temp array for flipping face order
+            uint32_t indicesCount = submesh.indices.size();
+            vector<VERTEX_POS> facesPos(indicesCount);
+            vector<VERTEX_OTHER> facesOther(indicesCount);
 
             int32_t faceIndex = 0;
-            for (uint32_t indicesIndex = 0; indicesIndex < submesh.indices.size(); indicesIndex += 3) {
+            for (uint32_t indicesIndex = 0; indicesIndex < indicesCount; indicesIndex += 3) {
 
                 const array zenFace = getFaceVerts(packedMesh.vertices, submesh.indices, indicesIndex);
 
@@ -97,9 +99,6 @@ namespace assets
                 if (faceLightmapIndex != -1) {
                     lightmap = worldMesh->getLightmapReferences()[faceLightmapIndex];
                 }
-
-                array<VERTEX_POS, 3> facePos;
-                array<VERTEX_OTHER, 3> faceOther;
 
                 for (uint32_t i = 0; i < 3; i++) {
                     const auto& zenVert = zenFace[i];
@@ -129,11 +128,9 @@ namespace assets
                     }
                     // flip faces (seems like zEngine uses counter-clockwise winding, while we use clockwise winding)
                     // TODO use D3D11_RASTERIZER_DESC FrontCounterClockwise instead?
-                    facePos.at(2 - i) = pos;
-                    faceOther.at(2 - i) = other;
+                    facesPos.at(indicesIndex + (2 - i)) = pos;
+                    facesOther.at(indicesIndex + (2 - i)) = other;
                 }
-                facesPos.insert(facesPos.end(), facePos.begin(), facePos.end());
-                facesOther.insert(facesOther.end(), faceOther.begin(), faceOther.end());
                 faceIndex++;
             }
 
@@ -183,13 +180,11 @@ namespace assets
 
 	void loadInstanceMesh(
         VERTEX_DATA_BY_MAT& target,
-        const ZenLoad::zCProgMeshProto& mesh,
+        const ZenLib::ZenLoad::zCProgMeshProto& mesh,
+        const ZenLib::ZenLoad::PackedMesh packedMesh,
         const StaticInstance& instance,
         bool debugChecksEnabled)
     {
-        ZenLoad::PackedMesh packedMesh;
-        mesh.packMesh(packedMesh, 0.01f);
-
         XMMATRIX normalTransform = inversedTransposed(instance.transform);
 
         uint32_t totalNormals = 0;
@@ -204,20 +199,20 @@ namespace assets
                 throw std::logic_error("Expected VOB mesh to NOT have lightmap information!");
             }
 
-            vector<VERTEX_POS> facesPos;
-            vector<VERTEX_OTHER> facesOther;
+            // at least in debug, resize & at-assignment is much faster than reserve & insert/copy, and we don't need temp array for flipping face order
+            uint32_t indicesCount = submesh.indices.size();
+            vector<VERTEX_POS> facesPos(indicesCount);
+            vector<VERTEX_OTHER> facesOther(indicesCount);
 
-            for (uint32_t indicesIndex = 0; indicesIndex < submesh.indices.size(); indicesIndex += 3) {
+            for (uint32_t indicesIndex = 0; indicesIndex < indicesCount; indicesIndex += 3) {
                 
                 const array zenFace = getFaceVerts(packedMesh.vertices, submesh.indices, indicesIndex);
-                array<VERTEX_POS, 3> facePos;
-                array<VERTEX_OTHER, 3> faceOther;
 
-                // read positions
+                // positions
                 array<XMVECTOR, 3> posXm;
                 posToXM4(zenFace, posXm);
 
-                // read normals
+                // normals
                 totalNormals += 3;
                 XMVECTOR faceNormalXm;
                 if (debugChecksEnabled) {
@@ -244,11 +239,9 @@ namespace assets
 
                     // flip faces (seems like zEngine uses counter-clockwise winding, while we use clockwise winding)
                     // TODO use D3D11_RASTERIZER_DESC FrontCounterClockwise instead?
-                    facePos.at(2 - i) = pos;
-                    faceOther.at(2 - i) = other;
+                    facesPos.at(indicesIndex + (2 - i)) = pos;
+                    facesOther.at(indicesIndex + (2 - i)) = other;
                 }
-                facesPos.insert(facesPos.end(), facePos.begin(), facePos.end());
-                facesOther.insert(facesOther.end(), faceOther.begin(), faceOther.end());
             }
 
             insert(target, submesh.material, facesPos, facesOther);
@@ -267,4 +260,48 @@ namespace assets
             processedVisuals.insert(visualname);
         }
 	}
+
+    void loadInstanceMeshLib(
+        VERTEX_DATA_BY_MAT& target,
+        const MeshLibData& libData,
+        const StaticInstance& instance,
+        bool debugChecksEnabled)
+    {
+        auto lib = libData.meshLib;
+        {
+            uint32_t count = 0;
+            for (auto mesh : lib.getMeshes()) {
+                auto trans = lib.getRootNodeTranslation();
+                // It's unclear why negation is needed and if only z component or other components needs to be negated as well.
+                // If z is not negated, sisha's in Gomez' throneroom are not placed correctly.
+                XMMATRIX transformRoot = XMMatrixTranslationFromVector(XMVectorSet(-trans.x, -trans.y, -trans.z, 0));
+
+                StaticInstance newInstance = instance;
+                newInstance.transform = XMMatrixMultiply(transformRoot, instance.transform);
+
+                loadInstanceMesh(target, mesh.getMesh(), libData.meshesPacked[count++], newInstance, debugChecksEnabled);
+            }
+        } {
+            uint32_t count = 0;
+            for (const auto& [name, mesh] : lib.getAttachments()) {
+                auto index = lib.findNodeIndex(name);
+
+                auto node = lib.getNodes()[index];
+                XMMATRIX transform = toXMM(node.transformLocal);
+
+                while (node.parentValid()) {
+                    const auto& parent = lib.getNodes()[node.parentIndex];
+                    XMMATRIX transformParent = toXMM(parent.transformLocal);
+                    transform = XMMatrixMultiply(transform, transformParent);
+                    node = parent;
+                }
+                // rootNode translation is not applied to attachments (example: see kettledrum placement on oldcamp music stage)
+
+                StaticInstance newInstance = instance;
+                newInstance.transform = XMMatrixMultiply(transform, instance.transform);
+
+                loadInstanceMesh(target, mesh, libData.attachementsPacked[count++], newInstance, debugChecksEnabled);
+            }
+        }
+    }
 }

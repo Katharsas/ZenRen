@@ -9,6 +9,9 @@
 
 namespace render
 {
+	// TODO move to MeshUtil
+	constexpr float G_ASSET_RESCALE = 0.01f;
+
 	typedef VEC3 VERTEX_POS;
 	typedef NORMAL_CL_UV_LUV_STATIC_LIGHT VERTEX_OTHER;
 

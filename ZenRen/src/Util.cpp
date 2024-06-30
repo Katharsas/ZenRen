@@ -52,14 +52,16 @@ namespace util
 	}
 
 
-	void asciiToLower(std::string& string) {
+	void asciiToLowerMut(std::string& string)
+	{
 		for (char& c : string) {
 			c = tolower(c);
 		}
 	}
 
-	std::string asciiToLower(const std::string& string) {
-		std::string result = string;
+	std::string asciiToLower(const std::string_view str)
+	{
+		std::string result = std::string(str);
 		std::transform(result.begin(), result.end(), result.begin(), ::tolower);
 		return result;
 	}
@@ -73,19 +75,32 @@ namespace util
 		return result;
 	}
 
-	std::string join(const std::vector<std::string>& strings, const std::string& delimiter) {
+	std::string join(const std::vector<std::string>& strings, const std::string& delimiter)
+	{
 		return strings.empty() ? "" : std::accumulate(
 				++strings.begin(), strings.end(), *strings.begin(),
 				[](auto&& a, auto&& b) -> auto& { a += ','; a += b; return a; }
 		);
 	}
 
-	std::string fromU8(const std::u8string& u8string) {
+	std::string fromU8(const std::u8string& u8string)
+	{
 		return std::string(u8string.cbegin(), u8string.cend());
 	}
 
-	std::string toString(const std::filesystem::path& path) {
+	std::string toString(const std::filesystem::path& path)
+	{
 		return fromU8(path.u8string());
+	}
+
+	bool endsWithEither(std::string_view str, std::initializer_list<FileExt> extensions)
+	{
+		for (const auto& ext : extensions) {
+			if (ext.isExtOf(str)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	std::string getUserFolderPath()

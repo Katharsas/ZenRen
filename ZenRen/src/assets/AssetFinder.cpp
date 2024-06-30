@@ -4,7 +4,8 @@
 #include "DebugTextures.h"
 #include "../Util.h"
 
-namespace assets {
+namespace assets
+{
 	namespace fs = std::filesystem;
 	using namespace ::ZenLib;
 	using std::string;
@@ -30,7 +31,7 @@ namespace assets {
 			if (!std::filesystem::is_directory(dirEntry)) {
 				const auto& path = dirEntry.path();
 				auto filename = util::toString(path.filename());
-				util::asciiToLower(filename);
+				util::asciiToLowerMut(filename);
 
 				onFile(path, filename);
 			}
@@ -106,7 +107,7 @@ namespace assets {
 
 		std::vector<string> vdfFileList = vdf->getKnownFiles();
 		for (auto& filename : vdfFileList) {
-			util::asciiToLower(filename);
+			util::asciiToLowerMut(filename);
 			if (util::endsWith(filename, ".zen")) {
 				zensFoundInVdfs.insert(filename);
 			}
