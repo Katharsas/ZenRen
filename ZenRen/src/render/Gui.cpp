@@ -49,7 +49,7 @@ namespace render {
 
 		// DPI scaling and font
 		float dpiScale = ImGui_ImplWin32_GetDpiScaleForHwnd(hWnd);
-		io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Consola.ttf", (int)((13 * dpiScale) + 0.5f));
+		io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Consola.ttf", 13.f * dpiScale);
 	}
 
 	float drawWindowWithGroups(const std::string& windowName, std::map<std::string, std::list<GuiComponent>> groups, float posY, float sizeY = -1)

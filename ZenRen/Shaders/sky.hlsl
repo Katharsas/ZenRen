@@ -135,7 +135,7 @@ float4 SkyTexColor(int layer, float2 uv)
         color.rgb = (float3) 1;
     }
     if (!(outputType == OUTPUT_FULL || outputType == OUTPUT_SOLID)) {
-        light = (float3) outputType == OUTPUT_DIFFUSE ? 1 : 0;
+        light = (float3) (outputType == OUTPUT_DIFFUSE ? 1 : 0);
     }
 
 	color.rgb *= light;

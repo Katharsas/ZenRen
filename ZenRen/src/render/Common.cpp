@@ -21,12 +21,12 @@ namespace render {
 	void initViewport(BufferSize& size, D3D11_VIEWPORT* viewport) {
 		ZeroMemory(viewport, sizeof(D3D11_VIEWPORT));
 
-		viewport->TopLeftX = 0;
-		viewport->TopLeftY = 0;
-		viewport->Width = size.width;
-		viewport->Height = size.height;
-		viewport->MinDepth = 0.0f;
-		viewport->MaxDepth = 1.0f;
+		viewport->TopLeftX = 0.f;
+		viewport->TopLeftY = 0.f;
+		viewport->Width = (float) size.width;
+		viewport->Height = (float) size.height;
+		viewport->MinDepth = 0.f;
+		viewport->MaxDepth = 1.f;
 	}
 
 	float fromSRGB(const float channel) {

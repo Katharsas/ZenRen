@@ -10,8 +10,8 @@
 #include "../Sky.h"
 #include "../RenderUtil.h"
 #include "Util.h"
-#include "assets/AssetFinder.h";
-#include "assets/ZenLoader.h";
+#include "assets/AssetFinder.h"
+#include "assets/ZenLoader.h"
 #include "assets/ObjLoader.h"
 #include "assets/TexFromVdfLoader.h"
 
@@ -85,7 +85,7 @@ namespace render::pass::world
 
 				float zoom = 2.0f;
 				if (debugTextures.size() >= 1) {
-					if (selectedDebugTexture >= 0 && selectedDebugTexture < debugTextures.size()) {
+					if (selectedDebugTexture >= 0 && selectedDebugTexture < (int32_t) debugTextures.size()) {
 						ImGui::Image(debugTextures.at(selectedDebugTexture)->GetResourceView(), { 256 * zoom, 256 * zoom });
 					}
 				}

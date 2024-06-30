@@ -51,7 +51,7 @@ namespace assets
         LOG(INFO) << "POINT    { x: " + std::to_string(pos.x) + ", y: " + std::to_string(pos.z) + " }";
         LOG(INFO) << "";
         string json = "";
-        for (int vertIndex = 0; vertIndex < verts.size(); vertIndex += 3) {
+        for (uint32_t vertIndex = 0; vertIndex < verts.size(); vertIndex += 3) {
             auto& a = verts[vertIndex];
             auto& b = verts[vertIndex + 1];
             auto& c = verts[vertIndex + 2];
@@ -71,15 +71,15 @@ namespace assets
         // TODO there must still be a bug here because VOBs that have multiple faces below & above them are not lit correctly
         float currentBestYDist = FLT_MAX;
         //float currentBestY = FLT_MAX;
-        int currentBestIndex = -1;
-        for (int vertIndex = 0; vertIndex < verts.size(); vertIndex += 3) {
+        int32_t currentBestIndex = -1;
+        for (uint32_t vertIndex = 0; vertIndex < verts.size(); vertIndex += 3) {
             bool isInsideTriangle2D = triangleXZContainsPointXZ(pos, verts[vertIndex], verts[vertIndex + 1], verts[vertIndex + 2]);
             if (!isInsideTriangle2D) {
                 // filter out faces that don't intersect with pos in 2D 
                 continue;
             }
             float yAverage = 0;
-            for (int i = vertIndex; i < vertIndex + 3; i++) {
+            for (uint32_t i = vertIndex; i < vertIndex + 3; i++) {
                 auto& vert = verts[i];
                 yAverage += vert.y;
             }
@@ -116,7 +116,7 @@ namespace assets
             if (isBetterGroundCandidate) {
                 currentBestYDist = yDist;
                 //currentBestY = yAverage;
-                currentBestIndex = vertIndex / 3;
+                currentBestIndex = (int32_t) vertIndex / 3;
             }
         }
         return currentBestIndex;

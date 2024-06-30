@@ -230,7 +230,7 @@ HWND InitInstance(HINSTANCE hInstance, int nCmdShow)
 	hInst = hInstance; // Store instance handle in our global variable
 
 	// set view size and calculate window size with borders/menu
-	RECT viewSize = {0, 0, windowClientWidth, windowClientHeight};
+	RECT viewSize = {0, 0, (int32_t) windowClientWidth, (int32_t) windowClientHeight};
 	AdjustWindowRect(&viewSize, WS_OVERLAPPEDWINDOW, FALSE);
 
 	LEVELS level = DEBUG;

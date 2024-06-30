@@ -41,7 +41,7 @@ namespace render {
 	bool hasExpectedMipmapCount(const ScratchImage* image, bool isGothicZTex = false) {
 		auto& metadata = image->GetMetadata();
 		int32_t maxDimPixelCount = std::max(metadata.width, metadata.height);
-		int32_t expectedCount = std::ceil(std::log2(maxDimPixelCount)) + 1;
+		int32_t expectedCount = (int) std::ceil(std::log2(maxDimPixelCount)) + 1;
 		if (isGothicZTex) {
 			expectedCount = std::max(1, expectedCount - 3);// compiled zTex textures seem to come without lowest 3 levels
 		}
@@ -77,6 +77,7 @@ namespace render {
 			}
 			auto formatString = std::string(magic_enum::enum_name(metadata.format));
 			throwError("Failed to determine if texture '" + name + "' uses alpha or not! Unrecognized format: " + formatString);
+			__assume(false);
 		}
 	}
 
@@ -105,7 +106,7 @@ namespace render {
 			}
 
 			imageOwners.push_back(image);
-			for (int m = 0; m < metadata.mipLevels; m++) {
+			for (uint32_t m = 0; m < metadata.mipLevels; m++) {
 				images.push_back(*image->GetImage(m, 0, 0));
 			}
 			i++;

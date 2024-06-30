@@ -88,7 +88,7 @@ namespace assets
             vector<VERTEX_OTHER> facesOther;
 
             int32_t faceIndex = 0;
-            for (int32_t indicesIndex = 0; indicesIndex < submesh.indices.size(); indicesIndex += 3) {
+            for (uint32_t indicesIndex = 0; indicesIndex < submesh.indices.size(); indicesIndex += 3) {
 
                 const array zenFace = getFaceVerts(packedMesh.vertices, submesh.indices, indicesIndex);
 
@@ -101,7 +101,7 @@ namespace assets
                 array<VERTEX_POS, 3> facePos;
                 array<VERTEX_OTHER, 3> faceOther;
 
-                for (int32_t i = 0; i < 3; i++) {
+                for (uint32_t i = 0; i < 3; i++) {
                     const auto& zenVert = zenFace[i];
                     VERTEX_POS pos;
                     pos = from(zenVert.Position);
@@ -110,8 +110,8 @@ namespace assets
                     other.uvDiffuse = from(zenVert.TexCoord);
                     other.colLight = fromSRGB(D3DXCOLOR(zenVert.Color));
                     //other.colLight = D3DXCOLOR(1, 1, 1, 0.f);
-                    other.dirLight = { -100, -100, -100 };// value that is easy to check as not normalized in shader
-                    other.lightSun = faceLightmapIndex == -1 ? 1 : 0;
+                    other.dirLight = { -100.f, -100.f, -100.f };// value that is easy to check as not normalized in shader
+                    other.lightSun = faceLightmapIndex == -1 ? 1.f : 0.f;
 
                     if (faceLightmapIndex == -1) {
                         other.uvLightmap = { 0, 0, -1 };
@@ -125,7 +125,7 @@ namespace assets
                         XMVECTOR lightmapDir = posXm - origin;
                         other.uvLightmap.u = XMVectorGetX(XMVector3Dot(lightmapDir, normalRight));
                         other.uvLightmap.v = XMVectorGetX(XMVector3Dot(lightmapDir, normalUp));
-                        other.uvLightmap.i = lightmap.lightmapTextureIndex;
+                        other.uvLightmap.i = (float) lightmap.lightmapTextureIndex;
                     }
                     // flip faces (seems like zEngine uses counter-clockwise winding, while we use clockwise winding)
                     // TODO use D3D11_RASTERIZER_DESC FrontCounterClockwise instead?
@@ -142,7 +142,7 @@ namespace assets
     }
 
     void posToXM4(const array<ZenLoad::WorldVertex, 3>& zenFace, array<XMVECTOR, 3>& target) {
-        for (int32_t i = 0; i < 3; i++) {
+        for (uint32_t i = 0; i < 3; i++) {
             const auto& zenVert = zenFace[i];
             target[i] = toXM4Pos(zenVert.Position);
         }
@@ -150,7 +150,7 @@ namespace assets
 
     uint8_t normalToXM4(const array<ZenLoad::WorldVertex, 3>& zenFace, array<XMVECTOR, 3>& target, const XMVECTOR& faceNormalXm, bool debugChecksEnabled) {
         uint8_t zeroNormals = 0;
-        for (int32_t i = 0; i < 3; i++) {
+        for (uint32_t i = 0; i < 3; i++) {
             const auto& zenVert = zenFace[i];
             if (debugChecksEnabled && isZero(zenVert.Normal, zeroThreshold)) {
                 target[i] = faceNormalXm;
@@ -169,7 +169,7 @@ namespace assets
             for (int32_t i = 0; i < 3; i++) {
                 XMVECTOR angleXm = XMVector3AngleBetweenNormals(faceNormalXm, normalsXm[i]);
                 float normalFlatnessRadian = XMVectorGetX(angleXm);
-                float normalFlatnessDegrees = normalFlatnessRadian * (180.0 / 3.141592653589793238463);
+                float normalFlatnessDegrees = normalFlatnessRadian * (180.f / 3.141592653589793238463f);
                 if (normalFlatnessDegrees > 90) {
                     wrongNormals++;
                 }
@@ -230,7 +230,7 @@ namespace assets
                 extremeNormals += normalAngleCheck(normalsXm, faceNormalXm, debugChecksEnabled);
 
                 // transform
-                for (int32_t i = 0; i < 3; i++) {
+                for (uint32_t i = 0; i < 3; i++) {
                     const auto& zenVert = zenFace[i];
                     VERTEX_POS pos;
                     pos = transformPos(posXm[i], instance.transform);
@@ -240,7 +240,7 @@ namespace assets
                     other.uvLightmap = { 0, 0, -1 };
                     other.colLight = instance.colLightStatic;
                     other.dirLight = toVec3(XMVector3Normalize(instance.dirLightStatic));
-                    other.lightSun = instance.receiveLightSun ? 1 : 0;
+                    other.lightSun = instance.receiveLightSun ? 1.f : 0.f;
 
                     // flip faces (seems like zEngine uses counter-clockwise winding, while we use clockwise winding)
                     // TODO use D3D11_RASTERIZER_DESC FrontCounterClockwise instead?

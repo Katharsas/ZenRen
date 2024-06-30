@@ -109,7 +109,7 @@ namespace render::pass::forward
 		d3d.deviceContext->ClearRenderTargetView(targetRtv, world::getBackgroundColor());
 
 		// clear depth and stencil buffer
-		const float zFar = settings.reverseZ ? 0.0 : 1.0f;
+		const float zFar = settings.reverseZ ? 0.0f : 1.0f;
 		d3d.deviceContext->ClearDepthStencilView(depthView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, zFar, 0);
 
 		// set rasterizer state

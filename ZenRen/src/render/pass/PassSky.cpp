@@ -2,10 +2,10 @@
 #include "PassSky.h"
 
 #include "../Renderer.h"
-#include "../RenderUtil.h";
+#include "../RenderUtil.h"
 #include "../MeshUtil.h"
 #include "../Camera.h"
-#include "assets/AssetFinder.h";
+#include "assets/AssetFinder.h"
 #include "assets/TexFromVdfLoader.h"
 
 // Sky is always rendered in relation to player camera with position 0,0,0 (origin).
@@ -220,7 +220,7 @@ namespace render::pass::sky
 
         // textures
         d3d.deviceContext->PSSetSamplers(0, 1, &layerSampler);
-        for (int i = 0; i < layerTextures.size(); i++) {
+        for (uint32_t i = 0; i < layerTextures.size(); i++) {
             auto* resourceView = layerTextures[i]->GetResourceView();
             d3d.deviceContext->PSSetShaderResources(i, 1, &resourceView);
         }

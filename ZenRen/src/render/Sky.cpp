@@ -77,7 +77,7 @@ namespace render
 	const SkyTex over_NIGHT = { "SKYNIGHT_LAYER1" };
 
 	const UV speedNormal = { 0.9f, 1.1f };
-	const UV speedSlow = { speedNormal.u * 0.2, speedNormal.v * 0.2 };
+	const UV speedSlow = { speedNormal.u * 0.2f, speedNormal.v * 0.2f };
 
 	// each previous SkyTexType is defined to last until next timekey
 	const array skyLayerBase = {
@@ -104,8 +104,8 @@ namespace render
 
 	struct CurrentTimeKeys {
 		float timeOfDay;// current time
-		int32_t lastTimeKeyIndex;// most recently elapsed
-		int32_t nextTimeKeyIndex;// upcoming
+		uint32_t lastTimeKeyIndex;// most recently elapsed
+		uint32_t nextTimeKeyIndex;// upcoming
 		float delta;// how much time has passed from last to next, between 0 and 1
 	};
 
@@ -125,9 +125,9 @@ namespace render
 
 	CurrentTimeKeys getTimeKeysInterpolated(float timeKey)
 	{
-		for (int32_t i = 0; i < timeKeys.size(); i++) {
+		for (uint32_t i = 0; i < timeKeys.size(); i++) {
 			float last = timeKeys[i];
-			int32_t nextIndex = (i + 1) % timeKeys.size();
+			uint32_t nextIndex = (i + 1) % timeKeys.size();
 			float next = timeKeys[nextIndex];
 			if (next < last) {
 				next += 1.f;// wrap over
@@ -138,7 +138,7 @@ namespace render
 				return { timeKey, i, nextIndex, delta };
 			}
 		}
-		assert(false);
+		__assume(false);
 	}
 
 	SkyState getSkyStateInterpolated(CurrentTimeKeys timeKeys)

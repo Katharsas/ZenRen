@@ -1,6 +1,6 @@
 #pragma once
 
-#include "dx11.h";
+#include "dx11.h"
 
 namespace render
 {
