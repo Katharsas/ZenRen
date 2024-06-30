@@ -19,7 +19,7 @@ namespace assets
 
     // debug stuff
 
-    extern int32_t vobLightWorldIntersectChecks;
+    extern uint32_t vobLightWorldIntersectChecks;
 
     struct DebugLine {
         VEC3 posStart;

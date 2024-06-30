@@ -141,8 +141,7 @@ namespace render {
 
 	Texture::Texture(D3d d3d, const std::string& sourceFile, bool sRgb)
 	{
-		auto name = sourceFile;
-		util::asciiToLower(name);
+		auto name = util::asciiToLower(sourceFile);
 		std::wstring sourceFileW = util::utf8ToWide(name);
 		HRESULT hr;
 		ScratchImage image;

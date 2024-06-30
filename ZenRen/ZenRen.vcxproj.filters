@@ -106,6 +106,7 @@
     <ClCompile Include="src\render\Sky.cpp" />
     <ClCompile Include="src\render\pass\PassSky.cpp" />
     <ClCompile Include="src\render\Settings.cpp" />
+    <ClCompile Include="src\assets\AssetCache.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Util.h">
@@ -171,5 +172,6 @@
     <ClInclude Include="src\render\pass\PassSky.h" />
     <ClInclude Include="src\render\Settings.h" />
     <ClInclude Include="src\render\Primitives.h" />
+    <ClInclude Include="src\assets\AssetCache.h" />
   </ItemGroup>
 </Project>

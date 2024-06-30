@@ -75,7 +75,7 @@ namespace assets
 
     vector<array<XMVECTOR, 3>> createDebugPointVerts(const VEC3& pos, const VEC3& scale)
     {
-        float quadSize = 0.15f;
+        float quadSize = 0.15f * scale.z;
         float minSize = 0.6f;
         VEC3 topA = { pos.x - quadSize, pos.y + std::max(minSize, scale.y), pos.z - quadSize };
         VEC3 topB = { pos.x - quadSize, pos.y + std::max(minSize, scale.y), pos.z + quadSize };

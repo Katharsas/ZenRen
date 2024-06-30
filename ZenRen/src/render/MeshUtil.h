@@ -22,6 +22,7 @@ namespace render
     {
         return DirectX::XMVectorSet(vec3.x, vec3.y, vec3.z, 0);
     }
+    DirectX::XMMATRIX toXMM(const ZenLib::ZMath::Matrix& matrix);
 
     UV from(const ZenLib::ZMath::float2& source);
     VEC3 from(const ZenLib::ZMath::float3& source);
