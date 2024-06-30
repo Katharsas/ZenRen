@@ -56,56 +56,56 @@
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="stdafx.cpp" />
-    <ClCompile Include="src\InitApp.cpp">
+    <ClCompile Include="src\viewer\InitApp.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="src\renderer\Renderer.cpp">
+    <ClCompile Include="src\render\Renderer.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="src\renderer\Shader.cpp">
+    <ClCompile Include="src\render\Shader.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="src\renderer\ShaderManager.cpp">
+    <ClCompile Include="src\render\ShaderManager.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="src\game\TimerPrecision.cpp">
+    <ClCompile Include="src\viewer\TimerPrecision.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="src\game\GameLoop.cpp" />
-    <ClCompile Include="src\renderer\Gui.cpp" />
+    <ClCompile Include="src\viewer\GameLoop.cpp" />
+    <ClCompile Include="src\render\Gui.cpp" />
     <ClCompile Include="lib\imgui\imgui.cpp" />
     <ClCompile Include="lib\imgui\imgui_draw.cpp" />
     <ClCompile Include="lib\imgui\imgui_impl_dx11.cpp" />
     <ClCompile Include="lib\imgui\imgui_impl_win32.cpp" />
     <ClCompile Include="lib\imgui\imgui_tables.cpp" />
     <ClCompile Include="lib\imgui\imgui_widgets.cpp" />
-    <ClCompile Include="src\renderer\Camera.cpp" />
-    <ClCompile Include="src\game\Input.cpp" />
-    <ClCompile Include="src\game\PerfStats.cpp" />
-    <ClCompile Include="src\renderer\PipelinePostProcess.cpp" />
-    <ClCompile Include="src\renderer\PipelineWorld.cpp" />
+    <ClCompile Include="src\render\Camera.cpp" />
+    <ClCompile Include="src\viewer\Input.cpp" />
+    <ClCompile Include="src\viewer\PerfStats.cpp" />
+    <ClCompile Include="src\render\pass\PassPost.cpp" />
+    <ClCompile Include="src\render\pass\PassWorld.cpp" />
     <ClCompile Include="src\imgui\imgui_custom.cpp" />
-    <ClCompile Include="src\renderer\Texture.cpp" />
-    <ClCompile Include="src\renderer\SettingsGui.cpp" />
-    <ClCompile Include="src\renderer\loader\DebugTextures.cpp" />
-    <ClCompile Include="src\renderer\loader\ZenLoader.cpp" />
-    <ClCompile Include="src\renderer\loader\ObjLoader.cpp" />
-    <ClCompile Include="src\renderer\RenderUtil.cpp" />
-    <ClCompile Include="src\game\Actions.cpp" />
-    <ClCompile Include="src\renderer\loader\MeshFromVdfLoader.cpp" />
-    <ClCompile Include="src\renderer\RendererCommon.cpp" />
-    <ClCompile Include="src\renderer\PipelineForward.cpp" />
-    <ClCompile Include="src\renderer\loader\AssetFinder.cpp" />
-    <ClCompile Include="src\game\GameArgs.cpp" />
-    <ClCompile Include="src\renderer\loader\TexFromVdfLoader.cpp" />
-    <ClCompile Include="src\renderer\loader\MeshUtil.cpp" />
-    <ClCompile Include="src\renderer\loader\LookupTrees.cpp" />
-    <ClCompile Include="src\renderer\loader\FindGroundFace.cpp" />
-    <ClCompile Include="src\renderer\loader\DebugMeshes.cpp" />
-    <ClCompile Include="src\renderer\loader\StaticLightFromVobLights.cpp" />
-    <ClCompile Include="src\renderer\Sky.cpp" />
-    <ClCompile Include="src\renderer\PipelineSky.cpp" />
-    <ClCompile Include="src\renderer\Settings.cpp" />
+    <ClCompile Include="src\render\Texture.cpp" />
+    <ClCompile Include="src\render\SettingsGui.cpp" />
+    <ClCompile Include="src\assets\DebugTextures.cpp" />
+    <ClCompile Include="src\assets\ZenLoader.cpp" />
+    <ClCompile Include="src\assets\ObjLoader.cpp" />
+    <ClCompile Include="src\render\RenderUtil.cpp" />
+    <ClCompile Include="src\viewer\Actions.cpp" />
+    <ClCompile Include="src\assets\MeshFromVdfLoader.cpp" />
+    <ClCompile Include="src\render\Common.cpp" />
+    <ClCompile Include="src\render\pass\PassForward.cpp" />
+    <ClCompile Include="src\assets\AssetFinder.cpp" />
+    <ClCompile Include="src\viewer\Args.cpp" />
+    <ClCompile Include="src\assets\TexFromVdfLoader.cpp" />
+    <ClCompile Include="src\render\MeshUtil.cpp" />
+    <ClCompile Include="src\assets\LookupTrees.cpp" />
+    <ClCompile Include="src\assets\FindGroundFace.cpp" />
+    <ClCompile Include="src\assets\DebugMeshes.cpp" />
+    <ClCompile Include="src\assets\StaticLightFromVobLights.cpp" />
+    <ClCompile Include="src\render\Sky.cpp" />
+    <ClCompile Include="src\render\pass\PassSky.cpp" />
+    <ClCompile Include="src\render\Settings.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Util.h">
@@ -113,24 +113,24 @@
     </ClInclude>
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
-    <ClInclude Include="src\InitApp.h">
+    <ClInclude Include="src\viewer\InitApp.h">
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="resource.h" />
-    <ClInclude Include="src\renderer\Renderer.h">
+    <ClInclude Include="src\render\Renderer.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="src\renderer\Shader.h">
+    <ClInclude Include="src\render\Shader.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="src\renderer\ShaderManager.h">
+    <ClInclude Include="src\render\ShaderManager.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="src\game\TimerPrecision.h">
+    <ClInclude Include="src\viewer\TimerPrecision.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="src\game\GameLoop.h" />
-    <ClInclude Include="src\renderer\Gui.h" />
+    <ClInclude Include="src\viewer\GameLoop.h" />
+    <ClInclude Include="src\render\Gui.h" />
     <ClInclude Include="lib\imgui\imconfig.h" />
     <ClInclude Include="lib\imgui\imgui.h" />
     <ClInclude Include="lib\imgui\imgui_impl_dx11.h" />
@@ -139,36 +139,37 @@
     <ClInclude Include="lib\imgui\imstb_rectpack.h" />
     <ClInclude Include="lib\imgui\imstb_textedit.h" />
     <ClInclude Include="lib\imgui\imstb_truetype.h" />
-    <ClInclude Include="src\renderer\Camera.h" />
-    <ClInclude Include="src\game\Input.h" />
-    <ClInclude Include="src\game\PerfStats.h" />
-    <ClInclude Include="src\renderer\PipelinePostProcess.h" />
-    <ClInclude Include="src\renderer\PipelineWorld.h" />
+    <ClInclude Include="src\render\Camera.h" />
+    <ClInclude Include="src\viewer\Input.h" />
+    <ClInclude Include="src\viewer\PerfStats.h" />
+    <ClInclude Include="src\render\pass\PassPost.h" />
+    <ClInclude Include="src\render\pass\PassWorld.h" />
     <ClInclude Include="src\imgui\imgui_custom.h" />
-    <ClInclude Include="src\renderer\dx11.h" />
-    <ClInclude Include="src\renderer\Texture.h" />
+    <ClInclude Include="src\render\dx11.h" />
+    <ClInclude Include="src\render\Texture.h" />
     <ClInclude Include="lib\tinyobj\tiny_obj_loader.h" />
-    <ClInclude Include="src\renderer\SettingsGui.h" />
-    <ClInclude Include="src\renderer\loader\DebugTextures.h" />
-    <ClInclude Include="src\renderer\loader\ZenLoader.h" />
-    <ClInclude Include="src\renderer\loader\ObjLoader.h" />
-    <ClInclude Include="src\renderer\RenderUtil.h" />
-    <ClInclude Include="src\game\Actions.h" />
-    <ClInclude Include="src\renderer\loader\MeshFromVdfLoader.h" />
-    <ClInclude Include="src\renderer\RendererCommon.h" />
-    <ClInclude Include="src\renderer\PipelineForward.h" />
-    <ClInclude Include="src\renderer\loader\AssetFinder.h" />
-    <ClInclude Include="src\game\GameArgs.h" />
-    <ClInclude Include="src\renderer\loader\TexFromVdfLoader.h" />
-    <ClInclude Include="src\renderer\loader\MeshUtil.h" />
-    <ClInclude Include="src\renderer\loader\LookupTrees.h" />
+    <ClInclude Include="src\render\SettingsGui.h" />
+    <ClInclude Include="src\assets\DebugTextures.h" />
+    <ClInclude Include="src\assets\ZenLoader.h" />
+    <ClInclude Include="src\assets\ObjLoader.h" />
+    <ClInclude Include="src\render\RenderUtil.h" />
+    <ClInclude Include="src\viewer\Actions.h" />
+    <ClInclude Include="src\assets\MeshFromVdfLoader.h" />
+    <ClInclude Include="src\render\Common.h" />
+    <ClInclude Include="src\render\pass\PassForward.h" />
+    <ClInclude Include="src\assets\AssetFinder.h" />
+    <ClInclude Include="src\viewer\Args.h" />
+    <ClInclude Include="src\assets\TexFromVdfLoader.h" />
+    <ClInclude Include="src\render\MeshUtil.h" />
+    <ClInclude Include="src\assets\LookupTrees.h" />
     <ClInclude Include="lib\octree_attcs\octree.h" />
     <ClInclude Include="lib\octree_attcs\octree_container.h" />
-    <ClInclude Include="src\renderer\loader\FindGroundFace.h" />
-    <ClInclude Include="src\renderer\loader\DebugMeshes.h" />
-    <ClInclude Include="src\renderer\loader\StaticLightFromVobLights.h" />
-    <ClInclude Include="src\renderer\Sky.h" />
-    <ClInclude Include="src\renderer\PipelineSky.h" />
-    <ClInclude Include="src\renderer\Settings.h" />
+    <ClInclude Include="src\assets\FindGroundFace.h" />
+    <ClInclude Include="src\assets\DebugMeshes.h" />
+    <ClInclude Include="src\assets\StaticLightFromVobLights.h" />
+    <ClInclude Include="src\render\Sky.h" />
+    <ClInclude Include="src\render\pass\PassSky.h" />
+    <ClInclude Include="src\render\Settings.h" />
+    <ClInclude Include="src\render\Primitives.h" />
   </ItemGroup>
 </Project>
