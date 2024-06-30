@@ -3,11 +3,11 @@
 #include "dx11.h"
 #include "RendererCommon.h"
 #include "ShaderManager.h"
-#include "Renderer.h"
+#include "Settings.h"
 
 namespace renderer::forward {
 	void clean();
-	void draw(D3d d3d, ShaderManager* shaders, RenderSettings& settings);
+	void draw(D3d d3d, ShaderManager* shaders, const RenderSettings& settings);
 	ID3D11ShaderResourceView* initRenderBuffer(D3d d3d, BufferSize& size, uint32_t multisampleCount);
 	void initViewport(BufferSize& size);
 	void initDepthBuffer(D3d d3d, BufferSize& size, uint32_t multisampleCount, bool reverseZ);

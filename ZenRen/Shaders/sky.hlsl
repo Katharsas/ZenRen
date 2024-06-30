@@ -2,20 +2,21 @@
 // Vertex Shader
 //--------------------------------------------------------------------------------------
 
-static const uint FLAG_OUTPUT_SOLID = 0;
-static const uint FLAG_OUTPUT_DIFFUSE = 1;
-static const uint FLAG_OUTPUT_NORMAL = 2;
-static const uint FLAG_OUTPUT_LIGHT_SUN = 3;
-static const uint FLAG_OUTPUT_LIGHT_STATIC = 4;
+static const uint OUTPUT_FULL = 0;
+static const uint OUTPUT_SOLID = 1;
+static const uint OUTPUT_DIFFUSE = 2;
+static const uint OUTPUT_NORMAL = 3;
+static const uint OUTPUT_LIGHT_SUN = 4;
+static const uint OUTPUT_LIGHT_STATIC = 5;
 
 cbuffer cbSettings : register(b0) {
+    float4 skyLight;
+    
     bool multisampleTransparency;
     bool distantAlphaDensityFix;
 
-    bool debugOutput;
-    uint debugOutputType;
+    uint outputType;
 
-    float4 skyLight;
     float timeOfDay;
     bool skyTexBlur;
 };
@@ -119,15 +120,25 @@ float4 AlphaOverToRgba(float3 base, float baseAlpha, float3 over, float overAlph
 
 float4 SkyTexColor(int layer, float2 uv)
 {
-	float4 color;
-	if (skyTexBlur && !texLayers[layer].blurDisabled) {
+    float4 color;
+    if (skyTexBlur && !texLayers[layer].blurDisabled) {
         // blur layer textures (including alpha) to conceal banding
-		color = FastGaussianBlur(skyTexColor[layer], uv);
-	}
-	else {
-		color = skyTexColor[layer].Sample(SampleType, uv);
-	}
-	color.rgb *= texLayers[layer].light.rgb;
+        color = FastGaussianBlur(skyTexColor[layer], uv);
+    }
+    else {
+        color = skyTexColor[layer].Sample(SampleType, uv);
+    }
+    float3 light = texLayers[layer].light.rgb;
+    
+    // debug modes
+    if (!(outputType == OUTPUT_FULL || outputType == OUTPUT_DIFFUSE)) {
+        color.rgb = (float3) 1;
+    }
+    if (!(outputType == OUTPUT_FULL || outputType == OUTPUT_SOLID)) {
+        light = (float3) outputType == OUTPUT_DIFFUSE ? 1 : 0;
+    }
+
+	color.rgb *= light;
 	return color;
 }
 

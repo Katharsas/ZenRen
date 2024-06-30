@@ -86,7 +86,7 @@
     <ClCompile Include="src\renderer\PipelineWorld.cpp" />
     <ClCompile Include="src\imgui\imgui_custom.cpp" />
     <ClCompile Include="src\renderer\Texture.cpp" />
-    <ClCompile Include="src\renderer\RenderSettings.cpp" />
+    <ClCompile Include="src\renderer\SettingsGui.cpp" />
     <ClCompile Include="src\renderer\loader\DebugTextures.cpp" />
     <ClCompile Include="src\renderer\loader\ZenLoader.cpp" />
     <ClCompile Include="src\renderer\loader\ObjLoader.cpp" />
@@ -105,6 +105,7 @@
     <ClCompile Include="src\renderer\loader\StaticLightFromVobLights.cpp" />
     <ClCompile Include="src\renderer\Sky.cpp" />
     <ClCompile Include="src\renderer\PipelineSky.cpp" />
+    <ClCompile Include="src\renderer\Settings.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Util.h">
@@ -129,7 +130,6 @@
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="src\game\GameLoop.h" />
-    <ClInclude Include="src\Settings.h" />
     <ClInclude Include="src\renderer\Gui.h" />
     <ClInclude Include="lib\imgui\imconfig.h" />
     <ClInclude Include="lib\imgui\imgui.h" />
@@ -148,7 +148,7 @@
     <ClInclude Include="src\renderer\dx11.h" />
     <ClInclude Include="src\renderer\Texture.h" />
     <ClInclude Include="lib\tinyobj\tiny_obj_loader.h" />
-    <ClInclude Include="src\renderer\RenderSettings.h" />
+    <ClInclude Include="src\renderer\SettingsGui.h" />
     <ClInclude Include="src\renderer\loader\DebugTextures.h" />
     <ClInclude Include="src\renderer\loader\ZenLoader.h" />
     <ClInclude Include="src\renderer\loader\ObjLoader.h" />
@@ -169,5 +169,6 @@
     <ClInclude Include="src\renderer\loader\StaticLightFromVobLights.h" />
     <ClInclude Include="src\renderer\Sky.h" />
     <ClInclude Include="src\renderer\PipelineSky.h" />
+    <ClInclude Include="src\renderer\Settings.h" />
   </ItemGroup>
 </Project>

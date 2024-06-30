@@ -7,7 +7,6 @@
 #include "conio.h"
 #include "../resource.h"
 
-#include "Settings.h"
 #include "Util.h"
 #include "game/GameArgs.h"
 #include "game/GameLoop.h"
@@ -28,8 +27,9 @@ HINSTANCE hInst;                                // current instance
 WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
 WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 
-uint32_t windowClientWidth = settings::SCREEN_WIDTH;
-uint32_t windowClientHeight = settings::SCREEN_HEIGHT;
+// Default client size
+uint32_t windowClientWidth = 1366;
+uint32_t windowClientHeight = 768;
 
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -165,7 +165,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	game::getOptionPath(game::ARG_ASSET_DIR, &(arguments.assetFilesRoot), optionsToValues);
 
 	// Initialize
-	game::init(hWnd, arguments);
+	game::init(hWnd, arguments, windowClientWidth, windowClientHeight);
 	
 	// Main message loop:
 	MSG msg;

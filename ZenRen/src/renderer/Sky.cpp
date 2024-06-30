@@ -1,8 +1,6 @@
 #include "stdafx.h"
 #include "Sky.h"
 
-#include "RendererCommon.h"
-
 namespace renderer
 {
 	using std::array;

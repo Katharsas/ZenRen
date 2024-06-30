@@ -1,6 +1,6 @@
 #include "stdafx.h"
+#include "SettingsGui.h"
 
-#include "RenderSettings.h"
 #include "Gui.h"
 #include "imgui/imgui.h"
 #include "imgui/imgui_custom.h"
@@ -112,6 +112,19 @@ namespace renderer::gui::settings {
 					ImGui::EndCombo();
 				}
 				ImGui::Checkbox("Cloud Blur", &settings.skyTexBlur);
+				ImGui::PopItemWidth();
+			}
+		});
+
+		addSettings("Image", {
+			[&]() -> void {
+				ImGui::PushItemWidth(GUI_ELEMENT_WIDTH);
+				ImGui::SliderFloat("##Gamma", &settings.gamma, 0.5, 1.5, "%.3f Gamma");
+				float f = settings.brightness * 100;
+				if (ImGui::SliderFloat("##Min", &f, -1, 1, "%.2f Min Brightness")) {
+					settings.brightness = f / 100;
+				}
+				ImGui::SliderFloat("##Max", &settings.contrast, 0, 5, "%.2f Max Brightness");
 				ImGui::PopItemWidth();
 			}
 		});

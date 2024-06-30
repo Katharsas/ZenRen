@@ -2,20 +2,21 @@
 // Vertex Shader
 //--------------------------------------------------------------------------------------
 
-static const uint FLAG_OUTPUT_SOLID = 0;
-static const uint FLAG_OUTPUT_DIFFUSE = 1;
-static const uint FLAG_OUTPUT_NORMAL = 2;
-static const uint FLAG_OUTPUT_LIGHT_SUN = 3;
-static const uint FLAG_OUTPUT_LIGHT_STATIC = 4;
+static const uint OUTPUT_FULL = 0;
+static const uint OUTPUT_SOLID = 1;
+static const uint OUTPUT_DIFFUSE = 2;
+static const uint OUTPUT_NORMAL = 3;
+static const uint OUTPUT_LIGHT_SUN = 4;
+static const uint OUTPUT_LIGHT_STATIC = 5;
 
 cbuffer cbSettings : register(b0) {
+    float4 skyLight;
+    
     bool multisampleTransparency;
     bool distantAlphaDensityFix;
 
-    bool debugOutput;
-    uint debugOutputType;
+    uint outputType;
 
-    float4 skyLight;
     float timeOfDay;
     bool skyTexBlur;
 };
@@ -104,23 +105,23 @@ VS_OUT VS_Main(VS_IN input)
     bool enableLightStatic = false;
     bool isVob = (input.dirLight.x > -99);
 
-    if (!debugOutput || debugOutputType == FLAG_OUTPUT_SOLID) {
+    if (outputType == OUTPUT_FULL || outputType == OUTPUT_SOLID) {
         enableLightSun = true;
         enableLightStatic = true;
     }
-    if (debugOutput && debugOutputType == FLAG_OUTPUT_LIGHT_SUN) {
+    if (outputType == OUTPUT_LIGHT_SUN) {
         enableLightSun = true;
     }
-    if (debugOutput && debugOutputType == FLAG_OUTPUT_LIGHT_STATIC) {
+    if (outputType == OUTPUT_LIGHT_STATIC) {
         enableLightStatic = true;
     }
 
     // alpha indicates show much skylight should be received
     float3 whiteOrSkyLight = lerp((float3) 1, skyLight.rgb, input.colLight.a);
-    float3 lightStaticCol = input.colLight * whiteOrSkyLight;
+    float3 lightStaticCol = input.colLight.rgb * whiteOrSkyLight;
 
     float sunStrengthForCurrentTime = abs(timeOfDay - 0.5f) * 2;// (0 = midnight, 1 = midday)
-    float lightSunAmount = lerp(0, 0.2f, sunStrengthForCurrentTime);
+    float lightSunAmount = lerp(0, 0.0f, sunStrengthForCurrentTime);
     float3 lightSun = (float3) (input.sunLight * CalcLightSun(viewLight3, viewNormal3));
     float3 lightStatic;
     float3 lightAmbient;
@@ -153,7 +154,7 @@ VS_OUT VS_Main(VS_IN input)
     output.uvBaseColor = input.uvBaseColor;
     output.uvLightmap = input.uvLightmap;
    
-    if (debugOutputType == FLAG_OUTPUT_NORMAL) {
+    if (outputType == OUTPUT_NORMAL) {
         output.color = float4((float3) input.normal, 1);
     }
     else {
@@ -236,15 +237,19 @@ float4 PS_Main(PS_IN input) : SV_TARGET
     // light color
     float4 lightColor = float4(input.light, 1);
 
-    if (!debugOutput
-            || debugOutputType == FLAG_OUTPUT_SOLID
-            || debugOutputType == FLAG_OUTPUT_LIGHT_STATIC) {
+    if (outputType == OUTPUT_FULL
+            || outputType == OUTPUT_SOLID
+            || outputType == OUTPUT_LIGHT_STATIC) {
         if (input.uvLightmap.z >= 0) /* dynamic branch */ {
             lightColor = SampleLightmap(input.uvLightmap);
         }
     }
+    
+    // TODO balance world lighting against sky, TODO indoor/outdoor and dynamic light
+    lightColor.rgb *= 1.3;
+    //lightColor.rgb = step(lightColor.rgb, (float3) 1);
 
-    // diffuse (calculate always so alpha clipping works regardless of debugOutputType)
+    // diffuse (calculate always so alpha clipping works regardless of outputType)
     float4 diffuseColor;
     {
         diffuseColor = baseColor.Sample(SampleType, input.uvBaseColor);
@@ -254,7 +259,7 @@ float4 PS_Main(PS_IN input) : SV_TARGET
 
     // albedo color
     float4 albedoColor;
-    if (!debugOutput || debugOutputType == FLAG_OUTPUT_DIFFUSE) {
+    if (outputType == OUTPUT_FULL || outputType == OUTPUT_DIFFUSE) {
         albedoColor = diffuseColor;
     }
     else {

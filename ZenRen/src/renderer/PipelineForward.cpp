@@ -13,11 +13,10 @@ namespace renderer::forward {
 	__declspec(align(16))
 	struct CbGlobalSettings {
 		// Note: smallest type for constant buffer values is 32 bit; cannot use bool or uint_16 without packing
+		D3DXCOLOR skyLight;
 		int32_t multisampleTransparency;
 		int32_t distantAlphaDensityFix;
-		int32_t outputDirectEnabled;
-		uint32_t outputDirectType;// TODO make 0 == !outputDirectEnabled (default rendering), so we can finally use this in shader in a sane way without need for outputDirectEnabled
-		D3DXCOLOR skyLight;
+		uint32_t outputType;
 		float timeOfDay;
 		int32_t skyTexBlurEnabled;
 	};
@@ -71,8 +70,7 @@ namespace renderer::forward {
 		CbGlobalSettings cbGlobalSettings;
 		cbGlobalSettings.multisampleTransparency = settings.multisampleTransparency;
 		cbGlobalSettings.distantAlphaDensityFix = settings.distantAlphaDensityFix;
-		cbGlobalSettings.outputDirectEnabled = settings.shader.mode != ShaderMode::Default;
-		cbGlobalSettings.outputDirectType = settings.shader.mode - 1;
+		cbGlobalSettings.outputType = settings.shader.mode;
 
 		cbGlobalSettings.timeOfDay = world::getWorldSettings().timeOfDay;
 		cbGlobalSettings.skyLight = getSkyLightFromIntensity(1, cbGlobalSettings.timeOfDay);
@@ -102,7 +100,7 @@ namespace renderer::forward {
 		d3d.deviceContext->UpdateSubresource(shaderCbs.cameraCb, 0, nullptr, &camera, 0, 0);
 	}
 
-	void draw(D3d d3d, ShaderManager* shaders, RenderSettings& settings) {
+	void draw(D3d d3d, ShaderManager* shaders, const RenderSettings& settings) {
 		// set the linear back buffer as rtv
 		d3d.deviceContext->OMSetRenderTargets(1, &targetRtv, depthView);
 		d3d.deviceContext->RSSetViewports(1, &viewport);

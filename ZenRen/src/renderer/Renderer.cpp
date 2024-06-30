@@ -15,7 +15,7 @@
 using namespace Microsoft::WRL;
 
 #include "Settings.h"
-#include "RenderSettings.h"
+#include "SettingsGui.h"
 #include "Camera.h"
 #include "PipelineForward.h"
 #include "PipelinePostProcess.h"
@@ -145,12 +145,9 @@ namespace renderer
 		//}
 	}
 
-	void initD3D(HWND hWnd)
+	void initD3D(HWND hWnd, const BufferSize& startSize)
 	{
-		clientSize = {
-			::settings::SCREEN_WIDTH,
-			::settings::SCREEN_HEIGHT,
-		};
+		clientSize = startSize;
 		updateRenderSize();
 
 		renderer::addInfo("", {
@@ -168,6 +165,7 @@ namespace renderer
 		flags.onInit();
 		reinitRenderer(flags);
 		postprocess::initDepthBuffer(d3d, clientSize);
+		postprocess::initConstantBuffers(d3d);
 
 		initGui(hWnd, d3d);
 
@@ -185,8 +183,8 @@ namespace renderer
 		world::loadLevel(d3d, level);
 	}
 
-	void onWindowResize(uint32_t width, uint32_t height) {
-		clientSize = { width, height };
+	void onWindowResize(const BufferSize& changedSize) {
+		clientSize = changedSize;
 		updateRenderSize();
 
 		// see https://docs.microsoft.com/en-us/windows/win32/direct3ddxgi/d3d10-graphics-programming-guide-dxgi#handling-window-resizing
@@ -265,7 +263,7 @@ namespace renderer
 		forward::draw(d3d, shaders, settings);
 		
 		// postprocessing pipeline renders linear backbuffer to real backbuffer
-		postprocess::draw(d3d, linearBackBufferResource, shaders, settings.downsampling);
+		postprocess::draw(d3d, linearBackBufferResource, shaders, settings);
 
 		// gui does not output shading information so it goes to real sRGB backbuffer as well
 		settingsPrevious = settings;

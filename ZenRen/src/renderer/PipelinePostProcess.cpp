@@ -4,9 +4,19 @@
 #include "Renderer.h"
 #include "Settings.h"
 #include "Shader.h"
+#include "RenderUtil.h"
 
 namespace renderer::postprocess
 {
+	__declspec(align(16))
+		struct CbPostSettings {
+		// Note: smallest type for constant buffer values is 32 bit; cannot use bool or uint_16 without packing
+
+		float contrast;
+		float brightness;
+		float gamma;
+	} postSettings;
+
 	ID3D11SamplerState* samplerState = nullptr; // sampler to read linear backbuffer texture
 
 	ID3D11Texture2D* multisampleTex = nullptr;
@@ -22,6 +32,8 @@ namespace renderer::postprocess
 	ID3D11DepthStencilView* multisampleDepthView = nullptr;
 	ID3D11DepthStencilState* depthStateNone = nullptr;
 	ID3D11RasterizerState* rasterizer;
+
+	ID3D11Buffer* settingsCb = nullptr;
 
 	uint32_t downsamplingSamples = 8;
 
@@ -44,7 +56,16 @@ namespace renderer::postprocess
 			multisampleDepthView,
 			depthStateNone,
 			rasterizer,
+
+			settingsCb,
 		});
+	}
+
+	void updatePostSettingsCb(D3d d3d, const RenderSettings& settings) {
+		postSettings.brightness = settings.brightness;
+		postSettings.contrast = settings.contrast;
+		postSettings.gamma = settings.gamma;
+		d3d.deviceContext->UpdateSubresource(settingsCb, 0, nullptr, &postSettings, 0, 0);
 	}
 
 	void renderToTexure(D3d d3d, Shader* shader, ID3D11ShaderResourceView* srv, ID3D11RenderTargetView* rtv, ID3D11DepthStencilView* depth) {
@@ -66,9 +87,9 @@ namespace renderer::postprocess
 		//deviceContext->DrawIndexed(toneMappingQuad.indexCount, 0, 0);
 	}
 
-	void draw(D3d d3d, ID3D11ShaderResourceView* linearBackBuffer, ShaderManager* shaders, bool downsampling)
+	void draw(D3d d3d, ID3D11ShaderResourceView* linearBackBuffer, ShaderManager* shaders, const RenderSettings& settings)
 	{
-		bool renderDirectlyToBackBuffer = !downsampling;
+		bool renderDirectlyToBackBuffer = !settings.downsampling;
 		// draw HDR back buffer to real back buffer via tone mapping
 
 		// disable depth
@@ -81,6 +102,8 @@ namespace renderer::postprocess
 		ID3D11DepthStencilView* depth = renderDirectlyToBackBuffer ? nullptr : multisampleDepthView;
 
 		Shader* toneMappingShader = shaders->getShader("toneMapping");
+		updatePostSettingsCb(d3d, settings);
+		d3d.deviceContext->PSSetConstantBuffers(0, 1, &settingsCb);
 		renderToTexure(d3d, toneMappingShader, linearBackBuffer, rtv, depth);
 
 		if (!renderDirectlyToBackBuffer) {
@@ -278,5 +301,11 @@ namespace renderer::postprocess
 
 		rasterizerDesc.MultisampleEnable = true;
 		d3d.device->CreateRasterizerState(&rasterizerDesc, &rasterizer);
+	}
+
+	void initConstantBuffers(D3d d3d)
+	{
+		// TODO this should probably be dynamic, see https://www.gamedev.net/forums/topic/673486-difference-between-d3d11-usage-default-and-d3d11-usage-dynamic/
+		util::createConstantBuffer<CbPostSettings>(d3d, &settingsCb, D3D11_USAGE_DEFAULT);
 	}
 }

@@ -14,20 +14,24 @@ struct VS_OUTPUT
 	float4 position : SV_POSITION;
 };
 
-
 VS_OUTPUT VS_Main(VS_INPUT Input)
 {
 	VS_OUTPUT Output;
-
 	Output.texcoord = Input.texcoord;
 	Output.position = Input.position;
-
 	return Output;
 }
 
 //--------------------------------------------------------------------------------------
 // Pixel Shader
 //--------------------------------------------------------------------------------------
+
+cbuffer cbPostSettings : register(b0)
+{
+    float contrast;
+    float brightness;
+    float gamma;
+};
 
 SamplerState SS_Linear : register(s0);
 Texture2D TX_BackBufferHDR : register(t0);
@@ -56,30 +60,20 @@ float3 Uncharted2Tonemap(float3 x) {
 
 float4 PS_Main(PS_INPUT input, uint sampleIndex : SV_SAMPLEINDEX) : SV_TARGET
 {
-	float brightness = 0.0f; // [-1, 1], default = 0, additive
-	float contrast = 1.0f; // [0, 100], default = 1, multiplicative
-
-	// sample linear
-	float4 color = TX_BackBufferHDR.Sample(SS_Linear, input.texcoord);
-
-	float gammaAdjust = 1.f;
-	color.rgb = pow(color.rgb, float3(gammaAdjust, gammaAdjust, gammaAdjust));// TODO should this come before or after tonemapping?
+	float3 color = TX_BackBufferHDR.Sample(SS_Linear, input.texcoord).rgb;
 
 	// This could be calculated by luminance of the picture to get eye adjustment effect.
-	float exposure = 1.3f; 
+	float exposure = 1.1f; 
 
 	// apply tonemapping
-	color = float4((color.rgb * exposure), 1.0f);// no tonemapping
-	//color = float4(ReinhardTonemap(color.rgb * exposure), 1.0f);
-	//color = float4(Uncharted2Tonemap(color.rgb * exposure), 1.0f);
+	color = float3(color * exposure);// no tonemapping
+	//color = float3(ReinhardTonemap(color.rgb * exposure));
+	//color = float3(Uncharted2Tonemap(color.rgb * exposure));
 
-	// apply contrast
+	// apply contrast, brightness, gamma
 	color = color * contrast;
-
-	// apply brightness
 	color = color + brightness;
-
-	// TODO gamma delta adjust ?
+    color = pow(abs(color), (float3) gamma);
  
-	return color;
+    return float4(color, 1);
 }

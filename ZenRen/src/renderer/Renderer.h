@@ -7,43 +7,6 @@
 
 namespace renderer
 {
-	enum ShaderMode {
-		Default,
-		Solid,
-		Diffuse,
-		Normals,
-		Light_Sun,
-		Light_Static
-	};
-
-	struct ShaderSettings {
-		ShaderMode mode;
-	};
-
-	struct RenderSettings {
-		bool wireframe = false;
-		bool reverseZ = true;
-
-		bool anisotropicFilter = true;
-		uint32_t anisotropicLevel = 16;
-
-		ShaderSettings shader = {
-			ShaderMode::Default,
-		};
-
-		float resolutionScaling = 1.0f;
-		bool resolutionUpscaleSmooth = true;
-		bool downsampling = false;// does not work currently, TODO implement mipmap generation for linear BB
-
-		uint32_t multisampleCount = 4;
-		bool multisampleTransparency = true;
-		bool distantAlphaDensityFix = true;
-		
-		bool depthPrepass = false;
-
-		bool skyTexBlur = true;
-	};
-
 	struct StaticInstance {
 		std::string meshName;
 		DirectX::XMMATRIX transform;
@@ -120,9 +83,9 @@ namespace renderer
 		ID3D11Buffer* cameraCb = nullptr;
 	};
 
-	void initD3D(HWND hWnd);
+	void initD3D(HWND hWnd, const BufferSize& changedSize);
 	void loadLevel(std::string& level);
-	void onWindowResize(uint32_t width, uint32_t height);
+	void onWindowResize(const BufferSize& changedSize);
 	// Clean up DirectX and COM
 	void cleanD3D();
 	void update(float deltaTime);

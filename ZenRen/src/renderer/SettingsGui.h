@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Renderer.h"
+#include "Settings.h"
 
 namespace renderer::gui::settings {
 	void init(RenderSettings& settings);

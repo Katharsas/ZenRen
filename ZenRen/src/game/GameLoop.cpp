@@ -25,7 +25,7 @@ namespace game
 	stats::FrameSample frameTime;
 
 
-	void init(HWND hWnd, Arguments args)
+	void init(HWND hWnd, Arguments args, uint32_t width, uint32_t height)
 	{
 		enablePreciseTimerResolution();
 		initMicrosleep();
@@ -51,7 +51,7 @@ namespace game
 			renderer::loader::initFileAssetSourceDir(args.assetFilesRoot.value());
 		}
 		
-		renderer::initD3D(hWnd);
+		renderer::initD3D(hWnd, { width, height });
 
 		if (args.level.has_value()) {
 			renderer::loadLevel(args.level.value());
@@ -65,7 +65,6 @@ namespace game
 		// START RENDER
 		int32_t deltaTimeMicros = frameTime.updateStart();
 		float deltaTime = (float)deltaTimeMicros / 1000000;
-		//LOG(DEBUG) << "DeltaTime:" << deltaTime;
 
 		processUserInput(deltaTime);
 		renderer::update(deltaTime);
@@ -98,7 +97,7 @@ namespace game
 	void onWindowResized(uint32_t width, uint32_t height)
 	{
 		LOG(DEBUG) << "Resizing game window! Width: " << width << ", Height: " << height;
-		renderer::onWindowResize(width, height);
+		renderer::onWindowResize({ width, height });
 	}
 
 	void execute()

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dx11.h"
+#include "Settings.h"
 #include "Renderer.h"
 #include "ShaderManager.h"
 
