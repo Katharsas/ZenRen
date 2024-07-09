@@ -35,6 +35,6 @@
 
 
 struct D3d {
-	ID3D11Device1* device;
-	ID3D11DeviceContext1* deviceContext;
+	ID3D11Device* device;
+	ID3D11DeviceContext* deviceContext;
 };
