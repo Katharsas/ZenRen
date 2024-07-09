@@ -40,8 +40,8 @@ namespace render::pass::forward
 	ID3D11DepthStencilState* depthState = nullptr;
 	ID3D11RasterizerState* rasterizer = nullptr;
 	ID3D11RasterizerState* rasterizerWf = nullptr;
-	ID3D11BlendState1* blendState = nullptr;
-	ID3D11BlendState1* blendStateNoAtc = nullptr;// Alpha to coverage must be disabled for transparent surfaces; always nullptr (default blendstate)
+	ID3D11BlendState* blendState = nullptr;
+	ID3D11BlendState* blendStateNoAtc = nullptr;// Alpha to coverage must be disabled for transparent surfaces; always nullptr (default blendstate)
 
 	ShaderCbs shaderCbs;
 
@@ -296,9 +296,9 @@ namespace render::pass::forward
 		release(blendState);
 
 		if (multisampleCount > 1) {
-			D3D11_BLEND_DESC1 blendStateDesc = CD3D11_BLEND_DESC1(CD3D11_DEFAULT{});
+			D3D11_BLEND_DESC blendStateDesc = CD3D11_BLEND_DESC(CD3D11_DEFAULT{});
 			blendStateDesc.AlphaToCoverageEnable = multisampleTransparency;
-			d3d.device->CreateBlendState1(&blendStateDesc, &blendState);
+			d3d.device->CreateBlendState(&blendStateDesc, &blendState);
 		}
 		else {
 			blendState = nullptr;

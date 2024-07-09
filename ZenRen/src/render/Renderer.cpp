@@ -279,11 +279,8 @@ namespace render
 		ComPtr<ID3D11Device> device_11_0;
 		ComPtr<ID3D11DeviceContext> deviceContext_11_0;
 
-		ComPtr<ID3D11Device1> device_11_1;
-		ComPtr<ID3D11DeviceContext1> deviceContext_11_1;
-
-		// all feature levels that will be checked in order, we only care about 11.1
-		const D3D_FEATURE_LEVEL requiredLevels[] = { D3D_FEATURE_LEVEL_11_1 };
+		// all feature levels that will be checked in order, we only care about 11_0
+		const D3D_FEATURE_LEVEL requiredLevels[] = { D3D_FEATURE_LEVEL_11_0 };
 
 		HRESULT hr = D3D11CreateDevice(
 			nullptr,
@@ -298,16 +295,12 @@ namespace render
 			&deviceContext_11_0);
 
 		if (hr == E_INVALIDARG) {
-			LOG(FATAL) << "DirectX 11.1 capable GPU required! If your are on Windows 7, please install KB 2670838.";
+			LOG(FATAL) << "DirectX Feature Level 11_0 capable GPU required! If your are on Windows 7, please install KB 2670838.";
 		}
-
-		// Convert the interfaces from the DirectX 11.0 to the DirectX 11.1 
-		device_11_0.As(&device_11_1);
-		deviceContext_11_0.As(&deviceContext_11_1);
 		
 		// Convert to dxgiDevice and get adapter/factory that originally created our device (in "D3D11CreateDevice")
 		ComPtr<IDXGIDevice2> dxgiDevice;
-		device_11_1.As(&dxgiDevice);
+		device_11_0.As(&dxgiDevice);
 		ComPtr<IDXGIAdapter> dxgiAdapter;
 		dxgiDevice->GetAdapter(&dxgiAdapter);
 		ComPtr<IDXGIFactory2> dxgiFactory_2;
@@ -342,14 +335,14 @@ namespace render
 		}
 
 		dxgiFactory_2->CreateSwapChainForHwnd(
-			device_11_1.Get(),
+			device_11_0.Get(),
 			hWnd,
 			&swapChainDesc,
 			nullptr,
 			nullptr,
 			&swapchain);
 
-		d3d.device = device_11_1.Detach();
-		d3d.deviceContext = deviceContext_11_1.Detach();
+		d3d.device = device_11_0.Detach();
+		d3d.deviceContext = deviceContext_11_0.Detach();
 	}
 }
