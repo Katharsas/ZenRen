@@ -127,10 +127,11 @@ namespace render::pass::forward
 		if (settings.depthPrepass) {
 			world::drawPrepass(d3d, shaders, shaderCbs);
 		}
-		world::drawWorld(d3d, shaders, shaderCbs, targetRtv);
+		world::drawWorld(d3d, shaders, shaderCbs);
 		if (settings.wireframe) {
 			d3d.deviceContext->RSSetState(rasterizerWf);
 			world::drawWireframe(d3d, shaders, shaderCbs);
+			d3d.deviceContext->RSSetState(rasterizer);
 		}
 
 		// draw sky (depth disabled, camera at origin)

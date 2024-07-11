@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "DebugMeshes.h"
 
+#include "AssetCache.h"
 #include "render/MeshUtil.h"
 
 namespace assets
@@ -69,7 +70,7 @@ namespace assets
                     });
             }
         }
-        const Material defaultMat = { "bbox.tga" };
+        const Material defaultMat = { getTexId("bbox.tga") };
         insert(target, defaultMat, facesPos, facesOther);
     }
 
@@ -112,7 +113,7 @@ namespace assets
                     });
             }
         }
-        const Material defaultMat = { "point.tga" };
+        const Material defaultMat = { getTexId("point.tga") };
         insert(target, defaultMat, facesPos, facesOther);
     }
 
@@ -150,7 +151,7 @@ namespace assets
                     });
             }
         }
-        const Material defaultMat = { "line.tga" };
+        const Material defaultMat = { getTexId("line.tga") };
         insert(target, defaultMat, facesPos, facesOther);
     }
 }

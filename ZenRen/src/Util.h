@@ -36,12 +36,17 @@ namespace util
 	bool endsWithEither(std::string_view str, std::initializer_list<FileExt> extensions);
 
 	std::string getUserFolderPath();
-	std::string replaceExtension(const std::string& filename, const std::string& extension);
+	std::string replaceExtension(const std::string_view filename, const std::string_view extension);
 
 	bool warnOnError(const HRESULT& hr, const std::string& message);
 	bool throwOnError(const HRESULT& hr, const std::string& message);
 
 	void throwError(const std::string& message);
+
+	template<typename Item>
+	void insert(std::vector<Item>& target, std::vector<Item> source) {
+		target.insert(target.end(), source.begin(), source.end());
+	}
 
 	template<typename Key, typename Value, typename Func>
 	Value& getOrSet(std::unordered_map<Key, Value>& map, const Key& key, const Func& setValue)

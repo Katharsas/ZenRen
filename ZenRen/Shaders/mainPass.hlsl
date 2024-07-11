@@ -32,16 +32,17 @@ struct VS_IN
 {
     float4 position : POSITION;
     float4 normal : NORMAL0;
-    float2 uvBaseColor : TEXCOORD0;
-    float3 uvLightmap : TEXCOORD1;
+    float2 uvBaseColor : TEXCOORD0; // TODO should be called uvTexColor
+    float3 uvLightmap : TEXCOORD1; // TODO should be called uviTexLightmap
     float4 colLight : COLOR;
     float3 dirLight : NORMAL1;
     float sunLight : TEXCOORD2;
+    uint1 iTexColor : TEXCOORD3;
 };
 
 struct VS_OUT
 {
-    float2 uvBaseColor : TEXCOORD0;
+    float3 uvBaseColor : TEXCOORD0;
     float3 uvLightmap : TEXCOORD1;
     float4 color : COLOR;
     float3 light : LIGHT_INTENSITY;
@@ -151,7 +152,7 @@ VS_OUT VS_Main(VS_IN input)
     output.light *= 1.0;// balance VOBs and non-lightmap world vs. lightmaps of world
 
     output.position = mul(viewPosition, projectionMatrix);
-    output.uvBaseColor = input.uvBaseColor;
+    output.uvBaseColor = float3(input.uvBaseColor, input.iTexColor);
     output.uvLightmap = input.uvLightmap;
    
     if (outputType == OUTPUT_NORMAL) {
@@ -167,14 +168,14 @@ VS_OUT VS_Main(VS_IN input)
 // Pixel Shader
 //--------------------------------------------------------------------------------------
 
-Texture2D baseColor : register(s0);
+Texture2DArray baseColor : register(s0);
 Texture2DArray lightmaps : register(s1);
 SamplerState SampleType : register(s0);
 
 struct PS_IN
 {
-    float2 uvBaseColor : TEXCOORD0;
-    float3 uvLightmap : TEXCOORD1;
+    float3 uvBaseColor : TEXCOORD0; // TODO should be called uviTexColor
+    float3 uvLightmap : TEXCOORD1; // TODO should be called uviTexLightmap
     float4 color : COLOR;
     float3 light : LIGHT_INTENSITY;
     //int indexLightmap : INDEX_LIGHTMAP;
@@ -190,14 +191,15 @@ float CalcMipLevel(float2 texCoord)
     return max(0.0f, 0.5f * log2(delta_max_sqr));
 }
 
-float CalcDistantAlphaDensityFactor(Texture2D<float4> sourceTex, float2 texCoord)
+float CalcDistantAlphaDensityFactor(Texture2DArray<float4> sourceTex, float2 texCoord)
 {
     // Distant Transparency Thickening
     // since non-blended transparency fades out on higher mips more than it should (potentially leading to disappearing vegetation), correct it
     if (distantAlphaDensityFix) {
         float texWidth;
         float texHeight;
-        sourceTex.GetDimensions(texWidth, texHeight);// TODO this info could be passed with cb
+        float elements;
+        sourceTex.GetDimensions(texWidth, texHeight, elements); // TODO this info could be passed with cb
         float distAlphaMipScale = 0.25f;
         return 1 + CalcMipLevel(texCoord * float2(texWidth, texHeight)) * distAlphaMipScale;
     }
@@ -253,7 +255,7 @@ float4 PS_Main(PS_IN input) : SV_TARGET
     float4 diffuseColor;
     {
         diffuseColor = baseColor.Sample(SampleType, input.uvBaseColor);
-        diffuseColor.a *= CalcDistantAlphaDensityFactor(baseColor, input.uvBaseColor);
+        diffuseColor.a *= CalcDistantAlphaDensityFactor(baseColor, input.uvBaseColor.xy);
         diffuseColor.a = AlphaTestAndSharpening(diffuseColor.a);
     }
 

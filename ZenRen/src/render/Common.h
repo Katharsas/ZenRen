@@ -12,35 +12,77 @@ namespace render
 	// TODO move to MeshUtil
 	constexpr float G_ASSET_RESCALE = 0.01f;
 
+	typedef uint16_t TexId;
+
 	typedef VEC3 VERTEX_POS;
 	typedef NORMAL_CL_UV_LUV_STATIC_LIGHT VERTEX_OTHER;
+
+	struct TexInfo {
+		uint16_t width = -1;
+		uint16_t height = -1;
+		uint16_t mipLevels = -1;
+		bool hasAlpha = true;
+
+		// compression and color space
+		DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
+
+		auto operator<=>(const TexInfo&) const = default;
+	};
 
 	struct VEC_VERTEX_DATA {
 		std::vector<VERTEX_POS> vecPos;
 		std::vector<VERTEX_OTHER> vecNormalUv;
 	};
 
-	struct Material {
-		std::string texBaseColor;
+	struct VEC_VERTEX_DATA_BATCH {
+		std::vector<VERTEX_POS> vecPos;
+		std::vector<VERTEX_OTHER> vecNormalUv;
+		std::vector<TEX_INDEX> texIndices;
+		std::vector<TexId> texIndexedIds;
+	};
 
-		bool operator==(const Material& other) const
-		{
-			return (texBaseColor == other.texBaseColor);
-		}
+	struct Material {
+		TexId texBaseColor;
+
+		auto operator<=>(const Material&) const = default;
 	};
 
 	typedef std::unordered_map<Material, VEC_VERTEX_DATA> VERTEX_DATA_BY_MAT;
+
+	// the boost hash_combine function
+	template <class Hashable>
+	inline void hashCombine(std::size_t& hash, const Hashable& value)
+	{
+		std::hash<Hashable> hasher;
+		hash ^= hasher(value) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+	}
 }
 namespace std
 {
 	using namespace render;
+
 	template <>
 	struct hash<Material>
 	{
 		size_t operator()(const Material& key) const
 		{
-			size_t res = 17;
-			res = res * 31 + hash<string>()(key.texBaseColor);
+			size_t res = 0;
+			hashCombine(res, key.texBaseColor);
+			return res;
+		}
+	};
+
+	template <>
+	struct hash<TexInfo>
+	{
+		size_t operator()(const TexInfo& key) const
+		{
+			size_t res = 0;
+			hashCombine(res, key.width);
+			hashCombine(res, key.height);
+			hashCombine(res, key.mipLevels);
+			hashCombine(res, key.hasAlpha);
+			hashCombine(res, key.format);
 			return res;
 		}
 	};

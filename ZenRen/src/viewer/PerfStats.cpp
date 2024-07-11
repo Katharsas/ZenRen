@@ -16,6 +16,7 @@ namespace viewer::stats
 
 	struct LoggingSettings
 	{
+		bool detailedLoggingEnabled = false;
 		bool fps = true;                    // average fps
 		bool renderTime = true;             // average render time [usec]
 		bool sleepTime = true;              // average sleep time [usec]
@@ -31,7 +32,7 @@ namespace viewer::stats
 
 	// logging
 	const int32_t sampleSize = 1000; // max number of frames before stas are averaged and logged
-	const int32_t maxDurationMillis = 4000; // max ms duration before stats are averaged and logged 
+	const int32_t maxDurationMillis = 1000; // max ms duration before stats are averaged and logged 
 
 	int32_t sampleIndex = 0;
 	bool isInitialized = false;
@@ -63,64 +64,66 @@ namespace viewer::stats
 		const int32_t averageSleepTime = average(sleepTimeSamples, sampleCount);
 		const int32_t fps = 1000000 / (averageRenderTime + averageSleepTime);
 
-		// log frame time divergence
-		int32_t higherFrameTimeCount = 0;
-		float higherFrameTimePercentSum = 0;
+		if (settings.detailedLoggingEnabled) {
 
-		int32_t lowerFrameTimeCount = 0;
-		float lowerFrameTimePercentSum = 0;
+			// log frame time divergence
+			int32_t higherFrameTimeCount = 0;
+			float higherFrameTimePercentSum = 0;
 
-		int32_t frameTimeOffCount = 0;
-		int32_t frameTimeOffSum = 0;
+			int32_t lowerFrameTimeCount = 0;
+			float lowerFrameTimePercentSum = 0;
 
-		for (int i = 0; i < sampleCount; i++)
-		{
-			const int32_t ft = renderTimeSamples[i] + sleepTimeSamples[i];
-			const int32_t off = ft - frameTimeTarget;
-			frameTimeOffCount++;
-			if (off > 0)
+			int32_t frameTimeOffCount = 0;
+			int32_t frameTimeOffSum = 0;
+
+			for (int i = 0; i < sampleCount; i++)
 			{
-				frameTimeOffSum += off;
-				higherFrameTimePercentSum += (float)off / frameTimeTarget;
-				higherFrameTimeCount++;
+				const int32_t ft = renderTimeSamples[i] + sleepTimeSamples[i];
+				const int32_t off = ft - frameTimeTarget;
+				frameTimeOffCount++;
+				if (off > 0)
+				{
+					frameTimeOffSum += off;
+					higherFrameTimePercentSum += (float)off / frameTimeTarget;
+					higherFrameTimeCount++;
+				}
+				else
+				{
+					frameTimeOffSum -= off;
+					lowerFrameTimePercentSum -= (float)off / frameTimeTarget;
+					lowerFrameTimeCount++;
+				}
 			}
-			else
+			const int32_t offAverage = frameTimeOffSum / frameTimeOffCount;
+			const int32_t averageHigherPermille = divideOrZero(higherFrameTimePercentSum * 1000, higherFrameTimeCount);
+			const int32_t averageLowerPermille = divideOrZero(lowerFrameTimePercentSum * 1000, lowerFrameTimeCount);
+			const int32_t averagePromille = (int32_t)((higherFrameTimePercentSum + lowerFrameTimePercentSum) * 1000) / (higherFrameTimeCount + lowerFrameTimeCount);
+
+			bool frameLimiterEnabled = frameTimeTarget != 0;
+			const std::string splitter = " | ";
+			std::stringstream log;
+			if (settings.fps)					log << "FPS: " << fps << splitter;
+			if (settings.renderTime)			log << "frameTime (update + render): " << (averageUpdateTime + averageRenderTime)
+				<< " (" << averageUpdateTime << " + " << averageRenderTime << ") " << splitter;
+
+			if (frameLimiterEnabled) {
+				if (settings.sleepTime)				log << "sleepTime: " << averageSleepTime << splitter;
+				if (settings.offsetTime)			log << "offsetTime: " << offAverage << splitter;
+				if (settings.offsetTimePermille)	log << "offsetTime (p): " << averagePromille << splitter;
+				if (settings.offsetPositivePermille) log << "offsetTime too high (p): " << averageHigherPermille << splitter;
+				if (settings.offsetNegativePermille) log << "offsetTime too low (p): " << averageLowerPermille << splitter;
+			}
+
+			LOG(DEBUG) << log.str();
+
+			// uncomment for checking actual frametime distribution for single batch of samples
+			/*for (int i = 0; i < sampleSize; i++)
 			{
-				frameTimeOffSum -= off;
-				lowerFrameTimePercentSum -= (float)off / frameTimeTarget;
-				lowerFrameTimeCount++;
+				LOG(DEBUG) << "renderTime: " << renderTimeSamples[i] << " sleepTime: " << sleepTimeSamples[i];
 			}
+			Sleep(100);
+			exit(0);*/
 		}
-		const int32_t offAverage = frameTimeOffSum / frameTimeOffCount;
-		const int32_t averageHigherPermille = divideOrZero(higherFrameTimePercentSum * 1000, higherFrameTimeCount);
-		const int32_t averageLowerPermille = divideOrZero(lowerFrameTimePercentSum * 1000, lowerFrameTimeCount);
-		const int32_t averagePromille = (int32_t)((higherFrameTimePercentSum + lowerFrameTimePercentSum) * 1000) / (higherFrameTimeCount + lowerFrameTimeCount);
-
-		bool frameLimiterEnabled = frameTimeTarget != 0;
-		const std::string splitter = " | ";
-		std::stringstream log;
-		if (settings.fps)					log << "FPS: " << fps << splitter;
-		if (settings.renderTime)			log << "frameTime (update + render): " << (averageUpdateTime + averageRenderTime)
-			<< " (" << averageUpdateTime << " + " << averageRenderTime << ") " << splitter;
-
-		if (frameLimiterEnabled) {
-			if (settings.sleepTime)				log << "sleepTime: " << averageSleepTime << splitter;
-			if (settings.offsetTime)			log << "offsetTime: " << offAverage << splitter;
-			if (settings.offsetTimePermille)	log << "offsetTime (p): " << averagePromille << splitter;
-			if (settings.offsetPositivePermille) log << "offsetTime too high (p): " << averageHigherPermille << splitter;
-			if (settings.offsetNegativePermille) log << "offsetTime too low (p): " << averageLowerPermille << splitter;
-		}
-
-		LOG(DEBUG) << log.str();
-
-		// uncomment for checking actual frametime distribution for single batch of samples
-		/*for (int i = 0; i < sampleSize; i++)
-		{
-			LOG(DEBUG) << "renderTime: " << renderTimeSamples[i] << " sleepTime: " << sleepTimeSamples[i];
-		}
-		Sleep(100);
-		exit(0);*/
-
 		currentStats.fps = fps;
 	}
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../render/Common.h"
+
 #include "vdfs/fileIndex.h"
 #include "zenload/zTypes.h"
 #include "zenload/zCProgMeshProto.h"
@@ -20,7 +22,10 @@ namespace assets
 		std::vector<ZenLib::ZenLoad::PackedMesh> attachementsPacked;
 	};
 
-	const MeshData& getOrParseMesh(ZenLib::VDFS::FileIndex& vdf, std::string meshName, bool pack);
-	const MeshLibData& getOrParseMeshLib(ZenLib::VDFS::FileIndex& vdf, std::string meshName, bool pack);
+	const MeshData& getOrParseMesh(ZenLib::VDFS::FileIndex& vdf, const std::string& meshName, bool pack);
+	const MeshLibData& getOrParseMeshLib(ZenLib::VDFS::FileIndex& vdf, const std::string& meshName, bool pack);
+
+	render::TexId getTexId(const std::string& texName);
+	std::string_view getTexName(render::TexId texId);
 }
 

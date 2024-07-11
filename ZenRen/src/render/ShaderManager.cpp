@@ -55,6 +55,7 @@ namespace render {
 				{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1 },
 				{ "NORMAL", 1, DXGI_FORMAT_R32G32B32_FLOAT, 1 },
 				{ "TEXCOORD", 2, DXGI_FORMAT_R32_FLOAT, 1 },
+				{ "TEXCOORD", 3, DXGI_FORMAT_R32_UINT, 2 },
 			};
 			shaders[shaderName] = new Shader(d3d, filePath(shaderName), layoutDesc);
 		} {

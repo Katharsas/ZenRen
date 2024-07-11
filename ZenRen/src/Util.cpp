@@ -13,6 +13,8 @@
 
 namespace util
 {
+	using std::string;
+
 	std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
 
 	const std::wstring utf8ToWide(const std::string& string)
@@ -112,12 +114,12 @@ namespace util
 		return wideToUtf8(wide);
 	}
 
-	std::string replaceExtension(const std::string& filename, const std::string& extension) {
+	std::string replaceExtension(const std::string_view filename, const std::string_view extension) {
 		size_t lastdot = filename.find_last_of(".");
 		if (lastdot == std::string::npos) {
-			return filename + extension;
+			return string(filename) + string(extension);
 		}
-		return filename.substr(0, lastdot) + extension;
+		return string(filename.substr(0, lastdot)) + string(extension);
 	}
 
 	bool handleHr(const HRESULT& hr, const std::string& message, bool throwOnError) {

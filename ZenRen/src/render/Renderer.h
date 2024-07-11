@@ -66,6 +66,24 @@ namespace render
 		}
 	};
 
+	struct MeshBatch {
+		// we could wrap this in a normal Texture object to make it more similar to unbatched meshes
+		ID3D11ShaderResourceView* texColorArray;
+
+		int32_t vertexCount = 0;
+		ID3D11Buffer* vertexBufferPos = nullptr;
+		ID3D11Buffer* vertexBufferOther = nullptr;
+		ID3D11Buffer* vertexBufferTexIndices = nullptr;// indices into texture array (base color textures)
+
+		void release()
+		{
+			render::release(texColorArray);
+			render::release(vertexBufferPos);
+			render::release(vertexBufferOther);
+			render::release(vertexBufferTexIndices);
+		}
+	};
+
 	struct PrepassMeshes
 	{
 		ID3D11Buffer* vertexBufferPos = nullptr;

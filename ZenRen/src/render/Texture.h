@@ -2,6 +2,7 @@
 
 #include <string>
 #include "dx11.h"
+#include "Common.h"
 
 namespace render
 {
@@ -13,11 +14,11 @@ namespace render
 		Texture(D3d d3d, const std::string& sourceFile, bool sRgb = true);
 		Texture(D3d d3d, std::vector<uint8_t>& ddsRaw, bool isGothicZTex, const std::string& name, bool sRgb = true);
 		~Texture();
-		ID3D11ShaderResourceView* GetResourceView();
-		bool hasAlpha();
+		ID3D11ShaderResourceView* GetResourceView() const;
+		TexInfo getInfo() const;
 	private:
 		ID3D11ShaderResourceView* resourceView = nullptr;
-		bool hasAlpha_ = false;
+		TexInfo info;
 	};
 }
 

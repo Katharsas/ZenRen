@@ -3,6 +3,7 @@
 
 #include <filesystem>
 
+#include "AssetCache.h"
 #include "render/MeshUtil.h"
 #include "../Util.h"
 #include "render/RenderUtil.h"
@@ -126,7 +127,7 @@ namespace assets
 					const auto texFilepath = std::filesystem::path(texture);
 					const auto texFilename = ::util::toString(texFilepath.filename());
 
-					Material material = { ::util::asciiToLower(texFilename) };
+					Material material = { getTexId(::util::asciiToLower(texFilename)) };
 					insert(matsToVertices, material, facePos, faceOther);
 					faceCount++;
 				}

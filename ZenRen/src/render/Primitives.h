@@ -86,3 +86,5 @@ inline std::ostream& operator <<(std::ostream& os, const NORMAL_CL_UV_LUV_STATIC
 {
 	return os << "[NOR:" << that.normal << " COL_LIGHT:" << that.colLight << " DIR_LIGHT:" << that.dirLight << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
 }
+
+typedef uint32_t TEX_INDEX;

@@ -9,6 +9,7 @@ namespace assets
 	namespace fs = std::filesystem;
 	using namespace ::ZenLib;
 	using std::string;
+	using std::string_view;
 
 	/*
 	struct path_hash {
@@ -51,8 +52,8 @@ namespace assets
 		return vdf->hasFile(assetName);
 	}
 
-	std::optional<const fs::path*> existsAsFile(const string& assetName) {
-		auto it = assetNamesToPaths.find(assetName);
+	std::optional<const fs::path*> existsAsFile(const string_view assetName) {
+		auto it = assetNamesToPaths.find(string(assetName));
 		if (it != assetNamesToPaths.end()) {
 			return &(it->second);
 		}

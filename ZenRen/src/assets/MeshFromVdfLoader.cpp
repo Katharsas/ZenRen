@@ -3,6 +3,7 @@
 
 #include <filesystem>
 
+#include "AssetCache.h"
 #include "render/MeshUtil.h"
 #include "../Util.h"
 
@@ -64,17 +65,19 @@ namespace assets
     {
         const auto& texture = material.texture;
         if (!texture.empty()) {
-            Material material = { ::util::asciiToLower(texture) };
+            Material material = { getTexId(::util::asciiToLower(texture)) };
             insert(target, material, positions, other);
         }
     }
 
-    void loadWorldMesh(
+    void loadWorldMeshSingle(
         VERTEX_DATA_BY_MAT& target,
-        ZenLoad::zCMesh* worldMesh)
+        ZenLoad::zCMesh* worldMesh, uint32_t loadIndex)
     {
         ZenLoad::PackedMesh packedMesh;
         worldMesh->packMesh(packedMesh, G_ASSET_RESCALE);
+
+        LOG(DEBUG) << "World Mesh: Loading " << packedMesh.subMeshes.size() << " Sub-Meshes.";
 
         for (const auto& submesh : packedMesh.subMeshes) {
             if (submesh.indices.empty()) {
@@ -82,6 +85,9 @@ namespace assets
             }
             if (submesh.triangleLightmapIndices.empty()) {
                 throw std::logic_error("Expected world mesh to have lightmap information!");
+            }
+            if (submesh.triangleLightmapIndices.size() != (submesh.indices.size() / 3)) {
+                ::util::throwError("Expected one lightmap index per face (with value -1 for non-lightmapped faces).");
             }
 
             // at least in debug, resize & at-assignment is much faster than reserve & insert/copy, and we don't need temp array for flipping face order
@@ -95,24 +101,28 @@ namespace assets
                 const array zenFace = getFaceVerts(packedMesh.vertices, submesh.indices, indicesIndex);
 
                 ZenLoad::Lightmap lightmap;
-                const int16_t faceLightmapIndex = submesh.triangleLightmapIndices[faceIndex];
-                if (faceLightmapIndex != -1) {
-                    lightmap = worldMesh->getLightmapReferences()[faceLightmapIndex];
+                const int16_t lightmapIndex = submesh.triangleLightmapIndices[faceIndex];
+                bool hasLightmap = lightmapIndex != -1;
+                if (hasLightmap) {
+                    lightmap = worldMesh->getLightmapReferences()[lightmapIndex];
                 }
 
                 for (uint32_t i = 0; i < 3; i++) {
                     const auto& zenVert = zenFace[i];
                     VERTEX_POS pos;
                     pos = from(zenVert.Position);
+                    pos.x += (loadIndex * 1);
+                    pos.x += (loadIndex * 0.5f);
+                    pos.z += (loadIndex * 0.3f);
                     VERTEX_OTHER other;
                     other.normal = from(zenVert.Normal);
                     other.uvDiffuse = from(zenVert.TexCoord);
                     other.colLight = fromSRGB(D3DXCOLOR(zenVert.Color));
                     //other.colLight = D3DXCOLOR(1, 1, 1, 0.f);
                     other.dirLight = { -100.f, -100.f, -100.f };// value that is easy to check as not normalized in shader
-                    other.lightSun = faceLightmapIndex == -1 ? 1.f : 0.f;
+                    other.lightSun = hasLightmap ? 0.f : 1.0f;
 
-                    if (faceLightmapIndex == -1) {
+                    if (!hasLightmap) {
                         other.uvLightmap = { 0, 0, -1 };
                     }
                     else {
@@ -135,6 +145,16 @@ namespace assets
             }
 
             insert(target, submesh.material, facesPos, facesOther);
+        }
+    }
+
+    void loadWorldMesh(
+        VERTEX_DATA_BY_MAT& target,
+        ZenLoad::zCMesh* worldMesh)
+    {
+        uint32_t instances = 1;
+        for (uint32_t i = 0; i < instances; ++i) {
+            loadWorldMeshSingle(target, worldMesh, i);
         }
     }
 

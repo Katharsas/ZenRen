@@ -3,7 +3,6 @@
 
 #include <comdef.h>
 
-#include "Common.h"
 #include "../Util.h"
 
 #include "magic_enum/magic_enum.hpp"
@@ -139,6 +138,21 @@ namespace render {
 		throwOnError(hr, name);
 	}
 
+	TexInfo createInfo(const ScratchImage& image, bool hasAlpha, ID3D11ShaderResourceView* srv) {
+		TexInfo info;
+		info.hasAlpha = hasAlpha;
+		info.width = (uint16_t) image.GetMetadata().width;
+		info.height = (uint16_t) image.GetMetadata().height;
+		info.mipLevels = (uint16_t) image.GetImageCount();
+
+		// format for correct color space is determined by DirectX::CreateShaderResourceViewEx, so we cannot get it from ScratchImage
+		D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
+		srv->GetDesc(&srvDesc);
+		info.format = srvDesc.Format;
+
+		return info;
+	}
+
 	Texture::Texture(D3d d3d, const std::string& sourceFile, bool sRgb)
 	{
 		auto name = util::asciiToLower(sourceFile);
@@ -155,12 +169,17 @@ namespace render {
 			hr = LoadFromWICFile(sourceFileW.c_str(), DirectX::WIC_FLAGS_NONE, &metadata, image);
 			throwOnError(hr, name);
 		}
+		else {
+			throwError("Texture file format not supported!");
+		}
 
 		createMipmapsIfMissing(&image, name);
 
-		DirectX::TEX_ALPHA_MODE alphaMode = metadata.GetAlphaMode();
-		hasAlpha_ = alphaMode != DirectX::TEX_ALPHA_MODE::TEX_ALPHA_MODE_OPAQUE;
 		createSetSrv(d3d, image, name, sRgb, &resourceView);
+
+		DirectX::TEX_ALPHA_MODE alphaMode = metadata.GetAlphaMode();
+		bool hasAlpha = alphaMode != DirectX::TEX_ALPHA_MODE::TEX_ALPHA_MODE_OPAQUE;
+		info = createInfo(image, hasAlpha, resourceView);
 	}
 
 	Texture::Texture(D3d d3d, std::vector<uint8_t>& ddsRaw, bool isGothicZTex, const std::string& name, bool sRgb)
@@ -183,8 +202,10 @@ namespace render {
 			createMipmapsIfMissing(&image, name);
 		}
 
-		hasAlpha_ = hasAlphaData(ddPixelFormat, metadata, name);
 		createSetSrv(d3d, image, name, sRgb, &resourceView);
+
+		bool hasAlpha = hasAlphaData(ddPixelFormat, metadata, name);
+		info = createInfo(image, hasAlpha, resourceView);
 	}
 
 	Texture::~Texture()
@@ -192,12 +213,12 @@ namespace render {
 		release(resourceView);
 	}
 
-	ID3D11ShaderResourceView* Texture::GetResourceView()
+	ID3D11ShaderResourceView* Texture::GetResourceView() const
 	{
 		return resourceView;
 	}
 
-	bool Texture::hasAlpha() {
-		return hasAlpha_;
+	TexInfo Texture::getInfo() const {
+		return info;
 	}
 }
