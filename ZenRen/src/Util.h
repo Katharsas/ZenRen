@@ -44,7 +44,7 @@ namespace util
 	void throwError(const std::string& message);
 
 	template<typename Item>
-	void insert(std::vector<Item>& target, std::vector<Item> source) {
+	void insert(std::vector<Item>& target, const std::vector<Item>& source) {
 		target.insert(target.end(), source.begin(), source.end());
 	}
 

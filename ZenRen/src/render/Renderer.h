@@ -48,11 +48,16 @@ namespace render
 		}
 	};
 
+	struct VertexBuffer {
+		const uint32_t stride = -1;
+		ID3D11Buffer* buffer = nullptr;
+	};
+
 	struct Mesh
 	{
-		ID3D11Buffer* vertexBufferPos = nullptr;
-		ID3D11Buffer* vertexBufferOther = nullptr;
 		int32_t vertexCount = 0;
+		VertexBuffer vbPos = { sizeof(VERTEX_POS) };
+		VertexBuffer vbOther = { sizeof(VERTEX_OTHER) };
 
 		// Ideally, we could not create one mesh per texture, but instead have a single mesh for whole world.
 		// This would require us to map every texture used for the mesh to an offset into the vertex buffer.
@@ -61,8 +66,8 @@ namespace render
 
 		void release()
 		{
-			render::release(vertexBufferPos);
-			render::release(vertexBufferOther);
+			render::release(vbPos.buffer);
+			render::release(vbOther.buffer);
 		}
 	};
 
@@ -71,27 +76,27 @@ namespace render
 		ID3D11ShaderResourceView* texColorArray;
 
 		int32_t vertexCount = 0;
-		ID3D11Buffer* vertexBufferPos = nullptr;
-		ID3D11Buffer* vertexBufferOther = nullptr;
-		ID3D11Buffer* vertexBufferTexIndices = nullptr;// indices into texture array (base color textures)
+		VertexBuffer vbPos = { sizeof(VERTEX_POS) };
+		VertexBuffer vbOther = { sizeof(VERTEX_OTHER) };
+		VertexBuffer vbTexIndices = { sizeof(TEX_INDEX) };// indices into texture array (base color textures)
 
 		void release()
 		{
 			render::release(texColorArray);
-			render::release(vertexBufferPos);
-			render::release(vertexBufferOther);
-			render::release(vertexBufferTexIndices);
+			render::release(vbPos.buffer);
+			render::release(vbOther.buffer);
+			render::release(vbTexIndices.buffer);
 		}
 	};
 
 	struct PrepassMeshes
 	{
-		ID3D11Buffer* vertexBufferPos = nullptr;
 		int32_t vertexCount = 0;
+		VertexBuffer vbPos = { sizeof(VERTEX_POS) };
 
 		void release()
 		{
-			render::release(vertexBufferPos);
+			render::release(vbPos.buffer);
 		}
 	};
 

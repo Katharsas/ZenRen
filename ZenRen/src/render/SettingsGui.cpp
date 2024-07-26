@@ -20,6 +20,10 @@ namespace render::gui::settings {
 	{
 		addSettings("Renderer", {
 			[&]()  -> void {
+				ImGui::PushItemWidth(GUI_ELEMENT_WIDTH);
+				ImGui::SliderFloat("##ViewDistance", &settings.viewDistance, 1, 2000, "%.0f View Distance");
+				ImGui::PopItemWidth();
+
 				ImGui::Checkbox("Wireframe Mode", &settings.wireframe);
 				ImGui::PushStyleColorDebugText();
 				ImGui::Checkbox("Reverse Z", &settings.reverseZ);

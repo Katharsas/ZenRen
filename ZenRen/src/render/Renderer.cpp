@@ -259,7 +259,7 @@ namespace render
 		//}
 		reinitRenderer(renderState);
 
-		camera::updateCamera(settings.reverseZ, renderSize);
+		camera::updateCamera(settings.reverseZ, renderSize, settings.viewDistance);
 
 		// foward pipeline renders scene to linear backbuffer
 		forward::draw(d3d, shaders, settings);

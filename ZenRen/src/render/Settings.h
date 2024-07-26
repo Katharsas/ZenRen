@@ -16,6 +16,8 @@ namespace render
 	};
 
 	struct RenderSettings {
+		float viewDistance = 1000;
+
 		bool wireframe = false;
 		bool reverseZ = true;
 

@@ -26,10 +26,9 @@ namespace render::pass::sky
     };
 
     typedef VEC3 VERTEX_POS;
-    typedef LAYER_UVS VERTEX_OTHER;
     struct VEC_VERTEX_DATA {
         std::vector<VERTEX_POS> vecPos;
-        std::vector<VERTEX_OTHER> vecOther;
+        std::vector<LAYER_UVS> vecOther;
     };
 
     __declspec(align(16))
@@ -52,7 +51,19 @@ namespace render::pass::sky
     array<UV, 2> lastUvMin = { UV { 0, 0 }, UV { 0, 0 } };
     array<UV, 2> lastUvMax = { UV { 0, 0 }, UV { 0, 0 } };
 
-    Mesh mesh;
+    struct SkyMesh
+    {
+        int32_t vertexCount = 0;
+        VertexBuffer vbPos = { sizeof(VERTEX_POS) };
+        VertexBuffer vbUvs = { sizeof(LAYER_UVS) };
+
+        void release()
+        {
+            render::release(vbPos.buffer);
+            render::release(vbUvs.buffer);
+        }
+    } mesh;
+
     struct SkyTexture {
         std::string name;
         Texture* tex;
@@ -119,7 +130,7 @@ namespace render::pass::sky
             }
 
             mesh.vertexCount = facesPos.size();
-            util::createVertexBuffer(d3d, &mesh.vertexBufferPos, facesPos);
+            util::createVertexBuffer(d3d, &mesh.vbPos.buffer, facesPos);
         } {
             // textures
             // TODO original game has (and mods could have even more) sky variants (A0, A1, ..)
@@ -136,7 +147,7 @@ namespace render::pass::sky
 
     void updateSkyUvs(D3d d3d)
     {
-        vector<VERTEX_OTHER> facesOther;
+        vector<LAYER_UVS> facesOther;
         const auto& baseUvs = createSkyUvs(lastUvMin[0], lastUvMax[0]);
         const auto& overlayUvs = createSkyUvs(lastUvMin[1], lastUvMax[1]);
         auto it = overlayUvs.begin();
@@ -149,8 +160,7 @@ namespace render::pass::sky
         }
         
         assert(mesh.vertexCount == facesOther.size());
-        release(mesh.vertexBufferOther);
-        util::createVertexBuffer(d3d, &mesh.vertexBufferOther, facesOther);
+        util::createVertexBuffer(d3d, mesh.vbUvs, facesOther);
     }
 
     void swapUvsIfSwapOccured(bool swapLayers) {
@@ -226,11 +236,7 @@ namespace render::pass::sky
         }
         
         // vertex buffer
-        UINT strides[] = { sizeof(VERTEX_POS), sizeof(VERTEX_OTHER) };
-        UINT offsets[] = { 0, 0 };
-        ID3D11Buffer* vertexBuffers[] = { mesh.vertexBufferPos, mesh.vertexBufferOther };
-
-        d3d.deviceContext->IASetVertexBuffers(0, std::size(vertexBuffers), vertexBuffers, strides, offsets);
+        util::setVertexBuffers(d3d, array { mesh.vbPos , mesh.vbUvs });
         d3d.deviceContext->Draw(mesh.vertexCount, 0);
     }
 

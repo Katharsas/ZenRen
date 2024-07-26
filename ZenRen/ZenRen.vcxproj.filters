@@ -50,6 +50,9 @@
     <None Include="Shaders\sky.hlsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="Shaders\mainPassTexOnly.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Util.cpp">

@@ -102,6 +102,10 @@ namespace assets
 				LOG(DEBUG) << "Loading VDF: " << filename;
 				vdf->loadVDF(path.string());
 			}
+			if (util::endsWith(filename, ".mod")) {
+				LOG(DEBUG) << "Loading MOD: " << filename;
+				vdf->loadVDF(path.string());
+			}
 		});
 
 		vdf->finalizeLoad();

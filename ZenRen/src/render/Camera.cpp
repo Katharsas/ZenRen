@@ -52,13 +52,13 @@ namespace render::camera {
 		return location.position;
 	}
 
-	void updateCamera(bool reverseZ, BufferSize& viewportSize) {
+	void updateCamera(bool reverseZ, BufferSize& viewportSize, float viewDistance) {
 		// Set view & projection matrix
 		matrices.view = XMMatrixLookAtLH(location.position, location.target, location.up);
 
 		const float aspectRatio = static_cast<float>(viewportSize.width) / viewportSize.height;
 		const float nearZ = 0.1f;
-		const float farZ = 1000.0f;
+		const float farZ = viewDistance;
 		matrices.projection = XMMatrixPerspectiveFovLH(0.4f * 3.14f, aspectRatio, reverseZ ? farZ : nearZ, reverseZ ? nearZ : farZ);
 	}
 

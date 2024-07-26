@@ -27,6 +27,7 @@ namespace render::pass::world
 	using namespace DirectX;
 	using ::std::unordered_map;
 	using ::std::vector;
+	using ::std::array;
 
 	struct World {
 		vector<PrepassMeshes> prepassMeshes;
@@ -62,6 +63,11 @@ namespace render::pass::world
 
 	vector<Texture*> debugTextures;
 	int32_t selectedDebugTexture = 0;
+
+	const bool debugWorldShaderEnabled = false;
+
+	const TEX_INDEX texturesPerBatch = 1024;
+
 
 	void updateTimeOfDay(float timeOfDay) {
 		// clamp, wrap around if negative
@@ -151,7 +157,7 @@ namespace render::pass::world
 		}
 		PrepassMeshes mesh;
 		mesh.vertexCount = allVerts.size();
-		util::createVertexBuffer(d3d, &mesh.vertexBufferPos, allVerts);
+		util::createVertexBuffer(d3d, mesh.vbPos, allVerts);
 		target.push_back(mesh);
 
 		return { 1, vertCount };
@@ -205,9 +211,9 @@ namespace render::pass::world
 	void loadBatch(D3d d3d, vector<MeshBatch>& target, TexInfo batchInfo, const VEC_VERTEX_DATA_BATCH& batchData) {
 		MeshBatch batch;
 		batch.vertexCount = batchData.vecPos.size();
-		util::createVertexBuffer(d3d, &batch.vertexBufferPos, batchData.vecPos);
-		util::createVertexBuffer(d3d, &batch.vertexBufferOther, batchData.vecNormalUv);
-		util::createVertexBuffer(d3d, &batch.vertexBufferTexIndices, batchData.texIndices);
+		util::createVertexBuffer(d3d, batch.vbPos, batchData.vecPos);
+		util::createVertexBuffer(d3d, batch.vbOther, batchData.vecNormalUv);
+		util::createVertexBuffer(d3d, batch.vbTexIndices, batchData.texIndices);
 		createTexArray(d3d, &batch.texColorArray, batchInfo, batchData.texIndexedIds);
 		target.push_back(batch);
 	}
@@ -225,7 +231,6 @@ namespace render::pass::world
 			}
 		}
 
-		const TEX_INDEX texturesPerBatch = 128;
 		LoadResult result;
 
 		// create batches
@@ -257,9 +262,11 @@ namespace render::pass::world
 			}
 
 			// create batch for leftover textures from this bucket
-			loadBatch(d3d, target, info, batchData);
-			result.loadedDraws++;
-			result.loadedVerts += batchData.vecPos.size();
+			if (!batchData.vecPos.empty()) {
+				loadBatch(d3d, target, info, batchData);
+				result.loadedDraws++;
+				result.loadedVerts += batchData.vecPos.size();
+			}
 		}
 
 		return result;
@@ -380,6 +387,7 @@ namespace render::pass::world
 		for (auto& tex : textureCache) {
 			delete tex.second;
 		}
+		textureCache.clear();
 	}
 
 	void updateObjects(float deltaTime)
@@ -460,41 +468,59 @@ namespace render::pass::world
 		}
 	}
 
-	void drawVertexBuffersPosOnly(D3d d3d, vector<PrepassMeshes> batches)
-	{
-		UINT strides[] = { sizeof(VERTEX_POS) };
-		UINT offsets[] = { 0 };
-		for (auto& batch : batches) {
-			ID3D11Buffer* vertexBuffers[] = { batch.vertexBufferPos };
-			d3d.deviceContext->IASetVertexBuffers(0, std::size(vertexBuffers), vertexBuffers, strides, offsets);
-			d3d.deviceContext->Draw(batch.vertexCount, 0);
-		}
-	}
+	// Let the template madness begin!
+	// Note: What should really happen here is that i accept that it is ok to have dynamic number of VertexBuffers per mesh at runtime.
+	
+	template <typename Mesh>
+	using GetTexSrv = ID3D11ShaderResourceView* (*) (const Mesh&);
 
-	void drawVertexBuffersNoTex(D3d d3d, vector<MeshBatch> batches)
-	{
-		UINT strides[] = { sizeof(VERTEX_POS), sizeof(VERTEX_OTHER) };
-		UINT offsets[] = { 0, 0 };
-		for (auto& batch : batches) {
-			ID3D11Buffer* vertexBuffers[] = { batch.vertexBufferPos, batch.vertexBufferOther };
-			d3d.deviceContext->IASetVertexBuffers(0, std::size(vertexBuffers), vertexBuffers, strides, offsets);
-			d3d.deviceContext->Draw(batch.vertexCount, 0);
-		}
-	}
+	template <typename Mesh, int VbCount>
+	using GetVertexBuffers = array<VertexBuffer, VbCount> (*) (const Mesh&);
 
-	void drawVertexBuffersFull(D3d d3d, vector<MeshBatch> batches)
-	{
-		UINT strides[] = { sizeof(VERTEX_POS), sizeof(VERTEX_OTHER), sizeof(TEX_INDEX) };
-		UINT offsets[] = { 0, 0, 0 };
-		for (auto& batch : batches) {
-			auto* resourceView = batch.texColorArray;
-			d3d.deviceContext->PSSetShaderResources(0, 1, &resourceView);
+	ID3D11ShaderResourceView* batchGetTex(const MeshBatch& mesh) { return mesh.texColorArray; }
 
-			ID3D11Buffer* vertexBuffers[] = { batch.vertexBufferPos, batch.vertexBufferOther, batch.vertexBufferTexIndices };
-			d3d.deviceContext->IASetVertexBuffers(0, std::size(vertexBuffers), vertexBuffers, strides, offsets);
-			d3d.deviceContext->Draw(batch.vertexCount, 0);
+	array<VertexBuffer, 1> prepassGetVbPos(const PrepassMeshes& mesh) { return { mesh.vbPos }; }
+	array<VertexBuffer, 1> batchGetVbPos   (const MeshBatch& mesh) { return { mesh.vbPos }; }
+	array<VertexBuffer, 2> batchGetVbPosTex(const MeshBatch& mesh) { return { mesh.vbPos, mesh.vbTexIndices }; }
+	array<VertexBuffer, 3> batchGetVbAll   (const MeshBatch& mesh) { return { mesh.vbPos, mesh.vbOther, mesh.vbTexIndices }; }
+
+	template<
+		typename Mesh, int VbCount,
+		GetVertexBuffers<Mesh, VbCount> GetVbs,
+		GetTexSrv<Mesh> GetTex
+	>
+	void drawVertexBuffers(D3d d3d, const vector<Mesh>& meshes)
+	{
+		for (auto& mesh : meshes) {
+			if (GetTex != nullptr) {
+				ID3D11ShaderResourceView* srv = GetTex(mesh);
+				d3d.deviceContext->PSSetShaderResources(0, 1, &srv);
+			}
+			util::setVertexBuffers(d3d, GetVbs(mesh));
+			d3d.deviceContext->Draw(mesh.vertexCount, 0);
 		}
-	}
+	};
+
+	template<int VbCount, GetVertexBuffers<MeshBatch, VbCount> GetVbs>
+	void drawVertexBuffersWorld(D3d d3d, bool bindTex)
+	{
+		if (worldSettings.drawWorld) {
+			if (bindTex) {
+				drawVertexBuffers<MeshBatch, VbCount, GetVbs, batchGetTex>(d3d, world.meshBatchesWorld);
+			}
+			else {
+				drawVertexBuffers<MeshBatch, VbCount, GetVbs, nullptr>(d3d, world.meshBatchesWorld);
+			}
+		}
+		if (worldSettings.drawStaticObjects) {
+			if (bindTex) {
+				drawVertexBuffers<MeshBatch, VbCount, GetVbs, batchGetTex>(d3d, world.meshBatchesObjects);
+			}
+			else {
+				drawVertexBuffers<MeshBatch, VbCount, GetVbs, nullptr>(d3d, world.meshBatchesObjects);
+			}
+		}
+	};
 
 	void drawPrepass(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs)
 	{
@@ -504,7 +530,7 @@ namespace render::pass::world
 		d3d.deviceContext->PSSetShader(nullptr, 0, 0);
 		d3d.deviceContext->VSSetConstantBuffers(1, 1, &cbs.cameraCb);
 
-		drawVertexBuffersPosOnly(d3d, world.prepassMeshes);
+		drawVertexBuffers<PrepassMeshes, 1, prepassGetVbPos, nullptr>(d3d, world.prepassMeshes);
 	}
 
 	void drawWireframe(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs)
@@ -514,19 +540,21 @@ namespace render::pass::world
 		d3d.deviceContext->VSSetShader(shader->getVertexShader(), 0, 0);
 		d3d.deviceContext->PSSetShader(shader->getPixelShader(), 0, 0);
 		d3d.deviceContext->VSSetConstantBuffers(1, 1, &cbs.cameraCb);
-
-		if (worldSettings.drawWorld) {
-			drawVertexBuffersNoTex(d3d, world.meshBatchesWorld);
-		}
-		if (worldSettings.drawStaticObjects) {
-			drawVertexBuffersNoTex(d3d, world.meshBatchesObjects);
-		}
+		
+		drawVertexBuffersWorld<1, batchGetVbPos>(d3d, false);
 	}
 
 	void drawWorld(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs)
 	{
 		// set the shader objects avtive
-		Shader* shader = shaders->getShader("mainPass");
+		Shader* shader;
+		if (debugWorldShaderEnabled) {
+			shader = shaders->getShader("mainPassTexOnly");
+		}
+		else {
+			shader = shaders->getShader("mainPass");
+		}
+		
 		d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
 		d3d.deviceContext->VSSetShader(shader->getVertexShader(), 0, 0);
 		d3d.deviceContext->PSSetShader(shader->getPixelShader(), 0, 0);
@@ -542,11 +570,12 @@ namespace render::pass::world
 		// lightmaps
 		d3d.deviceContext->PSSetShaderResources(1, 1, &lightmapTexArray);
 
-		if (worldSettings.drawWorld) {
-			drawVertexBuffersFull(d3d, world.meshBatchesWorld);
+		if (debugWorldShaderEnabled) {
+			//drawVertexBuffersWorld<2, batchGetVbPosTex>(d3d, true);
+			drawVertexBuffersWorld<3, batchGetVbAll>(d3d, true);
 		}
-		if (worldSettings.drawStaticObjects) {
-			drawVertexBuffersFull(d3d, world.meshBatchesObjects);
+		else {
+			drawVertexBuffersWorld<3, batchGetVbAll>(d3d, true);
 		}
 	}
 
