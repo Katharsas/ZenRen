@@ -156,8 +156,6 @@ namespace render
 			[]() -> void {
 				const std::string vram = "VRAM: " + render::util::getVramUsage(dx12.adapter);
 				ImGui::Text(vram.c_str());
-				const std::string fps = "FPS:  " + std::to_string(viewer::stats::getCurrentStats().fps);
-				ImGui::Text(fps.c_str());
 			}
 		});
 

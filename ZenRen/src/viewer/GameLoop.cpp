@@ -16,20 +16,40 @@
 namespace viewer
 {
 	struct Settings {
-		// frame limiter
 		bool frameLimiterEnabled = true;
 		int32_t frameLimit = 60;
-	};
+	}
+	settings;
 
-	Settings settings;
-	stats::FrameSample frameTime;
-
+	struct FrameTimes {
+		stats::TimeSampler full;
+		stats::TimeSampler update;
+		stats::TimeSampler render;
+		stats::TimeSampler wait;
+	}
+	frameTimes;
 
 	void init(HWND hWnd, Arguments args, uint32_t width, uint32_t height)
 	{
 		enablePreciseTimerResolution();
 		initMicrosleep();
 
+		render::addInfo("", {
+			[]() -> void {
+				uint32_t fullTime = stats::getSampleStats(frameTimes.full).averageMicros;
+				uint32_t updateTime = stats::getSampleStats(frameTimes.update).averageMicros;
+				uint32_t renderTime = stats::getSampleStats(frameTimes.render).averageMicros;
+				
+				const int32_t fpsReal = 1000000 / fullTime;
+
+				std::string microSymbol = util::fromU8(u8"µm");
+				std::stringstream buffer;
+				buffer << "Perf:  " << util::leftPad(std::to_string(fpsReal), 4) << " FPS" << std::endl;
+				buffer << "  Render: " + util::leftPad(std::to_string(renderTime), 4) << " " << microSymbol << std::endl;
+				buffer << "  Update: " + util::leftPad(std::to_string(updateTime), 4) << " " << microSymbol << std::endl;
+				ImGui::Text(buffer.str().c_str());
+			}
+		});
 		render::addSettings("FPS Limiter", {
 			[]() -> void {
 				ImGui::Checkbox("Enabled", &settings.frameLimiterEnabled);
@@ -58,28 +78,31 @@ namespace viewer
 		}
 
 		LOG(DEBUG) << "Statistics in microseconds";
+
+		frameTimes.full.start();
 	}
 
 	void renderAndSleep()
 	{
 		// START RENDER
-		int32_t deltaTimeMicros = frameTime.updateStart();
-		float deltaTime = (float)deltaTimeMicros / 1000000;
+		float deltaTime = (float) frameTimes.full.sampleRestart() / 1000000;
+		frameTimes.update.start(frameTimes.full.last);
 
 		processUserInput(deltaTime);
 		render::update(deltaTime);
 
-		frameTime.updateEndRenderStart();
+		stats::sampleAndStart(frameTimes.update, frameTimes.render);
 
 		render::renderFrame();
 
-		frameTime.renderEndSleepStart();
+		stats::sampleAndStart(frameTimes.render, frameTimes.wait);
+
 		int32_t frameTimeTarget = 0;
 		
 		if (settings.frameLimiterEnabled)
 		{
 			frameTimeTarget = 1000000 / settings.frameLimit;
-			const int32_t sleepTarget = frameTimeTarget - frameTime.renderTimeMicros;
+			const int32_t sleepTarget = frameTimeTarget - (frameTimes.update.lastTimeMicros + frameTimes.render.lastTimeMicros);
 			if (sleepTarget > 0)
 			{
 				// sleep_for can wake up about once every 1,4ms
@@ -90,8 +113,7 @@ namespace viewer
 			}
 		}
 
-		frameTime.sleepEnd();
-		stats::addFrameSample(frameTime, frameTimeTarget);
+		frameTimes.wait.sample();
 	}
 
 	void onWindowResized(uint32_t width, uint32_t height)

@@ -5,13 +5,20 @@
 
 namespace viewer::stats
 {
-	int32_t toDurationMicros(const std::chrono::steady_clock::time_point start, const std::chrono::steady_clock::time_point end) {
+	using std::array;
+	using std::vector;
+	using std::pair;
+	using std::chrono::steady_clock;
+
+	uint32_t toDurationMicros(const std::chrono::steady_clock::time_point start, const std::chrono::steady_clock::time_point end) {
 		const auto duration = end - start;
-		return static_cast<int32_t> (duration / std::chrono::microseconds(1));
+		assert(duration.count() > 0);
+		return static_cast<uint32_t> (duration / std::chrono::microseconds(1));
 	}
-	int32_t toDurationMillis(const std::chrono::steady_clock::time_point start, const std::chrono::steady_clock::time_point end) {
+	uint32_t toDurationMillis(const std::chrono::steady_clock::time_point start, const std::chrono::steady_clock::time_point end) {
 		const auto duration = end - start;
-		return static_cast<int32_t> (duration / std::chrono::milliseconds(1));
+		assert(duration.count() > 0);
+		return static_cast<uint32_t> (duration / std::chrono::milliseconds(1));
 	}
 
 	struct LoggingSettings
@@ -30,19 +37,12 @@ namespace viewer::stats
 		// overwrite logging defaults here
 	};
 
-	// logging
-	const int32_t sampleSize = 1000; // max number of frames before stas are averaged and logged
-	const int32_t maxDurationMillis = 1000; // max ms duration before stats are averaged and logged 
+	const int32_t sampleSize = 1000; // max number of frames before samples are averaged to update stats
+	const int32_t maxDurationMillis = 1000; // max ms duration before samples are averaged to update stats
 
-	int32_t sampleIndex = 0;
-	bool isInitialized = false;
-	std::chrono::steady_clock::time_point lastLogged;
-
-	std::array<int32_t, sampleSize> updateTimeSamples;
-	std::array<int32_t, sampleSize> renderTimeSamples;
-	std::array<int32_t, sampleSize> sleepTimeSamples;
-
-	Stats currentStats;
+	vector<array<uint32_t, sampleSize>> sampleBuffers;
+	vector<pair<int32_t, steady_clock::time_point>> lastUpdated;
+	vector<Stats> lastStats;
 
 
 	int32_t divideOrZero(float dividend, int32_t divisor)
@@ -51,104 +51,49 @@ namespace viewer::stats
 		else return static_cast<int32_t>(dividend / divisor);
 	}
 
-	int32_t average(const std::array<int32_t, sampleSize>& arr, int32_t sampleCount)
+	uint32_t average(const std::array<uint32_t, sampleSize>& samples, uint32_t sampleCount)
 	{
-		return std::accumulate(arr.begin(), (arr.begin() + sampleCount), 0) / sampleCount;
+		return std::accumulate(samples.begin(), (samples.begin() + sampleCount), 0) / sampleCount;
 	}
 
-	void logStats(int32_t frameTimeTarget, int32_t sampleCount)
+	void createSampler(TimeSampler& sampler)
 	{
-		// log fps and frame times
-		const int32_t averageUpdateTime = average(updateTimeSamples, sampleCount);
-		const int32_t averageRenderTime = average(renderTimeSamples, sampleCount);
-		const int32_t averageSleepTime = average(sleepTimeSamples, sampleCount);
-		const int32_t fps = 1000000 / (averageRenderTime + averageSleepTime);
-
-		if (settings.detailedLoggingEnabled) {
-
-			// log frame time divergence
-			int32_t higherFrameTimeCount = 0;
-			float higherFrameTimePercentSum = 0;
-
-			int32_t lowerFrameTimeCount = 0;
-			float lowerFrameTimePercentSum = 0;
-
-			int32_t frameTimeOffCount = 0;
-			int32_t frameTimeOffSum = 0;
-
-			for (int i = 0; i < sampleCount; i++)
-			{
-				const int32_t ft = renderTimeSamples[i] + sleepTimeSamples[i];
-				const int32_t off = ft - frameTimeTarget;
-				frameTimeOffCount++;
-				if (off > 0)
-				{
-					frameTimeOffSum += off;
-					higherFrameTimePercentSum += (float)off / frameTimeTarget;
-					higherFrameTimeCount++;
-				}
-				else
-				{
-					frameTimeOffSum -= off;
-					lowerFrameTimePercentSum -= (float)off / frameTimeTarget;
-					lowerFrameTimeCount++;
-				}
-			}
-			const int32_t offAverage = frameTimeOffSum / frameTimeOffCount;
-			const int32_t averageHigherPermille = divideOrZero(higherFrameTimePercentSum * 1000, higherFrameTimeCount);
-			const int32_t averageLowerPermille = divideOrZero(lowerFrameTimePercentSum * 1000, lowerFrameTimeCount);
-			const int32_t averagePromille = (int32_t)((higherFrameTimePercentSum + lowerFrameTimePercentSum) * 1000) / (higherFrameTimeCount + lowerFrameTimeCount);
-
-			bool frameLimiterEnabled = frameTimeTarget != 0;
-			const std::string splitter = " | ";
-			std::stringstream log;
-			if (settings.fps)					log << "FPS: " << fps << splitter;
-			if (settings.renderTime)			log << "frameTime (update + render): " << (averageUpdateTime + averageRenderTime)
-				<< " (" << averageUpdateTime << " + " << averageRenderTime << ") " << splitter;
-
-			if (frameLimiterEnabled) {
-				if (settings.sleepTime)				log << "sleepTime: " << averageSleepTime << splitter;
-				if (settings.offsetTime)			log << "offsetTime: " << offAverage << splitter;
-				if (settings.offsetTimePermille)	log << "offsetTime (p): " << averagePromille << splitter;
-				if (settings.offsetPositivePermille) log << "offsetTime too high (p): " << averageHigherPermille << splitter;
-				if (settings.offsetNegativePermille) log << "offsetTime too low (p): " << averageLowerPermille << splitter;
-			}
-
-			LOG(DEBUG) << log.str();
-
-			// uncomment for checking actual frametime distribution for single batch of samples
-			/*for (int i = 0; i < sampleSize; i++)
-			{
-				LOG(DEBUG) << "renderTime: " << renderTimeSamples[i] << " sleepTime: " << sleepTimeSamples[i];
-			}
-			Sleep(100);
-			exit(0);*/
-		}
-		currentStats.fps = fps;
+		sampler.id = (int16_t) sampleBuffers.size();
+		sampleBuffers.push_back({});
+		lastUpdated.push_back({ 0, std::chrono::high_resolution_clock::now() });
+		lastStats.push_back({ 0 });
 	}
 
-	void addFrameSample(FrameSample sample, int32_t frameTimeTarget) {
-		if (!isInitialized) {
-			lastLogged = std::chrono::high_resolution_clock::now();
-			isInitialized = true;
-		}
+	void updateStats(const TimeSamplerId& id, int32_t currentSampleCount)
+	{
+		lastStats[id].averageMicros = average(sampleBuffers[id], currentSampleCount);
+	}
 
-		updateTimeSamples[sampleIndex] = sample.updateTimeMicros;
-		renderTimeSamples[sampleIndex] = sample.renderTimeMicros;
-		sleepTimeSamples[sampleIndex] = sample.sleepTimeMicros;
+	void takeSample(const TimeSampler& sampler, std::chrono::steady_clock::time_point now)
+	{
+		// save sample into buffer
+		assert(sampler.id >= 0 && sampler.id < lastUpdated.size());
+		auto& [currentSampleCount, lastUpdate] = lastUpdated[sampler.id];
 
-		sampleIndex++;
-		int32_t millisSinceLastLogged = toDurationMillis(lastLogged, sample.last);
+		sampleBuffers[sampler.id][currentSampleCount] = sampler.lastTimeMicros;
+		currentSampleCount++;
 
-		if (sampleIndex >= sampleSize || millisSinceLastLogged >= maxDurationMillis)
-		{
-			logStats(frameTimeTarget, sampleIndex);
-			sampleIndex = 0;
-			lastLogged = std::chrono::high_resolution_clock::now();
+		// update stats
+		uint32_t millisSinceLastUpdated = toDurationMillis(lastUpdate, now);
+		if (currentSampleCount >= sampleSize || millisSinceLastUpdated >= maxDurationMillis) {
+			updateStats(sampler.id, currentSampleCount);
+			currentSampleCount = 0;
+			lastUpdate = now;
 		}
 	}
 
-	Stats& getCurrentStats() {
-		return currentStats;
+	Stats getSampleStats(const TimeSampler& sampler) {
+		return lastStats[sampler.id];
+	}
+
+	void sampleAndStart(TimeSampler& toStop, TimeSampler& toStart)
+	{
+		toStop.sample();
+		toStart.start(toStop.last);
 	}
 }
