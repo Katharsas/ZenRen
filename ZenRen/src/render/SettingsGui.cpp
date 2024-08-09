@@ -31,7 +31,7 @@ namespace render::gui::settings {
 				const auto& items = shaderModeItems;
 				auto& selected = shaderModeSelected;
 
-				ImGui::PushItemWidth(120);
+				ImGui::PushItemWidth(120);// TODO whats up with this??
 				if (ImGui::BeginCombo("Shader Mode", selected.c_str()))
 				{
 					for (uint32_t n = 0; n < items.size(); n++)

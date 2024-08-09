@@ -214,6 +214,8 @@ namespace render::pass::sky
 
     void drawSky(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs, ID3D11SamplerState* layerSampler)
     {
+        d3d.annotation->BeginEvent(L"sky");
+
         // set the shader objects avtive
         Shader* shader = shaders->getShader("sky");
         d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
@@ -238,6 +240,8 @@ namespace render::pass::sky
         // vertex buffer
         util::setVertexBuffers(d3d, array { mesh.vbPos , mesh.vbUvs });
         d3d.deviceContext->Draw(mesh.vertexCount, 0);
+
+        d3d.annotation->EndEvent();
     }
 
     void initConstantBuffers(D3d d3d)

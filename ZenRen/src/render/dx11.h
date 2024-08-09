@@ -37,4 +37,5 @@
 struct D3d {
 	ID3D11Device* device;
 	ID3D11DeviceContext* deviceContext;
+	ID3DUserDefinedAnnotation* annotation;
 };

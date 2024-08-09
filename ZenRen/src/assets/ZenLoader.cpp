@@ -38,6 +38,8 @@ namespace assets
     using ::util::endsWith;
     using ::util::FileExt;
 
+    bool loadStaticMeshes = true;
+
     bool debugInstanceMeshBbox = false;
     bool debugInstanceMeshBboxCenter = false;
     bool debugTintVobStaticLight = false;
@@ -406,9 +408,14 @@ namespace assets
 
         auto props = world.properties;
         bool isOutdoorLevel = world.bspTree.mode == ZenLoad::zCBspTreeData::TreeMode::Outdoor;
-        vector<StaticInstance> vobs = loadVobs(world.rootVobs, worldMeshData, lightsStatic, isOutdoorLevel);
-
-        LOG(INFO) << "VOBs loaded!";
+        vector<StaticInstance> vobs;
+        if (loadStaticMeshes) {
+            vobs = loadVobs(world.rootVobs, worldMeshData, lightsStatic, isOutdoorLevel);
+            LOG(INFO) << "VOBs loaded!";
+        }
+        else {
+            LOG(INFO) << "VOB loading disabled!";
+        }
 
         VERTEX_DATA_BY_MAT staticMeshData;
         for (auto& vob : vobs) {
@@ -434,11 +441,11 @@ namespace assets
         const auto duration = std::chrono::high_resolution_clock::now() - now;
         LOG(INFO) << "Loading finished in: " << duration / std::chrono::milliseconds(1) << " ms.";
 
-        return {
-            isOutdoorLevel,
-            worldMeshData,
-            staticMeshData,
-            lightmaps
-        };
+        RenderData result;
+        result.isOutdoorLevel = isOutdoorLevel;
+        result.worldMesh = worldMeshData;
+        result.staticMeshes = staticMeshData;
+        result.worldMeshLightmaps = lightmaps;
+        return result;
 	}
 }

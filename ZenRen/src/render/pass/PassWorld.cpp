@@ -9,13 +9,13 @@
 #include "../Texture.h"
 #include "../Sky.h"
 #include "../RenderUtil.h"
+#include "../PerfStats.h"
 #include "Util.h"
 #include "assets/AssetCache.h"
 #include "assets/AssetFinder.h"
 #include "assets/ZenLoader.h"
 #include "assets/ObjLoader.h"
 #include "assets/TexFromVdfLoader.h"
-
 
 // TODO move to RenderDebugGui
 #include "../Gui.h"
@@ -64,10 +64,28 @@ namespace render::pass::world
 	vector<Texture*> debugTextures;
 	int32_t selectedDebugTexture = 0;
 
-	const bool debugWorldShaderEnabled = false;
+	const TEX_INDEX texturesPerBatch = 256;
+	const uint32_t maxVertsPerDrawCall = 14000000 * 3;
+	uint32_t currentDrawCalls;
 
-	const TEX_INDEX texturesPerBatch = 1024;
+	struct DrawStats {
+		uint32_t stateChanges = 0;
+		uint32_t draws = 0;
+		uint32_t verts = 0;
 
+		auto operator+=(const DrawStats& rhs)
+		{
+			stateChanges += rhs.stateChanges;
+			draws += rhs.draws;
+			verts += rhs.verts;
+		};
+	};
+
+	struct DrawStatSamplers {
+		stats::SamplerId stateChanges;
+		stats::SamplerId draws;
+		stats::SamplerId verts;
+	} samplers;
 
 	void updateTimeOfDay(float timeOfDay) {
 		// clamp, wrap around if negative
@@ -77,6 +95,23 @@ namespace render::pass::world
 
 	void initGui()
 	{
+		samplers = {
+			stats::createSampler(), stats::createSampler(), stats::createSampler()
+		};
+
+		render::addInfo("World", {
+			[]() -> void {
+				uint32_t stateChanges = render::stats::getSamplerStats(samplers.stateChanges).average;
+				uint32_t draws = render::stats::getSamplerStats(samplers.draws).average;
+				uint32_t verts = render::stats::getSamplerStats(samplers.verts).average;
+
+				std::stringstream buffer;
+				buffer << "States/Draws: " << stateChanges << " / " << draws << std::endl;
+				buffer << "Verts: " << verts << std::endl;
+				ImGui::Text(buffer.str().c_str());
+			}
+		});
+
 		addSettings("World", {
 			[&]()  -> void {
 				ImGui::PushItemWidth(GUI_ELEMENT_WIDTH);
@@ -90,8 +125,10 @@ namespace render::pass::world
 				ImGui::PopItemWidth();
 
 				ImGui::PushStyleColorDebugText();
-				ImGui::Checkbox("Draw Worlds", &worldSettings.drawWorld);
+				ImGui::Checkbox("Draw World", &worldSettings.drawWorld);
 				ImGui::Checkbox("Draw VOBs/MOBs", &worldSettings.drawStaticObjects);
+				ImGui::Checkbox("Draw Sky", &worldSettings.drawSky);
+				ImGui::Checkbox("Debug Shader", &worldSettings.debugWorldShaderEnabled);
 				ImGui::PopStyleColor();
 			}
 		});
@@ -460,7 +497,7 @@ namespace render::pass::world
 
 	void drawSky(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs)
 	{
-		if (isOutdoorLevel) {
+		if (isOutdoorLevel && worldSettings.drawSky) {
 			const auto layers = getSkyLayers(worldSettings.timeOfDay);
 			bool swapLayers = getSwapLayers(worldSettings.timeOfDay);
 			sky::updateSkyLayers(d3d, layers, getSkyColor(worldSettings.timeOfDay), worldSettings.timeOfDay, swapLayers);
@@ -489,41 +526,72 @@ namespace render::pass::world
 		GetVertexBuffers<Mesh, VbCount> GetVbs,
 		GetTexSrv<Mesh> GetTex
 	>
-	void drawVertexBuffers(D3d d3d, const vector<Mesh>& meshes)
+	DrawStats drawVertexBuffers(D3d d3d, const vector<Mesh>& meshes)
 	{
+		DrawStats stats;
+
 		for (auto& mesh : meshes) {
 			if (GetTex != nullptr) {
 				ID3D11ShaderResourceView* srv = GetTex(mesh);
 				d3d.deviceContext->PSSetShaderResources(0, 1, &srv);
 			}
 			util::setVertexBuffers(d3d, GetVbs(mesh));
-			d3d.deviceContext->Draw(mesh.vertexCount, 0);
+
+			uint32_t vertexCount = (uint32_t) (mesh.vertexCount * worldSettings.debugDrawVertAmount);
+			vertexCount -= (vertexCount % 3);
+
+			//d3d.deviceContext->Draw(vertexCount, 0);
+			
+			uint32_t currentVertIndex = 0;
+			while (currentVertIndex + maxVertsPerDrawCall < vertexCount) {
+				d3d.deviceContext->Draw(maxVertsPerDrawCall, currentVertIndex);
+				currentVertIndex += maxVertsPerDrawCall;
+
+				stats.verts += maxVertsPerDrawCall;
+				stats.draws++;
+			}
+
+			uint32_t remainingVertCount = vertexCount - currentVertIndex;
+			d3d.deviceContext->Draw(remainingVertCount, currentVertIndex);
+
+			stats.verts += remainingVertCount;
+			stats.draws++;
+			stats.stateChanges++;
 		}
+
+		return stats;
 	};
 
 	template<int VbCount, GetVertexBuffers<MeshBatch, VbCount> GetVbs>
-	void drawVertexBuffersWorld(D3d d3d, bool bindTex)
+	DrawStats drawVertexBuffersWorld(D3d d3d, bool bindTex)
 	{
+		DrawStats stats;
 		if (worldSettings.drawWorld) {
+			d3d.annotation->BeginEvent(L"World");
 			if (bindTex) {
-				drawVertexBuffers<MeshBatch, VbCount, GetVbs, batchGetTex>(d3d, world.meshBatchesWorld);
+				stats += drawVertexBuffers<MeshBatch, VbCount, GetVbs, batchGetTex>(d3d, world.meshBatchesWorld);
 			}
 			else {
-				drawVertexBuffers<MeshBatch, VbCount, GetVbs, nullptr>(d3d, world.meshBatchesWorld);
+				stats += drawVertexBuffers<MeshBatch, VbCount, GetVbs, nullptr>(d3d, world.meshBatchesWorld);
 			}
+			d3d.annotation->EndEvent();
 		}
 		if (worldSettings.drawStaticObjects) {
+			d3d.annotation->BeginEvent(L"Objects");
 			if (bindTex) {
-				drawVertexBuffers<MeshBatch, VbCount, GetVbs, batchGetTex>(d3d, world.meshBatchesObjects);
+				stats += drawVertexBuffers<MeshBatch, VbCount, GetVbs, batchGetTex>(d3d, world.meshBatchesObjects);
 			}
 			else {
-				drawVertexBuffers<MeshBatch, VbCount, GetVbs, nullptr>(d3d, world.meshBatchesObjects);
+				stats += drawVertexBuffers<MeshBatch, VbCount, GetVbs, nullptr>(d3d, world.meshBatchesObjects);
 			}
+			d3d.annotation->EndEvent();
 		}
+		return stats;
 	};
 
 	void drawPrepass(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs)
 	{
+		d3d.annotation->BeginEvent(L"Prepass");
 		Shader* shader = shaders->getShader("depthPrepass");
 		d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
 		d3d.deviceContext->VSSetShader(shader->getVertexShader(), 0, 0);
@@ -531,6 +599,7 @@ namespace render::pass::world
 		d3d.deviceContext->VSSetConstantBuffers(1, 1, &cbs.cameraCb);
 
 		drawVertexBuffers<PrepassMeshes, 1, prepassGetVbPos, nullptr>(d3d, world.prepassMeshes);
+		d3d.annotation->EndEvent();
 	}
 
 	void drawWireframe(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs)
@@ -546,9 +615,11 @@ namespace render::pass::world
 
 	void drawWorld(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs)
 	{
+		d3d.annotation->BeginEvent(L"Main");
+
 		// set the shader objects avtive
 		Shader* shader;
-		if (debugWorldShaderEnabled) {
+		if (worldSettings.debugWorldShaderEnabled) {
 			shader = shaders->getShader("mainPassTexOnly");
 		}
 		else {
@@ -570,13 +641,18 @@ namespace render::pass::world
 		// lightmaps
 		d3d.deviceContext->PSSetShaderResources(1, 1, &lightmapTexArray);
 
-		if (debugWorldShaderEnabled) {
-			//drawVertexBuffersWorld<2, batchGetVbPosTex>(d3d, true);
-			drawVertexBuffersWorld<3, batchGetVbAll>(d3d, true);
+		DrawStats stats;
+		if (worldSettings.debugWorldShaderEnabled) {
+			stats = drawVertexBuffersWorld<3, batchGetVbAll>(d3d, true);
 		}
 		else {
-			drawVertexBuffersWorld<3, batchGetVbAll>(d3d, true);
+			stats = drawVertexBuffersWorld<3, batchGetVbAll>(d3d, true);
 		}
+		stats::takeSample(samplers.stateChanges, stats.stateChanges);
+		stats::takeSample(samplers.draws, stats.draws);
+		stats::takeSample(samplers.verts, stats.verts);
+
+		d3d.annotation->EndEvent();
 	}
 
 	void clean()

@@ -13,6 +13,10 @@ namespace render::pass::world
 
 		bool drawWorld = true;
 		bool drawStaticObjects = true;
+		bool drawSky = true;
+
+		bool debugWorldShaderEnabled = false;
+		float debugDrawVertAmount = 1.f;
 	};
 
 	void loadLevel(D3d d3d, std::string& level);

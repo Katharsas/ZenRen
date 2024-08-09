@@ -3,7 +3,7 @@
 
 #include <numeric>
 
-namespace viewer::stats
+namespace render::stats
 {
 	using std::array;
 	using std::vector;
@@ -21,22 +21,6 @@ namespace viewer::stats
 		return static_cast<uint32_t> (duration / std::chrono::milliseconds(1));
 	}
 
-	struct LoggingSettings
-	{
-		bool detailedLoggingEnabled = false;
-		bool fps = true;                    // average fps
-		bool renderTime = true;             // average render time [usec]
-		bool sleepTime = true;              // average sleep time [usec]
-		bool offsetTime = true;             // average difference between target & actual frame time [usec]
-		bool offsetTimePermille = true;     // offsetTime as percentage of target frame time [permille]
-		bool offsetPositivePermille = true; // like offsetTimePermille, but only for frame times > target time
-		bool offsetNegativePermille = true; // like offsetTimePermille, but only for frame times < target time
-	};
-
-	const LoggingSettings settings = {
-		// overwrite logging defaults here
-	};
-
 	const int32_t sampleSize = 1000; // max number of frames before samples are averaged to update stats
 	const int32_t maxDurationMillis = 1000; // max ms duration before samples are averaged to update stats
 
@@ -53,47 +37,66 @@ namespace viewer::stats
 
 	uint32_t average(const std::array<uint32_t, sampleSize>& samples, uint32_t sampleCount)
 	{
-		return std::accumulate(samples.begin(), (samples.begin() + sampleCount), 0) / sampleCount;
+		uint64_t sum = std::accumulate(samples.begin(), (samples.begin() + sampleCount), (uint64_t) 0);
+		return (uint32_t) ((sum / (double) sampleCount) + .5f);
+		
 	}
 
-	void createSampler(TimeSampler& sampler)
+	void updateStats(SamplerId id, int32_t currentSampleCount)
 	{
-		sampler.id = (int16_t) sampleBuffers.size();
+		lastStats[id].average = average(sampleBuffers[id], currentSampleCount);
+	}
+
+	SamplerId createSampler()
+	{
+		SamplerId id = (SamplerId) sampleBuffers.size();
 		sampleBuffers.push_back({});
 		lastUpdated.push_back({ 0, std::chrono::high_resolution_clock::now() });
 		lastStats.push_back({ 0 });
+		return id;
 	}
 
-	void updateStats(const TimeSamplerId& id, int32_t currentSampleCount)
-	{
-		lastStats[id].averageMicros = average(sampleBuffers[id], currentSampleCount);
-	}
-
-	void takeSample(const TimeSampler& sampler, std::chrono::steady_clock::time_point now)
+	void takeSample(SamplerId samplerId, uint32_t value, const std::chrono::steady_clock::time_point now)
 	{
 		// save sample into buffer
-		assert(sampler.id >= 0 && sampler.id < lastUpdated.size());
-		auto& [currentSampleCount, lastUpdate] = lastUpdated[sampler.id];
+		assert(samplerId >= 0 && (size_t) samplerId < lastUpdated.size());
+		auto& [currentSampleCount, lastUpdate] = lastUpdated[samplerId];
 
-		sampleBuffers[sampler.id][currentSampleCount] = sampler.lastTimeMicros;
+		sampleBuffers[samplerId][currentSampleCount] = value;
 		currentSampleCount++;
 
 		// update stats
 		uint32_t millisSinceLastUpdated = toDurationMillis(lastUpdate, now);
 		if (currentSampleCount >= sampleSize || millisSinceLastUpdated >= maxDurationMillis) {
-			updateStats(sampler.id, currentSampleCount);
+			updateStats(samplerId, currentSampleCount);
 			currentSampleCount = 0;
 			lastUpdate = now;
 		}
 	}
 
-	Stats getSampleStats(const TimeSampler& sampler) {
-		return lastStats[sampler.id];
+	Stats getSamplerStats(SamplerId samplerId) {
+		return lastStats[samplerId];
+	}
+
+	TimeSampler createTimeSampler()
+	{
+		TimeSampler sampler;
+		sampler.id = createSampler();
+		return sampler;
+	}
+
+	void takeTimeSample(const TimeSampler& sampler, const std::chrono::steady_clock::time_point now)
+	{
+		takeSample(sampler.id, sampler.lastTimeMicros, now);
 	}
 
 	void sampleAndStart(TimeSampler& toStop, TimeSampler& toStart)
 	{
 		toStop.sample();
 		toStart.start(toStop.last);
+	}
+
+	Stats getTimeSamplerStats(const TimeSampler& sampler) {
+		return lastStats[sampler.id];
 	}
 }

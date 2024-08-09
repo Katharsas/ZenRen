@@ -26,7 +26,6 @@ using namespace Microsoft::WRL;
 #include "RenderUtil.h"
 #include "../Util.h"
 #include "Gui.h"
-#include "viewer/PerfStats.h"
 
 #include "imgui/imgui.h"
 
@@ -267,7 +266,9 @@ namespace render
 
 		// gui does not output shading information so it goes to real sRGB backbuffer as well
 		settingsPrevious = settings;
+		d3d.annotation->BeginEvent(L"imgui");
 		drawGui();
+		d3d.annotation->EndEvent();
 
 		post::resolveAndPresent(d3d, swapchain);
 	}
@@ -342,5 +343,7 @@ namespace render
 
 		d3d.device = device_11_0.Detach();
 		d3d.deviceContext = deviceContext_11_0.Detach();
+
+		d3d.deviceContext->QueryInterface(__uuidof(ID3DUserDefinedAnnotation), (void**)&d3d.annotation);
 	}
 }

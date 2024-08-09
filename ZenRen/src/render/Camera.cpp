@@ -24,6 +24,17 @@ namespace render::camera {
 	CameraMatrices matrices;
 	CameraLocation location;
 
+	CameraLocation defaultLocation = {
+		XMVectorSet(0.0f, 3.0f, -5.0f, 0.0f),
+		XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
+		XMVector4Normalize(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)),
+	};
+	CameraLocation g2NewWorldCity = {
+		XMVectorSet(-25.0f, 10.0f, 0.0f, 0.0f),
+		XMVectorSet(0.0f, 5.0f, 0.0f, 0.0f),
+		XMVector4Normalize(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)),
+	};
+
 	ObjectMatrices getWorldViewMatrix(const XMMATRIX & objectsWorldMatrix)
 	{
 		const XMMATRIX worldView = objectsWorldMatrix * matrices.view;
@@ -41,11 +52,7 @@ namespace render::camera {
 	}
 
 	void init() {
-		location = {
-			XMVectorSet(0.0f, 3.0f, -6.0f, 0.0f),
-			XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
-			XMVector4Normalize(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)),
-		};
+		location = g2NewWorldCity;
 	}
 
 	XMVECTOR getCameraPosition() {

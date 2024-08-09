@@ -84,7 +84,7 @@
     <ClCompile Include="lib\imgui\imgui_widgets.cpp" />
     <ClCompile Include="src\render\Camera.cpp" />
     <ClCompile Include="src\viewer\Input.cpp" />
-    <ClCompile Include="src\viewer\PerfStats.cpp" />
+    <ClCompile Include="src\render\PerfStats.cpp" />
     <ClCompile Include="src\render\pass\PassPost.cpp" />
     <ClCompile Include="src\render\pass\PassWorld.cpp" />
     <ClCompile Include="src\imgui\imgui_custom.cpp" />
@@ -144,7 +144,7 @@
     <ClInclude Include="lib\imgui\imstb_truetype.h" />
     <ClInclude Include="src\render\Camera.h" />
     <ClInclude Include="src\viewer\Input.h" />
-    <ClInclude Include="src\viewer\PerfStats.h" />
+    <ClInclude Include="src\render\PerfStats.h" />
     <ClInclude Include="src\render\pass\PassPost.h" />
     <ClInclude Include="src\render\pass\PassWorld.h" />
     <ClInclude Include="src\imgui\imgui_custom.h" />

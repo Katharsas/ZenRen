@@ -66,10 +66,12 @@ namespace render {
 		if (ImGui::Begin(windowName.c_str(), 0, windowFlags)) {
 			for (const auto& [groupName, commands] : groups) {
 				// group text
-				if (groups.size() > 1) {
-					ImGui::Dummy(ImVec2(0.0f, 8.0f));
-					ImGui::SetCursorPos({ ImGui::GetCursorPos().x + 8, ImGui::GetCursorPos().y });
-					ImGui::Text((groupName).c_str());
+				if (groups.size() > 1 && groupName != "") {
+					if (groupName != "") {
+						ImGui::Dummy(ImVec2(0.0f, 6.0f));
+						ImGui::SetCursorPos({ ImGui::GetCursorPos().x + 8, ImGui::GetCursorPos().y });
+						ImGui::Text((groupName).c_str());
+					}
 				}
 				// group elements
 				// make roughly as dark as original ImGuiCol_WindowBg (when added on top of custom WindowBg)
@@ -86,6 +88,7 @@ namespace render {
 				ImGui::EndChild();
 				ImGui::PopStyleColor();
 			}
+			ImGui::Dummy(ImVec2(0.0f, 3.0f));
 		}
 		float sizeX = ImGui::GetWindowSize().y;
 		ImGui::End();

@@ -5,7 +5,7 @@
 #include "Input.h"
 #include "Actions.h"
 #include "TimerPrecision.h"
-#include "PerfStats.h"
+#include "render/PerfStats.h"
 #include "render/Gui.h"
 #include "render/Renderer.h"
 #include "render/Camera.h"
@@ -22,10 +22,10 @@ namespace viewer
 	settings;
 
 	struct FrameTimes {
-		stats::TimeSampler full;
-		stats::TimeSampler update;
-		stats::TimeSampler render;
-		stats::TimeSampler wait;
+		render::stats::TimeSampler full;
+		render::stats::TimeSampler update;
+		render::stats::TimeSampler render;
+		render::stats::TimeSampler wait;
 	}
 	frameTimes;
 
@@ -34,19 +34,33 @@ namespace viewer
 		enablePreciseTimerResolution();
 		initMicrosleep();
 
+		frameTimes = {
+			render::stats::createTimeSampler(),
+			render::stats::createTimeSampler(),
+			render::stats::createTimeSampler(),
+			render::stats::createTimeSampler()
+		};
+
 		render::addInfo("", {
 			[]() -> void {
-				uint32_t fullTime = stats::getSampleStats(frameTimes.full).averageMicros;
-				uint32_t updateTime = stats::getSampleStats(frameTimes.update).averageMicros;
-				uint32_t renderTime = stats::getSampleStats(frameTimes.render).averageMicros;
+				uint32_t fullTime = render::stats::getTimeSamplerStats(frameTimes.full).average;
+				uint32_t updateTime = render::stats::getTimeSamplerStats(frameTimes.update).average;
+				uint32_t renderTime = render::stats::getTimeSamplerStats(frameTimes.render).average;
 				
 				const int32_t fpsReal = 1000000 / fullTime;
 
-				std::string microSymbol = util::fromU8(u8"µm");
 				std::stringstream buffer;
-				buffer << "Perf:  " << util::leftPad(std::to_string(fpsReal), 4) << " FPS" << std::endl;
-				buffer << "  Render: " + util::leftPad(std::to_string(renderTime), 4) << " " << microSymbol << std::endl;
-				buffer << "  Update: " + util::leftPad(std::to_string(updateTime), 4) << " " << microSymbol << std::endl;
+				buffer << "FPS:  " << util::leftPad(std::to_string(fpsReal), 4) << std::endl;
+
+				// when frame limiter is enabled GPU time is masked by sleep time
+				if (!settings.frameLimiterEnabled) {
+					buffer << "  Render: " + util::leftPad(std::to_string(renderTime), 4) << " us" << std::endl;
+				}
+				else {
+					buffer << "  Render: (limited)"  << std::endl;
+				}
+
+				buffer << "  Update: " + util::leftPad(std::to_string(updateTime), 4) << " us" << std::endl;
 				ImGui::Text(buffer.str().c_str());
 			}
 		});
@@ -91,11 +105,11 @@ namespace viewer
 		processUserInput(deltaTime);
 		render::update(deltaTime);
 
-		stats::sampleAndStart(frameTimes.update, frameTimes.render);
+		render::stats::sampleAndStart(frameTimes.update, frameTimes.render);
 
 		render::renderFrame();
 
-		stats::sampleAndStart(frameTimes.render, frameTimes.wait);
+		render::stats::sampleAndStart(frameTimes.render, frameTimes.wait);
 
 		int32_t frameTimeTarget = 0;
 		

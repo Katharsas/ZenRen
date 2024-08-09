@@ -43,6 +43,7 @@ struct VS_IN
 struct VS_OUT
 {
     float3 uvBaseColor : TEXCOORD0;
+    //float3 uvLightmap : TEXCOORD1;
     float4 position : SV_POSITION;
 };
 
@@ -52,7 +53,9 @@ VS_OUT VS_Main(VS_IN input)
     VS_OUT output;
     float4 viewPosition = mul(input.position, worldViewMatrix);
     output.position = mul(viewPosition, projectionMatrix);
-    output.uvBaseColor = float3(0.5, 0.5, input.iTexColor);
+    output.uvBaseColor = float3(input.uvBaseColor, input.iTexColor);
+    //output.uvBaseColor = float3(0.5, 0.5, input.iTexColor);
+    //output.uvLightmap = input.uvLightmap;
 	return output;
 }
 
@@ -67,12 +70,13 @@ SamplerState SampleType : register(s0);
 struct PS_IN
 {
     float3 uvBaseColor : TEXCOORD0; // TODO should be called uviTexColor
+    //float3 uvLightmap : TEXCOORD1;
 };
 
 
 float4 PS_Main(PS_IN input) : SV_TARGET
 {
     float4 diffuseColor = baseColor.Sample(SampleType, input.uvBaseColor);
-    //clip(diffuseColor.a < 0.4 ? -1 : 1);
+    clip(diffuseColor.a < 0.4 ? -1 : 1);
     return float4(diffuseColor.rgb, 1);
 }

@@ -42,11 +42,12 @@ struct VS_IN
 
 struct VS_OUT
 {
-    float3 uvBaseColor : TEXCOORD0;
-    float3 uvLightmap : TEXCOORD1;
-    float4 color : COLOR;
+    nointerpolation float iBaseColor : TEX_INDEX0;
+    nointerpolation float iLightmap : TEX_INDEX1;
+    
+    float2 uvBaseColor : TEXCOORD0;
+    float2 uvLightmap : TEXCOORD1;
     float3 light : LIGHT_INTENSITY;
-    //float4 normal : NORMAL;
     float4 position : SV_POSITION;
 };
 
@@ -104,64 +105,67 @@ VS_OUT VS_Main(VS_IN input)
 
     bool enableLightSun = false;
     bool enableLightStatic = false;
-    bool isVob = (input.dirLight.x > -99);
 
     if (outputType == OUTPUT_FULL || outputType == OUTPUT_SOLID) {
         enableLightSun = true;
         enableLightStatic = true;
     }
-    if (outputType == OUTPUT_LIGHT_SUN) {
-        enableLightSun = true;
-    }
-    if (outputType == OUTPUT_LIGHT_STATIC) {
-        enableLightStatic = true;
-    }
-
-    // alpha indicates show much skylight should be received
-    float3 whiteOrSkyLight = lerp((float3) 1, skyLight.rgb, input.colLight.a);
-    float3 lightStaticCol = input.colLight.rgb * whiteOrSkyLight;
-
-    float sunStrengthForCurrentTime = abs(timeOfDay - 0.5f) * 2;// (0 = midnight, 1 = midday)
-    float lightSunAmount = lerp(0, 0.0f, sunStrengthForCurrentTime);
-    float3 lightSun = (float3) (input.sunLight * CalcLightSun(viewLight3, viewNormal3));
-    float3 lightStatic;
-    float3 lightAmbient;
-    if (isVob) {
-        lightStatic = lightStaticCol * CalcLightStaticVob(input.dirLight, viewNormal3);
-        lightAmbient = lightStaticCol * 0.27f;// original SRGB factor = 0.4f
-    }
     else {
-        lightStatic = lightStaticCol;
-        lightAmbient = 0.f;
+        if (outputType == OUTPUT_LIGHT_SUN) {
+            enableLightSun = true;
+        }
+        if (outputType == OUTPUT_LIGHT_STATIC) {
+            enableLightStatic = true;
+        }
     }
+    
+    if (enableLightSun || enableLightStatic) {
+        bool isVob = (input.dirLight.x > -99);
+        
+        // alpha indicates show much skylight should be received
+        float3 whiteOrSkyLight = lerp((float3) 1, skyLight.rgb, input.colLight.a);
+        float3 lightStaticCol = input.colLight.rgb * whiteOrSkyLight;
 
-    output.light = (float3) 0;
-    if (enableLightSun && enableLightStatic) {
-        output.light = (lightSun * lightSunAmount) + ((lightAmbient + lightStatic) * (1.f - lightSunAmount));
+        float sunStrengthForCurrentTime = abs(timeOfDay - 0.5f) * 2; // (0 = midnight, 1 = midday)
+        float lightSunAmount = lerp(0, 0.0f, sunStrengthForCurrentTime);
+        float3 lightSun = (float3) (input.sunLight * CalcLightSun(viewLight3, viewNormal3));
+        float3 lightStatic;
+        float3 lightAmbient;
+        if (isVob) {
+            lightStatic = lightStaticCol * CalcLightStaticVob(input.dirLight, viewNormal3);
+            lightAmbient = lightStaticCol * 0.27f; // original SRGB factor = 0.4f
+        }
+        else {
+            lightStatic = lightStaticCol;
+            lightAmbient = 0.f;
+        }
+
+        output.light = (float3) 0;
+        if (enableLightSun) {
+            output.light += lightSun * lightSunAmount;
+        }
+        if (enableLightStatic) {
+            output.light = (lightAmbient + lightStatic) * (1.f - lightSunAmount);
+        }
+
+        output.light *= 1.0; // balance VOBs and non-lightmap world vs. lightmaps of world
     }
-    else if (enableLightSun) {
-        output.light = lightSun * lightSunAmount;
-    }
-    else if (enableLightStatic) {
-        output.light = (lightAmbient + lightStatic) * (1.f - lightSunAmount);
+    else if (outputType == OUTPUT_NORMAL) {
+        output.light = input.normal.xyz;
     }
     else {
         output.light = (float3) 1;
     }
-    
-    output.light *= 1.0;// balance VOBs and non-lightmap world vs. lightmaps of world
 
     output.position = mul(viewPosition, projectionMatrix);
-    output.uvBaseColor = float3(input.uvBaseColor, input.iTexColor);
-    output.uvLightmap = input.uvLightmap;
+    output.uvBaseColor = input.uvBaseColor;
+    output.iBaseColor = input.iTexColor;
+    //output.uvBaseColor = float3(input.uvBaseColor, input.iTexColor);
+    //output.uvBaseColor = input.uvBaseColor;
+    output.uvLightmap = input.uvLightmap.xy;
+    output.iLightmap = input.uvLightmap.z;
    
-    if (outputType == OUTPUT_NORMAL) {
-        output.color = float4((float3) input.normal, 1);
-    }
-    else {
-        output.color = (float4) 1;
-    }
-	return output;
+    return output;
 }
 
 //--------------------------------------------------------------------------------------
@@ -174,12 +178,13 @@ SamplerState SampleType : register(s0);
 
 struct PS_IN
 {
-    float3 uvBaseColor : TEXCOORD0; // TODO should be called uviTexColor
-    float3 uvLightmap : TEXCOORD1; // TODO should be called uviTexLightmap
-    float4 color : COLOR;
+    // TODO values that do not need to be interpolated like tex array index should be marked as such
+    nointerpolation float iBaseColor : TEX_INDEX0;
+    nointerpolation float iLightmap : TEX_INDEX1;
+    
+    float2 uvBaseColor : TEXCOORD0; // TODO should be called uviTexColor
+    float2 uvLightmap : TEXCOORD1; // TODO should be called uviTexLightmap
     float3 light : LIGHT_INTENSITY;
-    //int indexLightmap : INDEX_LIGHTMAP;
-    //float4 normal : NORMAL;
 };
 
 float CalcMipLevel(float2 texCoord)
@@ -237,24 +242,31 @@ float4 SampleLightmap(float3 uvLightmap)
 float4 PS_Main(PS_IN input) : SV_TARGET
 {
     // light color
-    float4 lightColor = float4(input.light, 1);
+    float4 lightColor;
+    if (outputType == OUTPUT_NORMAL) {
+        lightColor = float4((float3) 0.5, 1);
+    }
+    else {
+        lightColor = float4(input.light, 1);
 
-    if (outputType == OUTPUT_FULL
+        if (outputType == OUTPUT_FULL
             || outputType == OUTPUT_SOLID
             || outputType == OUTPUT_LIGHT_STATIC) {
-        if (input.uvLightmap.z >= 0) /* dynamic branch */ {
-            lightColor = SampleLightmap(input.uvLightmap);
+            
+            if (input.iLightmap >= 0) /* dynamic branch */ {
+                lightColor = SampleLightmap(float3(input.uvLightmap, input.iLightmap));
+            }
         }
-    }
     
-    // TODO balance world lighting against sky, TODO indoor/outdoor and dynamic light
-    lightColor.rgb *= 1.3;
-    //lightColor.rgb = step(lightColor.rgb, (float3) 1);
+        // TODO balance world lighting against sky, TODO indoor/outdoor and dynamic light
+        lightColor.rgb *= 1.3;
+    }
 
     // diffuse (calculate always so alpha clipping works regardless of outputType)
     float4 diffuseColor;
     {
-        diffuseColor = baseColor.Sample(SampleType, input.uvBaseColor);
+        diffuseColor = baseColor.Sample(SampleType, float3(input.uvBaseColor, input.iBaseColor));
+        //diffuseColor = baseColor.Sample(SampleType, float3(input.uvBaseColor, 0));
         diffuseColor.a *= CalcDistantAlphaDensityFactor(baseColor, input.uvBaseColor.xy);
         diffuseColor.a = AlphaTestAndSharpening(diffuseColor.a);
     }
@@ -264,8 +276,11 @@ float4 PS_Main(PS_IN input) : SV_TARGET
     if (outputType == OUTPUT_FULL || outputType == OUTPUT_DIFFUSE) {
         albedoColor = diffuseColor;
     }
+    else if (outputType == OUTPUT_NORMAL) {
+        albedoColor = float4(input.light, 1);
+    }
     else {
-        albedoColor = input.color;
+        albedoColor = float4((float3) 0.5, 1);
     }
     
     float4 shadedColor = albedoColor * lightColor;
