@@ -160,7 +160,7 @@ namespace render::pass::sky
         }
         
         assert(mesh.vertexCount == facesOther.size());
-        util::createVertexBuffer(d3d, mesh.vbUvs, facesOther);
+        util::createVertexBuffer(d3d, mesh.vbUvs, facesOther);// TODO we should probably update the buffer instead of recreating it
     }
 
     void swapUvsIfSwapOccured(bool swapLayers) {

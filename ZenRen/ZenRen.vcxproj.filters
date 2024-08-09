@@ -109,6 +109,7 @@
     <ClCompile Include="src\render\Sky.cpp" />
     <ClCompile Include="src\render\pass\PassSky.cpp" />
     <ClCompile Include="src\assets\AssetCache.cpp" />
+    <ClCompile Include="src\render\pass\PassWorldLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Util.h">
@@ -175,5 +176,6 @@
     <ClInclude Include="src\render\Settings.h" />
     <ClInclude Include="src\render\Primitives.h" />
     <ClInclude Include="src\assets\AssetCache.h" />
+    <ClInclude Include="src\render\pass\PassWorldLoader.h" />
   </ItemGroup>
 </Project>

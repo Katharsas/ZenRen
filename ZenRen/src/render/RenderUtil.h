@@ -10,14 +10,14 @@ namespace render::util
 	// TODO all of the following should probably go into pipelineutil
 
 	template<typename T>
-	void createVertexBuffer(D3d d3d, ID3D11Buffer** target, const std::vector<T>& vertexData)
+	void createVertexBuffer(D3d d3d, ID3D11Buffer** target, const std::vector<T>& vertexData, D3D11_USAGE usage = D3D11_USAGE_IMMUTABLE)
 	{
 		release(*target);
 
 		D3D11_BUFFER_DESC bufferDesc;
 		ZeroMemory(&bufferDesc, sizeof(bufferDesc));
 
-		bufferDesc.Usage = D3D11_USAGE_DEFAULT;// TODO should be configurable and probably different both for static and for per-frame buffers
+		bufferDesc.Usage = usage;
 		bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 		bufferDesc.ByteWidth = sizeof(T) * vertexData.size();
 
@@ -27,11 +27,12 @@ namespace render::util
 	}
 
 	template<typename T>
-	void createVertexBuffer(D3d d3d, VertexBuffer& target, const std::vector<T>& vertexData)
+	void createVertexBuffer(D3d d3d, VertexBuffer& target, const std::vector<T>& vertexData, D3D11_USAGE usage = D3D11_USAGE_IMMUTABLE)
 	{
-		createVertexBuffer(d3d, &target.buffer, vertexData);
+		createVertexBuffer(d3d, &target.buffer, vertexData, usage);
 	}
 
+	// TODO make sure usage is sensibly specified by all callers
 	template<typename T>
 	void createConstantBuffer(D3d d3d, ID3D11Buffer** target, D3D11_USAGE usage)
 	{

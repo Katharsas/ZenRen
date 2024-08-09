@@ -19,7 +19,7 @@ namespace render::pass::world
 		float debugDrawVertAmount = 1.f;
 	};
 
-	void loadLevel(D3d d3d, std::string& level);
+	void loadWorld(D3d d3d, const std::string& level);
 	void updateObjects(float deltaTime);
 	const WorldSettings& getWorldSettings();
 	void initLinearSampler(D3d d3d, RenderSettings& settings);

@@ -178,8 +178,8 @@ namespace render
 
 	void loadLevel(std::string& level)
 	{
-		sky::loadSky(d3d);// TODO only if indoor (by world)
-		world::loadLevel(d3d, level);
+		world::loadWorld(d3d, level);
+		sky::loadSky(d3d);// TODO only if outdoor (by world)
 	}
 
 	void onWindowResize(const BufferSize& changedSize) {
