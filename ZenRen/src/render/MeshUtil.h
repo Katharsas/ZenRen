@@ -9,6 +9,8 @@
 
 namespace render
 {
+    const std::array<VEC3, 2> bboxInfinite = { VEC3 {-FLT_MAX,-FLT_MAX,-FLT_MAX}, VEC3 {FLT_MAX,FLT_MAX,FLT_MAX} };
+
     template <typename T> bool isZero(const T& vec3, float threshold)
     {
         return std::abs(vec3.x) <= threshold && std::abs(vec3.y) <= threshold && std::abs(vec3.z) <= threshold;
@@ -28,6 +30,7 @@ namespace render
     VEC3 from(const ZenLib::ZMath::float3& source);
     VEC3 from(const ZenLib::ZMath::float3& source, float scale);
 
+    VEC3 toVec3(const DirectX::XMFLOAT3& xmf3);
     VEC3 toVec3(const DirectX::XMVECTOR& xm4);
     VEC4 toVec4(const DirectX::XMVECTOR& xm4);
 
@@ -43,9 +46,11 @@ namespace render
     template <typename C1, typename C2>
     void insert(VERTEX_DATA_BY_MAT& target, const Material& material, const C1& positions, const C2& normalsAndUvs)
     {
-        auto& meshData = ::util::getOrCreate(target, material);
+        auto& meshData = ::util::getOrCreateDefault(target, material);
+        auto vertCountBefore = meshData.vecPos.size();
+
         meshData.vecPos.insert(meshData.vecPos.end(), positions.begin(), positions.end());
-        meshData.vecNormalUv.insert(meshData.vecNormalUv.end(), normalsAndUvs.begin(), normalsAndUvs.end());
+        meshData.vecOther.insert(meshData.vecOther.end(), normalsAndUvs.begin(), normalsAndUvs.end());
     }
 
     void warnIfNotNormalized(const DirectX::XMVECTOR& source);

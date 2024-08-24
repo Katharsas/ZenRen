@@ -29,16 +29,29 @@ namespace render
 		auto operator<=>(const TexInfo&) const = default;
 	};
 
-	struct VEC_VERTEX_DATA {
-		std::vector<VERTEX_POS> vecPos;
-		std::vector<VERTEX_OTHER> vecNormalUv;
+	const float chunkSizePerDim = 200;
+	// TODO we need to also save the Chunks themselves (and provide a method for bbox merging to update chunks)
+
+	struct ChunkIndex {
+		int16_t x;
+		int16_t y;
+
+		auto operator<=>(const ChunkIndex&) const = default;
 	};
 
-	struct VEC_VERTEX_DATA_BATCH {
+	struct Chunk {
+		ChunkIndex pos;
+		std::array<VEC3, 2> bbox;
+	};
+
+	struct ChunkVertCluster {
+		ChunkIndex pos;
+		uint32_t vertStartIndex;
+	};
+
+	struct VEC_VERTEX_DATA {
 		std::vector<VERTEX_POS> vecPos;
-		std::vector<VERTEX_OTHER> vecNormalUv;
-		std::vector<TEX_INDEX> texIndices;
-		std::vector<TexId> texIndexedIds;
+		std::vector<VERTEX_OTHER> vecOther;
 	};
 
 	struct Material {
@@ -48,6 +61,36 @@ namespace render
 	};
 
 	typedef std::unordered_map<Material, VEC_VERTEX_DATA> VERTEX_DATA_BY_MAT;
+
+	typedef std::unordered_map<ChunkIndex, VEC_VERTEX_DATA> VERT_CHUNKS;
+	typedef std::unordered_map<Material, VERT_CHUNKS> VERT_CHUNKS_BY_MAT;
+
+	struct VEC_VERTEX_DATA_BATCH {
+		std::vector<ChunkVertCluster> vertClusters;
+		std::vector<VERTEX_POS> vecPos;
+		std::vector<VERTEX_OTHER> vecOther;
+		std::vector<TEX_INDEX> texIndices;
+		std::vector<TexId> texIndexedIds;
+	};
+
+    // TODO call with [[msvc::forceinline]] if necessary for performance
+	template <typename FaceData>
+	using GetFace = const FaceData(*) (const Material&, const ChunkIndex&, uint32_t, const VEC_VERTEX_DATA&);
+
+	template <typename FaceData, GetFace<FaceData> GetFace>
+	void for_each_face(
+		const VERT_CHUNKS_BY_MAT& data,
+		const std::function<void(const FaceData& face)>& func)
+	{
+		for (const auto& [material, chunkData] : data) {
+			for (const auto& [chunkIndex, vertData] : chunkData) {
+				for (uint32_t i = 0; i < vertData.vecPos.size(); i += 3) {
+					const auto faceData = GetFace(material, chunkIndex, i, vertData);
+					func(faceData);
+				}
+			}
+		}
+	}
 
 	// the boost hash_combine function
 	template <class Hashable>
@@ -60,17 +103,6 @@ namespace render
 namespace std
 {
 	using namespace render;
-
-	template <>
-	struct hash<Material>
-	{
-		size_t operator()(const Material& key) const
-		{
-			size_t res = 0;
-			hashCombine(res, key.texBaseColor);
-			return res;
-		}
-	};
 
 	template <>
 	struct hash<TexInfo>
@@ -86,22 +118,53 @@ namespace std
 			return res;
 		}
 	};
+
+	template <>
+	struct hash<Material>
+	{
+		size_t operator()(const Material& key) const
+		{
+			size_t res = 0;
+			hashCombine(res, key.texBaseColor);
+			return res;
+		}
+	};
+
+	template <>
+	struct hash<ChunkIndex>
+	{
+		size_t operator()(const ChunkIndex& key) const
+		{
+			size_t res = 0;
+			hashCombine(res, key.x);
+			hashCombine(res, key.y);
+			return res;
+		}
+	};
 }
 namespace render
 {
 	struct VertKey {
-		const Material* mat;// this should be ok because elements in an unordered_map never move
+		// this should be ok because elements in an unordered_map never move
+		const Material mat;
+		const ChunkIndex chunkIndex;
+
+		// we assume the vert vector is not modified during lifetime of index
 		const uint32_t vertIndex;
 
-		const VEC_VERTEX_DATA& get(const VERTEX_DATA_BY_MAT& meshData) const {
-			return meshData.find(*this->mat)->second;
+
+		const VEC_VERTEX_DATA& get(const VERT_CHUNKS_BY_MAT& meshData) const
+		{
+			return meshData.find(this->mat)->second.find(this->chunkIndex)->second;
 		}
-		const std::array<VERTEX_POS, 3> getPos(const VERTEX_DATA_BY_MAT& meshData) const {
-			auto& vertData = meshData.find(*this->mat)->second.vecPos;
+		const std::array<VERTEX_POS, 3> getPos(const VERT_CHUNKS_BY_MAT& meshData) const
+		{
+			auto& vertData = get(meshData).vecPos;
 			return { vertData[this->vertIndex], vertData[this->vertIndex + 1], vertData[this->vertIndex + 2] };
 		}
-		const std::array<VERTEX_OTHER, 3> getOther(const VERTEX_DATA_BY_MAT& meshData) const {
-			auto& vertData = meshData.find(*this->mat)->second.vecNormalUv;
+		const std::array<VERTEX_OTHER, 3> getOther(const VERT_CHUNKS_BY_MAT& meshData) const
+		{
+			auto& vertData = get(meshData).vecOther;
 			return { vertData[this->vertIndex], vertData[this->vertIndex + 1], vertData[this->vertIndex + 2] };
 		}
 	};
@@ -110,7 +173,8 @@ namespace render
 		uint32_t width;
 		uint32_t height;
 
-		BufferSize operator*(const float scalar) const {
+		BufferSize operator*(const float scalar) const
+		{
 			return { (uint32_t)((width * scalar) + 0.5f), (uint32_t)((height * scalar) + 0.5f) };
 		}
 	};

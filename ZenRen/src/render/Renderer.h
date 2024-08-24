@@ -32,7 +32,7 @@ namespace render
 
 	struct RenderData {
 		bool isOutdoorLevel;
-		VERTEX_DATA_BY_MAT worldMesh;
+		VERT_CHUNKS_BY_MAT worldMesh;
 		VERTEX_DATA_BY_MAT staticMeshes;
 		std::vector<InMemoryTexFile> worldMeshLightmaps;
 	};
@@ -75,7 +75,9 @@ namespace render
 		// we could wrap this in a normal Texture object to make it more similar to unbatched meshes
 		ID3D11ShaderResourceView* texColorArray;
 
-		int32_t vertexCount = 0;
+		std::vector<ChunkVertCluster> vertClusters;
+
+		uint32_t vertexCount = 0;
 		VertexBuffer vbPos = { sizeof(VERTEX_POS) };
 		VertexBuffer vbOther = { sizeof(VERTEX_OTHER) };
 		VertexBuffer vbTexIndices = { sizeof(TEX_INDEX) };// indices into texture array (base color textures)
@@ -91,6 +93,8 @@ namespace render
 
 	struct PrepassMeshes
 	{
+		std::vector<ChunkVertCluster> vertClusters;
+
 		int32_t vertexCount = 0;
 		VertexBuffer vbPos = { sizeof(VERTEX_POS) };
 

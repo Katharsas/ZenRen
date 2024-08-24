@@ -27,6 +27,10 @@ namespace render
     {
         return VEC3{ source.x * scale, source.y * scale, source.z * scale };
     }
+    VEC3 toVec3(const XMFLOAT3& xmf3)
+    {
+        return VEC3{ xmf3.x, xmf3.y, xmf3.z };
+    }
     VEC3 toVec3(const XMVECTOR& xm4)
     {
         XMFLOAT4 result;

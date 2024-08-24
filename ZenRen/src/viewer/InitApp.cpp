@@ -160,6 +160,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	}
 
 	viewer::Arguments arguments;
+	viewer::getOptionFlag(viewer::ARG_RDP_COMPAT, &(arguments.rdpCompatMode), optionsToValues);
 	viewer::getOptionString(viewer::ARG_LEVEL, &(arguments.level), optionsToValues);
 	viewer::getOptionPath(viewer::ARG_VDF_DIR, &(arguments.vdfFilesRoot), optionsToValues);
 	viewer::getOptionPath(viewer::ARG_ASSET_DIR, &(arguments.assetFilesRoot), optionsToValues);

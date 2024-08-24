@@ -19,6 +19,17 @@ inline std::ostream& operator <<(std::ostream& os, const UV& that)
 	return os << "[U=" << that.u << " V=" << that.v << "]";
 }
 
+struct VEC2 {
+	union {
+		struct { float x, y; };
+		float vec[2];
+	};
+};
+inline std::ostream& operator <<(std::ostream& os, const VEC2& that)
+{
+	return os << "[X=" << that.x << " Y=" << that.y << "]";
+}
+
 struct VEC3 {
 	union {
 		struct { float x, y, z; };

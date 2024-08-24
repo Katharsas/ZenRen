@@ -30,6 +30,9 @@ namespace render::pass::world
 
 	int32_t selectedDebugTexture = 0;
 
+	uint32_t currentDrawCall = 0;
+	uint32_t maxDrawCalls = 0;
+
 	const uint32_t maxVertsPerDrawCall = 14000000 * 3;
 
 	struct DrawStats {
@@ -77,7 +80,7 @@ namespace render::pass::world
 		});
 
 		addSettings("World", {
-			[&]()  -> void {
+			[&]() -> void {
 				ImGui::PushItemWidth(GUI_ELEMENT_WIDTH);
 				// Lables starting with ## are hidden
 				float timeOfDay = worldSettings.timeOfDay;
@@ -93,13 +96,17 @@ namespace render::pass::world
 				ImGui::Checkbox("Draw VOBs/MOBs", &worldSettings.drawStaticObjects);
 				ImGui::Checkbox("Draw Sky", &worldSettings.drawSky);
 				ImGui::Checkbox("Debug Shader", &worldSettings.debugWorldShaderEnabled);
+				ImGui::Checkbox("Debug Single Draw", &worldSettings.debugSingleDrawEnabled);
+				ImGui::BeginDisabled(!worldSettings.debugSingleDrawEnabled);
+				ImGui::SliderInt("Debug Single Draw Index", &worldSettings.debugSingleDrawIndex, 0, maxDrawCalls - 1);
+				ImGui::EndDisabled();
 				ImGui::PopStyleColor();
 			}
 		});
 
 		// TODO move to RenderDebugGui
 		addWindow("Lightmaps", {
-			[&]()  -> void {
+			[&]() -> void {
 				ImGui::PushItemWidth(60);
 				ImGui::InputInt("Lightmap Index", &selectedDebugTexture, 0);
 				ImGui::PopItemWidth();
@@ -196,6 +203,19 @@ namespace render::pass::world
 	array<VertexBuffer, 2> batchGetVbPosTex(const MeshBatch& mesh) { return { mesh.vbPos, mesh.vbTexIndices }; }
 	array<VertexBuffer, 3> batchGetVbAll   (const MeshBatch& mesh) { return { mesh.vbPos, mesh.vbOther, mesh.vbTexIndices }; }
 
+	DrawStats draw(D3d d3d, uint32_t count, uint32_t startIndex)
+	{
+		DrawStats stats; 
+		if (!worldSettings.debugSingleDrawEnabled || worldSettings.debugSingleDrawIndex == currentDrawCall) {
+			d3d.deviceContext->Draw(count, startIndex);
+
+			stats.verts += count;
+			stats.draws++;
+		}
+
+		return stats;
+	}
+
 	template<
 		typename Mesh, int VbCount,
 		GetVertexBuffers<Mesh, VbCount> GetVbs,
@@ -212,25 +232,37 @@ namespace render::pass::world
 			}
 			util::setVertexBuffers(d3d, GetVbs(mesh));
 
-			uint32_t vertexCount = (uint32_t) (mesh.vertexCount * worldSettings.debugDrawVertAmount);
-			vertexCount -= (vertexCount % 3);
+			if (mesh.vertexCount < 1000) {
+				// for small number of verts per batch we ignore the clusters to save draw calls
+				// TODO cutoff should be adjustable in GUI
+				stats += draw(d3d, mesh.vertexCount, 0);
+				currentDrawCall++;
+			}
+			else {
+				const std::vector<ChunkVertCluster>& vertClusters = mesh.vertClusters;
+				uint32_t nextStartIndex = 0;
+				for (uint32_t i = 0; i < vertClusters.size(); i++) {
 
-			//d3d.deviceContext->Draw(vertexCount, 0);
-			
-			uint32_t currentVertIndex = 0;
-			while (currentVertIndex + maxVertsPerDrawCall < vertexCount) {
-				d3d.deviceContext->Draw(maxVertsPerDrawCall, currentVertIndex);
-				currentVertIndex += maxVertsPerDrawCall;
+					// TODO only draw clusters whose bb intersects camera
 
-				stats.verts += maxVertsPerDrawCall;
-				stats.draws++;
+					uint32_t startIndex = nextStartIndex;
+					uint32_t vertCount;
+					if (i + 1 == vertClusters.size()) {
+						vertCount = mesh.vertexCount - startIndex;
+					}
+					else {
+						nextStartIndex = vertClusters[i + 1].vertStartIndex;
+						vertCount = nextStartIndex - startIndex;
+					}
+
+					vertCount = (uint32_t)(vertCount * worldSettings.debugDrawVertAmount);
+					vertCount -= (vertCount % 3);
+
+					stats += draw(d3d, vertCount, startIndex);
+					currentDrawCall++;
+				}
 			}
 
-			uint32_t remainingVertCount = vertexCount - currentVertIndex;
-			d3d.deviceContext->Draw(remainingVertCount, currentVertIndex);
-
-			stats.verts += remainingVertCount;
-			stats.draws++;
 			stats.stateChanges++;
 		}
 
@@ -315,6 +347,9 @@ namespace render::pass::world
 
 		// lightmaps
 		d3d.deviceContext->PSSetShaderResources(1, 1, &world.lightmapTexArray);
+
+		maxDrawCalls = currentDrawCall;
+		currentDrawCall = 0;
 
 		DrawStats stats;
 		if (worldSettings.debugWorldShaderEnabled) {

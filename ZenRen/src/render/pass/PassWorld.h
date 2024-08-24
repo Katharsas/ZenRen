@@ -17,6 +17,9 @@ namespace render::pass::world
 
 		bool debugWorldShaderEnabled = false;
 		float debugDrawVertAmount = 1.f;
+
+		bool debugSingleDrawEnabled = false;
+		int32_t debugSingleDrawIndex = 0;
 	};
 
 	void loadWorld(D3d d3d, const std::string& level);

@@ -14,7 +14,7 @@ namespace assets
             DirectX::XMVECTOR posXm,
             const std::vector<render::Light>& lights,
             const LightLookupTree& lightLookup,
-            const render::VERTEX_DATA_BY_MAT& worldMeshData,
+            const render::VERT_CHUNKS_BY_MAT& worldMeshData,
             const VertLookupTree& worldFaceLookup);
 
     // debug stuff

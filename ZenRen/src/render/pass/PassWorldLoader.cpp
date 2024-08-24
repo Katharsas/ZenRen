@@ -18,10 +18,19 @@ namespace render::pass::world
 	using ::std::string;
 	using ::std::vector;
 	using ::std::unordered_map;
+	using ::std::pair;
 
 	struct LoadResult {
-		uint32_t loadedDraws = 0;
-		uint32_t loadedVerts = 0;
+		uint32_t states = 0;
+		uint32_t draws = 0;
+		uint32_t verts = 0;
+
+		auto operator+=(const LoadResult& rhs)
+		{
+			states += rhs.states;
+			draws += rhs.draws;
+			verts += rhs.verts;
+		};
 	};
 
 	const TEX_INDEX texturesPerBatch = 256;
@@ -59,9 +68,18 @@ namespace render::pass::world
 		return new Texture(d3d, ::util::toString(assets::DEFAULT_TEXTURE));
 	}
 
+	struct TextureCreator {
+		D3d d3d;
+		TexId texId;
+		void operator()(Texture*& ref) {
+			ref = createTexture(d3d, texId);
+		}
+	};
+
 	Texture* getOrCreateTexture(D3d d3d, TexId texId)
 	{
-		return ::util::getOrSet(textureCache, texId, [&](Texture*& ref) { ref = createTexture(d3d, texId); });
+		// [[msvc::forceinline]]
+		return ::util::createOrGet<TexId, Texture*>(textureCache, texId, [&](Texture*& ref) { ref = createTexture(d3d, texId); });
 	}
 
 	LoadResult loadPrepassData(D3d d3d, vector<PrepassMeshes>& target, const VERTEX_DATA_BY_MAT& meshData)
@@ -132,53 +150,45 @@ namespace render::pass::world
 		}
 	}
 
-	void loadBatch(D3d d3d, vector<MeshBatch>& target, TexInfo batchInfo, const VEC_VERTEX_DATA_BATCH& batchData)
+	void loadRenderBatch(D3d d3d, vector<MeshBatch>& target, TexInfo batchInfo, const VEC_VERTEX_DATA_BATCH& batchData)
 	{
 		MeshBatch batch;
+		batch.vertClusters = batchData.vertClusters;
 		batch.vertexCount = batchData.vecPos.size();
 		util::createVertexBuffer(d3d, batch.vbPos, batchData.vecPos);
-		util::createVertexBuffer(d3d, batch.vbOther, batchData.vecNormalUv);
+		util::createVertexBuffer(d3d, batch.vbOther, batchData.vecOther);
 		util::createVertexBuffer(d3d, batch.vbTexIndices, batchData.texIndices);
 		createTexArray(d3d, &batch.texColorArray, batchInfo, batchData.texIndexedIds);
 		target.push_back(batch);
 	}
 
-	LoadResult loadVertexDataBatched(D3d d3d, vector<MeshBatch>& target, const VERTEX_DATA_BY_MAT& meshData)
+	vector<pair<TexInfo, vector<pair<Material, const VERT_CHUNKS*>>>> groupByTexId(D3d d3d, const VERT_CHUNKS_BY_MAT& meshData)
 	{
 		// load and bucket all materials so textures that are texture-array-compatible are grouped in a single bucket
 		unordered_map<TexInfo, vector<Material>> texBuckets;
-
 		for (const auto& [mat, data] : meshData) {
-			if (!data.vecPos.empty()) {
-				Texture* texture = getOrCreateTexture(d3d, mat.texBaseColor);
-				auto& vec = ::util::getOrCreate(texBuckets, texture->getInfo());
-				vec.push_back(mat);
-			}
+			Texture* texture = getOrCreateTexture(d3d, mat.texBaseColor);
+			auto& vec = ::util::getOrCreateDefault(texBuckets, texture->getInfo());
+			vec.push_back(mat);
 		}
 
-		LoadResult result;
+		vector<pair<TexInfo, vector<pair<Material, const VERT_CHUNKS*>>>> result;
 
 		// create batches
-		for (const auto& [info, textures] : texBuckets) {
+		for (const auto& [texInfo, textures] : texBuckets) {
 
-			VEC_VERTEX_DATA_BATCH batchData;
+			pair<TexInfo, vector<pair<Material, const VERT_CHUNKS*>>> batch = { texInfo, {} };
 			TEX_INDEX currentIndex = 0;
 
 			for (const auto mat : textures) {
-
-				VEC_VERTEX_DATA curentMatVertices = meshData.find(mat)->second;
-				::util::insert(batchData.vecPos, curentMatVertices.vecPos);
-				::util::insert(batchData.vecNormalUv, curentMatVertices.vecNormalUv);
-				batchData.texIndices.insert(batchData.texIndices.end(), curentMatVertices.vecPos.size(), currentIndex);
-				batchData.texIndexedIds.push_back(mat.texBaseColor);
+				const VERT_CHUNKS& currentMatData = meshData.find(mat)->second;
+				batch.second.push_back(pair{ mat, &currentMatData });
 
 				// create and start new batch because we reached max texture size per batch
 				if (currentIndex + 1 >= texturesPerBatch) {
-					loadBatch(d3d, target, info, batchData);
-					result.loadedDraws++;
-					result.loadedVerts += batchData.vecPos.size();
+					result.push_back(batch);
+					batch = { texInfo, {} };
 
-					batchData = VEC_VERTEX_DATA_BATCH();
 					currentIndex = 0;
 				}
 				else {
@@ -187,15 +197,110 @@ namespace render::pass::world
 			}
 
 			// create batch for leftover textures from this bucket
-			if (!batchData.vecPos.empty()) {
-				loadBatch(d3d, target, info, batchData);
-				result.loadedDraws++;
-				result.loadedVerts += batchData.vecPos.size();
+			if (!batch.second.empty()) {
+				result.push_back(batch);
+				batch = { texInfo, {} };
 			}
 		}
 
 		return result;
 	}
+
+	vector<pair<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>>> groupAndSortByChunkIndex(const vector<pair<Material, const VERT_CHUNKS*>>& batchData)
+	{
+		// use unordered_map to group
+		unordered_map<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>> chunkBuckets;
+
+		for (const auto& [mat, chunkData] : batchData) {
+			for (const auto& [chunkIndex, chunkVerts] : *chunkData) {
+
+				auto& vec = ::util::getOrCreateDefault(chunkBuckets, chunkIndex);
+				vec.push_back({ mat, chunkVerts });
+			}
+		}
+
+		// convert unordered_map to vector for sorting
+		vector<pair<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>>> result;
+		result.reserve(chunkBuckets.size());
+
+		for (const auto& [chunkIndex, chunkData] : chunkBuckets) {
+			result.push_back({chunkIndex, chunkData});
+		}
+
+		// TODO sort by morton code
+
+		return result;
+	}
+
+	pair<VEC_VERTEX_DATA_BATCH, LoadResult> flattenIntoBatch(const vector<pair<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>>>& batchData)
+	{
+		LoadResult result;
+		result.states = 1;
+		VEC_VERTEX_DATA_BATCH target;
+
+		uint32_t clusterCount = batchData.size();
+		result.draws = clusterCount;
+		target.vertClusters.reserve(clusterCount);
+
+		unordered_map<Material, TEX_INDEX> materialIndices;
+		vector<Material> materials;
+
+		// reserve to avoid over-allocation (because the resulting vert vectors are going to be very big)
+		uint32_t vertCount = 0;
+		for (const auto& [chunkIndex, vertDataByMat] : batchData) {
+			for (const auto& [material, vertData] : vertDataByMat) {
+				vertCount += vertData.vecPos.size();
+			}
+		}
+		target.vecPos.reserve(vertCount);
+		target.vecOther.reserve(vertCount);
+		target.texIndices.reserve(vertCount);
+
+		for (const auto& [chunkIndex, vertDataByMat] : batchData) {
+			// set vertex data
+			uint32_t currentVertIndex = target.vecPos.size();
+			target.vertClusters.push_back({ chunkIndex, currentVertIndex });
+
+			for (const auto& [material, vertData] : vertDataByMat) {
+				::util::insert(target.vecPos, vertData.vecPos);
+				::util::insert(target.vecOther, vertData.vecOther);
+
+				TEX_INDEX texIndex = ::util::getOrCreate<Material, TEX_INDEX>(materialIndices, material, [&]() -> TEX_INDEX {
+					materials.push_back(material);
+					return (TEX_INDEX) materials.size() - 1;
+				});
+				target.texIndices.insert(target.texIndices.end(), vertData.vecPos.size(), texIndex);
+			}
+		}
+
+		for (const Material& material : materials) {
+			target.texIndexedIds.push_back(material.texBaseColor);
+		}
+
+		result.verts = target.vecPos.size();
+		return { target, result };
+	}
+
+	LoadResult loadVertexDataBatched(D3d d3d, vector<MeshBatch>& target, const VERT_CHUNKS_BY_MAT& meshData)
+	{
+		vector<pair<TexInfo, vector<pair<Material, const VERT_CHUNKS*>>>> batchedMeshData = groupByTexId(d3d, meshData);
+
+		LoadResult result;
+		for (const auto& [texInfo, batchData] : batchedMeshData) {
+
+			vector<pair<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>>> batchDataByChunk = groupAndSortByChunkIndex(batchData);
+
+			const auto [batchDataFlat, batchLoadResult] = flattenIntoBatch(batchDataByChunk);
+			result += batchLoadResult;
+
+			loadRenderBatch(d3d, target, texInfo, batchDataFlat);
+		}
+
+		// TODO sort batches by vertcount
+
+		return result;
+	}
+
 
 	// TODO remove this, this is identical to setting texturesPerBatch to 1
 	LoadResult loadVertexData(D3d d3d, vector<MeshBatch>& target, const VERTEX_DATA_BY_MAT& meshData)
@@ -210,15 +315,17 @@ namespace render::pass::world
 				VEC_VERTEX_DATA_BATCH batchData;
 
 				uint32_t vertCount = matData.vecPos.size();
+				batchData.vertClusters.push_back({ {0, 0}, 0 });
 				batchData.vecPos = matData.vecPos;
-				batchData.vecNormalUv = matData.vecNormalUv;
+				batchData.vecOther = matData.vecOther;
 				batchData.texIndices.insert(batchData.texIndices.end(), vertCount, 0);
 				batchData.texIndexedIds = { material.texBaseColor };
 
 				Texture* texture = getOrCreateTexture(d3d, material.texBaseColor);
-				loadBatch(d3d, target, texture->getInfo(), batchData);
-				result.loadedDraws++;
-				result.loadedVerts += batchData.vecPos.size();
+				loadRenderBatch(d3d, target, texture->getInfo(), batchData);
+				result.states++;
+				result.draws++;
+				result.verts += batchData.vecPos.size();
 			}
 		}
 		return result;
@@ -261,7 +368,7 @@ namespace render::pass::world
 
 		if (optionalFilepath.has_value()) {
 			if (::util::endsWith(level, ".obj")) {
-				data = { true, assets::loadObj(::util::toString(*optionalFilepath.value())) };
+				//data = { true, assets::loadObj(::util::toString(*optionalFilepath.value())) };
 				levelDataFound = true;
 			}
 			else {
@@ -300,14 +407,15 @@ namespace render::pass::world
 		}
 
 		LoadResult loadResult;
-		loadResult = loadPrepassData(d3d, world.prepassMeshes, data.worldMesh);
-		LOG(INFO) << "Render Data Loaded - Depth Prepass    - Draws: " << loadResult.loadedDraws << " Verts: " << loadResult.loadedVerts;
-
+		// TODO fix prepass
+		//loadResult = loadPrepassData(d3d, world.prepassMeshes, data.worldMesh);
+		LOG(INFO) << "Level Loaded - Depth Prepass    - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
+		
 		loadResult = loadVertexDataBatched(d3d, world.meshBatchesWorld, data.worldMesh);
-		LOG(INFO) << "Render Data Loaded - World Mesh       - Draws: " << loadResult.loadedDraws << " Verts: " << loadResult.loadedVerts;
-
-		loadResult = loadVertexDataBatched(d3d, world.meshBatchesObjects, data.staticMeshes);
-		LOG(INFO) << "Render Data Loaded - Static Instances - Draws: " << loadResult.loadedDraws << " Verts: " << loadResult.loadedVerts;
+		LOG(INFO) << "Level Loaded - World Mesh       - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
+		
+		loadResult = loadVertexData(d3d, world.meshBatchesObjects, data.staticMeshes);
+		LOG(INFO) << "Level Loaded - Static Instances - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
 
 		// since single textures have been copied to texture arrays, we can release them
 		for (auto& tex : textureCache) {

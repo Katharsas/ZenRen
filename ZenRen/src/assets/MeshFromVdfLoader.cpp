@@ -7,6 +7,8 @@
 #include "render/MeshUtil.h"
 #include "../Util.h"
 
+#include "directxcollision.h"
+
 namespace assets
 {
     using namespace render;
@@ -20,6 +22,13 @@ namespace assets
 	using ::util::getOrCreate;
 
     const float zeroThreshold = 0.000001f;
+
+    void posToXM4(const array<ZenLoad::WorldVertex, 3>& zenFace, array<XMVECTOR, 3>& target) {
+        for (uint32_t i = 0; i < 3; i++) {
+            const auto& zenVert = zenFace[i];
+            target[i] = toXM4Pos(zenVert.Position);
+        }
+    }
 
     int32_t wrapModulo(int32_t positiveOrNegative, int32_t modulo)
     {
@@ -61,17 +70,54 @@ namespace assets
         };
     }
 
-    void insert(VERTEX_DATA_BY_MAT& target, const ZenLoad::zCMaterialData& material, const vector<VERTEX_POS>& positions, const vector<VERTEX_OTHER>& other)
+
+    Material toMaterial(const ZenLoad::zCMaterialData& material)
     {
         const auto& texture = material.texture;
-        if (!texture.empty()) {
-            Material material = { getTexId(::util::asciiToLower(texture)) };
-            insert(target, material, positions, other);
-        }
+        return { getTexId(::util::asciiToLower(texture)) };
     }
 
-    void loadWorldMeshSingle(
-        VERTEX_DATA_BY_MAT& target,
+    void insertFace(VEC_VERTEX_DATA& target, const array<VERTEX_POS, 3>& facePos, const array<VERTEX_OTHER, 3>& faceOther) {
+        // TODO find fastest way to insert in debug mode
+        target.vecPos.push_back(facePos[0]);
+        target.vecPos.push_back(facePos[1]);
+        target.vecPos.push_back(facePos[2]);
+        target.vecOther.push_back(faceOther[0]);
+        target.vecOther.push_back(faceOther[1]);
+        target.vecOther.push_back(faceOther[2]);
+    }
+
+    array<VEC3, 2> createVertlistBbox(const vector<VERTEX_POS>& verts)
+    {
+        BoundingBox bbox;
+        BoundingBox::CreateFromPoints(bbox, verts.size(), (XMFLOAT3*) verts.data(), sizeof(VEC3));
+        array<XMFLOAT3, 8> corners;
+        bbox.GetCorners(corners.data());
+        XMFLOAT3 min = corners[2];
+        XMFLOAT3 max = corners[4];
+
+        return { toVec3(min), toVec3(max) };
+    }
+
+    XMVECTOR centroidPos(array<XMVECTOR, 3> face)
+    {
+        const static float oneThird = 1.f / 3.f;
+        return XMVectorScale(XMVectorAdd(XMVectorAdd(face[0], face[1]), face[2]), oneThird);
+    }
+
+    ChunkIndex toChunkIndex(XMVECTOR posXm)
+    {
+        const static XMVECTOR chunkSize = toXM4Pos(VEC3{ chunkSizePerDim, chunkSizePerDim, chunkSizePerDim });
+        XMVECTOR indexXm = XMVectorFloor(XMVectorDivide(posXm, chunkSize));
+
+        XMFLOAT4 result;
+        XMStoreFloat4(&result, indexXm);
+
+        return { (int16_t) result.x, (int16_t) result.z };
+    }
+
+    void loadWorldMesh(
+        VERT_CHUNKS_BY_MAT& target,
         ZenLoad::zCMesh* worldMesh, uint32_t loadIndex)
     {
         ZenLoad::PackedMesh packedMesh;
@@ -80,6 +126,9 @@ namespace assets
         LOG(DEBUG) << "World Mesh: Loading " << packedMesh.subMeshes.size() << " Sub-Meshes.";
 
         for (const auto& submesh : packedMesh.subMeshes) {
+            if (submesh.material.texture.empty()) {
+                continue;
+            }
             if (submesh.indices.empty()) {
                 continue;
             }
@@ -90,10 +139,10 @@ namespace assets
                 ::util::throwError("Expected one lightmap index per face (with value -1 for non-lightmapped faces).");
             }
 
-            // at least in debug, resize & at-assignment is much faster than reserve & insert/copy, and we don't need temp array for flipping face order
             uint32_t indicesCount = submesh.indices.size();
-            vector<VERTEX_POS> facesPos(indicesCount);
-            vector<VERTEX_OTHER> facesOther(indicesCount);
+
+            const Material& mat = toMaterial(submesh.material);
+            unordered_map<ChunkIndex, VEC_VERTEX_DATA>& materialData = ::util::getOrCreateDefault(target, mat);// this function is faster for creating
 
             int32_t faceIndex = 0;
             for (uint32_t indicesIndex = 0; indicesIndex < indicesCount; indicesIndex += 3) {
@@ -107,13 +156,16 @@ namespace assets
                     lightmap = worldMesh->getLightmapReferences()[lightmapIndex];
                 }
 
+                array<XMVECTOR, 3> facePosXm;
+                posToXM4(zenFace, facePosXm);
+
+                array<VERTEX_POS, 3> facePos;
+                array<VERTEX_OTHER, 3> faceOther;
+
                 for (uint32_t i = 0; i < 3; i++) {
                     const auto& zenVert = zenFace[i];
                     VERTEX_POS pos;
-                    pos = from(zenVert.Position);
-                    pos.x += (loadIndex * 1);
-                    pos.x += (loadIndex * 0.5f);
-                    pos.z += (loadIndex * 0.3f);
+                    pos = toVec3(facePosXm[i]);
                     VERTEX_OTHER other;
                     other.normal = from(zenVert.Normal);
                     other.uvDiffuse = from(zenVert.TexCoord);
@@ -138,30 +190,26 @@ namespace assets
                     }
                     // flip faces (seems like zEngine uses counter-clockwise winding, while we use clockwise winding)
                     // TODO use D3D11_RASTERIZER_DESC FrontCounterClockwise instead?
-                    facesPos.at(indicesIndex + (2 - i)) = pos;
-                    facesOther.at(indicesIndex + (2 - i)) = other;
+                    facePos.at(2 - i) = pos;
+                    faceOther.at(2 - i) = other;
                 }
+
+                const ChunkIndex chunkIndex = toChunkIndex(centroidPos(facePosXm));
+                VEC_VERTEX_DATA& chunkData = ::util::getOrCreateDefault(materialData, chunkIndex);// this function is faster for getting existing
+                insertFace(chunkData, facePos, faceOther);
+
                 faceIndex++;
             }
-
-            insert(target, submesh.material, facesPos, facesOther);
         }
     }
 
     void loadWorldMesh(
-        VERTEX_DATA_BY_MAT& target,
+        VERT_CHUNKS_BY_MAT& target,
         ZenLoad::zCMesh* worldMesh)
     {
         uint32_t instances = 1;
         for (uint32_t i = 0; i < instances; ++i) {
-            loadWorldMeshSingle(target, worldMesh, i);
-        }
-    }
-
-    void posToXM4(const array<ZenLoad::WorldVertex, 3>& zenFace, array<XMVECTOR, 3>& target) {
-        for (uint32_t i = 0; i < 3; i++) {
-            const auto& zenVert = zenFace[i];
-            target[i] = toXM4Pos(zenVert.Position);
+            loadWorldMesh(target, worldMesh, i);
         }
     }
 
@@ -195,7 +243,6 @@ namespace assets
         return wrongNormals;
     }
 
-
     unordered_set<string> processedVisuals;
 
 	void loadInstanceMesh(
@@ -205,6 +252,8 @@ namespace assets
         const StaticInstance& instance,
         bool debugChecksEnabled)
     {
+        // TODO switch to chunked loading
+        // TODO share code with world mesh loading
         XMMATRIX normalTransform = inversedTransposed(instance.transform);
 
         uint32_t totalNormals = 0;
@@ -212,6 +261,9 @@ namespace assets
         uint32_t extremeNormals = 0;
 
         for (const auto& submesh : packedMesh.subMeshes) {
+            if (submesh.material.texture.empty()) {
+                continue;
+            }
             if (submesh.indices.empty()) {
                 continue;
             }
@@ -264,7 +316,8 @@ namespace assets
                 }
             }
 
-            insert(target, submesh.material, facesPos, facesOther);
+            const Material& material = toMaterial(submesh.material);
+            insert(target, material, facesPos, facesOther);
         }
 
         if (debugChecksEnabled) {

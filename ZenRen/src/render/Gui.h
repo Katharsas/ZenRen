@@ -4,7 +4,7 @@
 
 namespace render
 {
-	const float GUI_PANEL_WIDTH = 240;
+	const float GUI_PANEL_WIDTH = 280;
 	const float GUI_PANEL_PADDING = 8;
 	const float GUI_ELEMENT_WIDTH = GUI_PANEL_WIDTH - (2 * GUI_PANEL_PADDING);
 	const float INPUT_FLOAT_WIDTH = 50;

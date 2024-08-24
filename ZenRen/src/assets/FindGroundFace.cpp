@@ -122,7 +122,7 @@ namespace assets
         return currentBestIndex;
     }
 
-    std::optional<VertKey> getGroundFaceAtPos(const XMVECTOR pos, const unordered_map<Material, VEC_VERTEX_DATA>& meshData, const VertLookupTree& vertLookup)
+    std::optional<VertKey> getGroundFaceAtPos(const XMVECTOR pos, const VERT_CHUNKS_BY_MAT& meshData, const VertLookupTree& vertLookup)
     {
         VEC3 pos3 = toVec3(pos);
         vector<VertKey> vertKeys;

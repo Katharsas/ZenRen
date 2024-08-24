@@ -13,7 +13,7 @@
 namespace assets
 {
     void loadWorldMesh(
-        render::VERTEX_DATA_BY_MAT& target,
+        render::VERT_CHUNKS_BY_MAT& target,
         ZenLib::ZenLoad::zCMesh* worldMesh);
     
     void loadInstanceMesh(

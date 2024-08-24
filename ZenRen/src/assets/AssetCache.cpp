@@ -15,7 +15,7 @@ namespace assets
 	using ::std::string;
 	using ::std::vector;
 	using ::std::unordered_map;
-	using ::util::getOrSet;
+	using ::util::createOrGet;
 
 	unordered_map<string, MeshData> cacheMeshes;
 	unordered_map<string, MeshLibData> cacheMeshLibs;
@@ -25,7 +25,7 @@ namespace assets
 
 	const MeshData& getOrParseMesh(VDFS::FileIndex& vdf, const string& meshName, bool pack)
 	{
-		return getOrSet(cacheMeshes, meshName, [&](MeshData& ref) {
+		return createOrGet<string, MeshData>(cacheMeshes, meshName, [&](MeshData& ref) {
 			//LOG(DEBUG) << "Loading: " << meshName;
 			ref.hasPacked = pack;
 			ref.mesh = ZenLoad::zCProgMeshProto(meshName, vdf);
@@ -37,7 +37,7 @@ namespace assets
 
 	const MeshLibData& getOrParseMeshLib(VDFS::FileIndex& vdf, const string& meshName, bool pack)
 	{
-		return getOrSet(cacheMeshLibs, meshName, [&](MeshLibData& ref) {
+		return createOrGet<string, MeshLibData>(cacheMeshLibs, meshName, [&](MeshLibData& ref) {
 			//LOG(DEBUG) << "Loading: " << meshName;
 			ref.hasPacked = pack;
 			ref.meshLib = ZenLoad::zCModelMeshLib(meshName, vdf, render::G_ASSET_RESCALE);
@@ -64,7 +64,7 @@ namespace assets
 		std::string copy = texName;
 		std::hash<string> hasher;
 		int32_t hash = hasher(copy);
-		return getOrSet(cacheTexNameHashToIds, hash, [&](TexId& ref) {
+		return createOrGet<int32_t, TexId>(cacheTexNameHashToIds, hash, [&](TexId& ref) {
 			TexId currentIndex = (TexId) cacheTexNames.size();
 			cacheTexNames.push_back(texName);
 			ref = currentIndex;

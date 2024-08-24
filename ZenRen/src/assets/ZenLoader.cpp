@@ -223,11 +223,11 @@ namespace assets
         return lights;
     }
 
-    D3DXCOLOR interpolateColor(const VEC3& pos, const VERTEX_DATA_BY_MAT& meshData, const VertKey& vertKey)
+    D3DXCOLOR interpolateColor(const VEC3& pos, const VERT_CHUNKS_BY_MAT& meshData, const VertKey& vertKey)
     {
-        auto& vecVertData = meshData.find(*vertKey.mat)->second;
+        auto& vecVertData = vertKey.get(meshData);
         auto& vecPos = vecVertData.vecPos;
-        auto& others = vecVertData.vecNormalUv;
+        auto& others = vecVertData.vecOther;
         auto vertIndex = vertKey.vertIndex;
         float v0Distance = std::sqrt(std::pow(vecPos[vertIndex + 0].x - pos.x, 2.f) + std::pow(vecPos[vertIndex + 0].z - pos.z, 2.f));
         float v1Distance = std::sqrt(std::pow(vecPos[vertIndex + 1].x - pos.x, 2.f) + std::pow(vecPos[vertIndex + 1].z - pos.z, 2.f));
@@ -245,7 +245,7 @@ namespace assets
 
     vector<StaticInstance> loadVobs(
         vector<ZenLoad::zCVobData>& rootVobs,
-        const VERTEX_DATA_BY_MAT& worldMeshData,
+        const VERT_CHUNKS_BY_MAT& worldMeshData,
         const vector<Light>& lightsStatic,
         const bool isOutdoorLevel)
     {
@@ -399,7 +399,7 @@ namespace assets
 
         vector<InMemoryTexFile> lightmaps = loadZenLightmaps(worldMesh);
 
-        VERTEX_DATA_BY_MAT worldMeshData;
+        VERT_CHUNKS_BY_MAT worldMeshData;
         loadWorldMesh(worldMeshData, parser.getWorldMesh());
 
         LOG(INFO) << "Zen parsed!";

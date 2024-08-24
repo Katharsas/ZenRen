@@ -13,6 +13,16 @@ namespace assets
 
     const float rayIntersectTolerance = 0.001f;
 
+    struct FacePosData {
+        VertKey vertKey;
+        vector<VERTEX_POS> vecPos;
+    };
+    const FacePosData GetFacePos(const Material& material, const ChunkIndex& chunkIndex, const uint32_t vertIndex, const VEC_VERTEX_DATA& vertData)
+    {
+        return { { material, chunkIndex, vertIndex }, vertData.vecPos };
+    }
+
+
     OrthoVector3D toOrthoVec3(const XMVECTOR& xm4)
     {
         DirectX::XMFLOAT4 result;
@@ -36,21 +46,19 @@ namespace assets
         return OrthoTree::BoundingBoxND<3, float>{ {minX, minY, minZ}, {maxX, maxY, maxZ} };
     }
 
-    VertLookupTree createVertLookup(const VERTEX_DATA_BY_MAT& meshData)
+    VertLookupTree createVertLookup(const VERT_CHUNKS_BY_MAT& meshData)
     {
         vector<OrthoBoundingBox3D> bboxes;
 
         VertLookupTree result;
         uint32_t bbIndex = 0;
-        for (auto& it : meshData) {
-            auto& mat = it.first;
-            auto& vecPos = it.second.vecPos;
-            for (uint32_t i = 0; i < vecPos.size(); i += 3) {
-                bboxes.push_back(createBB3D(vecPos, i));
-                result.bboxIndexToVert.insert({ bbIndex, { &mat, i } });
-                bbIndex++;
-            }
-        }
+
+        for_each_face<FacePosData, GetFacePos>(meshData, [&](const FacePosData& data) -> void {
+            bboxes.push_back(createBB3D(data.vecPos, data.vertKey.vertIndex));
+            result.bboxIndexToVert.insert({ bbIndex, data.vertKey });
+            bbIndex++;
+        });
+
         result.tree = OrthoOctree(bboxes
             , 8 // max depth
             , std::nullopt // user-provided bounding Box for all
@@ -105,17 +113,14 @@ namespace assets
         return !(pos.y >= (maxY + rayIntersectTolerance + searchSizeY) || pos.y >= (minY - rayIntersectTolerance));
     }
 
-    std::vector<VertKey> rayDownIntersectedNaive(const VERTEX_DATA_BY_MAT& meshData, const VEC3& pos, float searchSizeY)
+    std::vector<VertKey> rayDownIntersectedNaive(const VERT_CHUNKS_BY_MAT& meshData, const VEC3& pos, float searchSizeY)
     {
         vector<VertKey> result;
-        for (auto& it : meshData) {
-            auto& vecPos = it.second.vecPos;
-            for (uint32_t i = 0; i < vecPos.size(); i += 3) {
-                if (rayDownIntersectsFaceBB(pos, vecPos, i, searchSizeY)) {
-                    result.push_back({ &it.first, i });
-                }
+        for_each_face<FacePosData, GetFacePos>(meshData, [&](const FacePosData& data) -> void {
+            if (rayDownIntersectsFaceBB(pos, data.vecPos, data.vertKey.vertIndex, searchSizeY)) {
+                result.push_back(data.vertKey);
             }
-        }
+        });
         return result;
     }
 

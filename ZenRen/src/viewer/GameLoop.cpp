@@ -76,6 +76,7 @@ namespace viewer
 			}
 		});
 
+		input::setRdpCompatMode(args.rdpCompatMode);
 		initActions();
 
 		if (args.vdfFilesRoot.has_value()) {

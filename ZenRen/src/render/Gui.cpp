@@ -10,27 +10,29 @@
 
 #include "../Util.h"
 
-namespace render {
+namespace render
+{
+	using std::string;
 
-	std::map<std::string, std::list<GuiComponent>> windowsToGuis;
-	std::map<std::string, std::list<GuiComponent>> settingsGroupToGuis;
-	std::map<std::string, std::list<GuiComponent>> infoGroupToGuis;
+	std::map<string, std::list<GuiComponent>> windowsToGuis;
+	std::map<string, std::list<GuiComponent>> settingsGroupToGuis;
+	std::map<string, std::list<GuiComponent>> infoGroupToGuis;
 
-	void addWindow(const std::string& windowName, GuiComponent guiComponent)
+	void addWindow(const string& windowName, GuiComponent guiComponent)
 	{
-		auto& components = util::getOrCreate(windowsToGuis, windowName);
+		auto& components = util::getOrCreateDefault(windowsToGuis, windowName);
 		components.push_back(guiComponent);
 	}
 
-	void addSettings(const std::string& groupName, GuiComponent guiComponent)
+	void addSettings(const string& groupName, GuiComponent guiComponent)
 	{
-		auto& components = util::getOrCreate(settingsGroupToGuis, groupName);
+		auto& components = util::getOrCreateDefault(settingsGroupToGuis, groupName);
 		components.push_back(guiComponent);
 	}
 
-	void addInfo(const std::string& groupName, GuiComponent guiComponent)
+	void addInfo(const string& groupName, GuiComponent guiComponent)
 	{
-		auto& components = util::getOrCreate(infoGroupToGuis, groupName);
+		auto& components = util::getOrCreateDefault(infoGroupToGuis, groupName);
 		components.push_back(guiComponent);
 	}
 
@@ -52,7 +54,7 @@ namespace render {
 		io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Consola.ttf", 13.f * dpiScale);
 	}
 
-	float drawWindowWithGroups(const std::string& windowName, std::map<std::string, std::list<GuiComponent>> groups, float posY, float sizeY = -1)
+	float drawWindowWithGroups(const string& windowName, std::map<string, std::list<GuiComponent>> groups, float posY, float sizeY = -1)
 	{
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
 		ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.7f));
