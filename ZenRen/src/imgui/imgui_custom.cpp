@@ -8,6 +8,11 @@
 
 #include "imgui/imgui_internal.h"
 
+void ImGui::VerticalSpacing(float height)
+{
+    ImGui::Dummy(ImVec2(0.0f, height));
+}
+
 static ImVector<ImRect> s_GroupPanelLabelStack;
 
 void ImGui::BeginGroupPanel(const char* name, const ImVec2& size)

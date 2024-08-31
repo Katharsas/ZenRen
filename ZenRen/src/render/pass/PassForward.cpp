@@ -124,6 +124,7 @@ namespace render::pass::forward
 
 		// draw world to linear buffer
 		updateCamera(d3d);
+		world::updateCameraFrustum(camera::getFrustum());
 		if (settings.depthPrepass) {
 			world::drawPrepass(d3d, shaders, shaderCbs);
 		}

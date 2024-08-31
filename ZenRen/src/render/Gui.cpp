@@ -70,7 +70,7 @@ namespace render
 				// group text
 				if (groups.size() > 1 && groupName != "") {
 					if (groupName != "") {
-						ImGui::Dummy(ImVec2(0.0f, 6.0f));
+						ImGui::VerticalSpacing(6.f);
 						ImGui::SetCursorPos({ ImGui::GetCursorPos().x + 8, ImGui::GetCursorPos().y });
 						ImGui::Text((groupName).c_str());
 					}
@@ -79,18 +79,18 @@ namespace render
 				// make roughly as dark as original ImGuiCol_WindowBg (when added on top of custom WindowBg)
 				ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.05f, 0.05f, 0.05f, 0.80f));
 				ImGui::BeginChild(groupName.c_str(), ImVec2(0, 0), ImGuiChildFlags_AutoResizeY);
-				ImGui::Dummy(ImVec2(0.0f, 4.0f));
+				ImGui::VerticalSpacing(4.f);
 				ImGui::SetCursorPos({ ImGui::GetCursorPos().x + GUI_PANEL_PADDING, ImGui::GetCursorPos().y });
 				ImGui::BeginGroup();
 				for (const auto& command : commands) {
 					command.buildGui();
 				}
 				ImGui::EndGroup();
-				ImGui::Dummy(ImVec2(0.0f, 4.0f));
+				ImGui::VerticalSpacing(4.f);
 				ImGui::EndChild();
 				ImGui::PopStyleColor();
 			}
-			ImGui::Dummy(ImVec2(0.0f, 3.0f));
+			ImGui::VerticalSpacing(3.f);
 		}
 		float sizeX = ImGui::GetWindowSize().y;
 		ImGui::End();

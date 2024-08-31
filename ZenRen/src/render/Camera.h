@@ -14,6 +14,8 @@ namespace render::camera
 	/* pre-transposed for HLSL usage */
 	DirectX::XMMATRIX getProjectionMatrix();
 
+	DirectX::BoundingFrustum getFrustum();
+
 	void init();
 	DirectX::XMVECTOR getCameraPosition();
 	void updateCamera(bool reverseZ, BufferSize& viewportSize, float viewDistance);

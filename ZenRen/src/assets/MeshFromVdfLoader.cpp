@@ -7,8 +7,6 @@
 #include "render/MeshUtil.h"
 #include "../Util.h"
 
-#include "directxcollision.h"
-
 namespace assets
 {
     using namespace render;
@@ -116,6 +114,30 @@ namespace assets
         return { (int16_t) result.x, (int16_t) result.z };
     }
 
+    bool isSubmeshEmptyAndValidate(const ZenLoad::PackedMesh::SubMesh& submesh, bool expectLigtmaps)
+    {
+        if (submesh.material.texture.empty()) {
+            return true;
+        }
+        if (submesh.indices.empty()) {
+            return true;
+        }
+        if (expectLigtmaps) {
+            if (submesh.triangleLightmapIndices.empty()) {
+                ::util::throwError("Expected world mesh to have lightmap information!");
+            }
+            if (submesh.triangleLightmapIndices.size() != (submesh.indices.size() / 3)) {
+                ::util::throwError("Expected one lightmap index per face (with value -1 for non-lightmapped faces).");
+            }
+        }
+        else {
+            if (!submesh.triangleLightmapIndices.empty()) {
+                ::util::throwError("Expected VOB mesh to NOT have lightmap information!");
+            }
+        }
+        return false;
+    }
+
     void loadWorldMesh(
         VERT_CHUNKS_BY_MAT& target,
         ZenLoad::zCMesh* worldMesh, uint32_t loadIndex)
@@ -126,23 +148,14 @@ namespace assets
         LOG(DEBUG) << "World Mesh: Loading " << packedMesh.subMeshes.size() << " Sub-Meshes.";
 
         for (const auto& submesh : packedMesh.subMeshes) {
-            if (submesh.material.texture.empty()) {
+            if (isSubmeshEmptyAndValidate(submesh, true)) {
                 continue;
-            }
-            if (submesh.indices.empty()) {
-                continue;
-            }
-            if (submesh.triangleLightmapIndices.empty()) {
-                throw std::logic_error("Expected world mesh to have lightmap information!");
-            }
-            if (submesh.triangleLightmapIndices.size() != (submesh.indices.size() / 3)) {
-                ::util::throwError("Expected one lightmap index per face (with value -1 for non-lightmapped faces).");
             }
 
             uint32_t indicesCount = submesh.indices.size();
 
             const Material& mat = toMaterial(submesh.material);
-            unordered_map<ChunkIndex, VEC_VERTEX_DATA>& materialData = ::util::getOrCreateDefault(target, mat);// this function is faster for creating
+            unordered_map<ChunkIndex, VEC_VERTEX_DATA>& materialData = ::util::getOrCreateDefault(target, mat);
 
             int32_t faceIndex = 0;
             for (uint32_t indicesIndex = 0; indicesIndex < indicesCount; indicesIndex += 3) {
@@ -253,7 +266,7 @@ namespace assets
         bool debugChecksEnabled)
     {
         // TODO switch to chunked loading
-        // TODO share code with world mesh loading
+        // TODO share code with world mesh loading if possible
         XMMATRIX normalTransform = inversedTransposed(instance.transform);
 
         uint32_t totalNormals = 0;
@@ -261,14 +274,8 @@ namespace assets
         uint32_t extremeNormals = 0;
 
         for (const auto& submesh : packedMesh.subMeshes) {
-            if (submesh.material.texture.empty()) {
+            if (isSubmeshEmptyAndValidate(submesh, false)) {
                 continue;
-            }
-            if (submesh.indices.empty()) {
-                continue;
-            }
-            if (!submesh.triangleLightmapIndices.empty()) {
-                throw std::logic_error("Expected VOB mesh to NOT have lightmap information!");
             }
 
             // at least in debug, resize & at-assignment is much faster than reserve & insert/copy, and we don't need temp array for flipping face order

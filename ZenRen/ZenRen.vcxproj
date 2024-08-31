@@ -286,6 +286,7 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\render\pass\PassWorldChunkGrid.cpp" />
     <ClCompile Include="src\assets\AssetCache.cpp" />
     <ClCompile Include="src\render\pass\PassSky.cpp" />
     <ClCompile Include="src\render\pass\PassWorldLoader.cpp" />
@@ -293,6 +294,7 @@
     <ClCompile Include="src\assets\DebugMeshes.cpp" />
     <ClCompile Include="src\assets\LookupTrees.cpp" />
     <ClCompile Include="src\render\MeshUtil.cpp" />
+    <ClInclude Include="src\render\pass\PassWorldChunkGrid.h" />
     <ClInclude Include="src\assets\AssetCache.h" />
     <ClInclude Include="src\render\pass\PassWorldLoader.h" />
     <ClInclude Include="src\render\Primitives.h" />

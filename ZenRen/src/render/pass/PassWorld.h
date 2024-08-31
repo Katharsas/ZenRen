@@ -15,6 +15,9 @@ namespace render::pass::world
 		bool drawStaticObjects = true;
 		bool drawSky = true;
 
+		bool enableFrustumCulling = true;
+		bool updateFrustumCulling = true;
+
 		bool debugWorldShaderEnabled = false;
 		float debugDrawVertAmount = 1.f;
 
@@ -24,6 +27,7 @@ namespace render::pass::world
 
 	void loadWorld(D3d d3d, const std::string& level);
 	void updateObjects(float deltaTime);
+	void updateCameraFrustum(const DirectX::BoundingFrustum& cameraFrustum);
 	const WorldSettings& getWorldSettings();
 	void initLinearSampler(D3d d3d, RenderSettings& settings);
 	void init(D3d d3d);

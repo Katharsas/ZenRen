@@ -55,7 +55,7 @@ namespace render
 
 	struct Mesh
 	{
-		int32_t vertexCount = 0;
+		uint32_t vertexCount = 0;
 		VertexBuffer vbPos = { sizeof(VERTEX_POS) };
 		VertexBuffer vbOther = { sizeof(VERTEX_OTHER) };
 
@@ -95,7 +95,7 @@ namespace render
 	{
 		std::vector<ChunkVertCluster> vertClusters;
 
-		int32_t vertexCount = 0;
+		uint32_t vertexCount = 0;
 		VertexBuffer vbPos = { sizeof(VERTEX_POS) };
 
 		void release()

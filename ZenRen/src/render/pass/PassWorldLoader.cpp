@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "PassWorldLoader.h"
 
+#include "PassWorldChunkGrid.h"
+
 #include "assets/AssetCache.h"
 #include "assets/AssetFinder.h"
 #include "assets/ZenLoader.h"
@@ -44,6 +46,7 @@ namespace render::pass::world
 	//   - lightmapTexArray -> array used by forward renderer
 
 	unordered_map<TexId, Texture*> textureCache;
+
 
 	Texture* createTexture(D3d d3d, TexId texId)
 	{
@@ -405,6 +408,12 @@ namespace render::pass::world
 			}
 			world.lightmapTexArray = createShaderTexArray(d3d, ddsRaws, 256, 256, true);
 		}
+
+		// chunk grid
+		chunkgrid::updateSize(data.worldMesh);
+		uint32_t cellCount = chunkgrid::finalizeSize();
+		chunkgrid::updateMesh(data.worldMesh);
+		LOG(INFO) << "Level Loaded - Chunk Grid       - Cells: " << cellCount;
 
 		LoadResult loadResult;
 		// TODO fix prepass

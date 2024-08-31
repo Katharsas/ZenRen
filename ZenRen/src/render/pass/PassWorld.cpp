@@ -5,6 +5,7 @@
 #include <stdexcept>
 
 #include "PassWorldLoader.h"
+#include "PassWorldChunkGrid.h"
 #include "PassSky.h"
 #include "../Camera.h"
 #include "../Sky.h"
@@ -32,8 +33,6 @@ namespace render::pass::world
 
 	uint32_t currentDrawCall = 0;
 	uint32_t maxDrawCalls = 0;
-
-	const uint32_t maxVertsPerDrawCall = 14000000 * 3;
 
 	struct DrawStats {
 		uint32_t stateChanges = 0;
@@ -70,11 +69,11 @@ namespace render::pass::world
 			[]() -> void {
 				uint32_t stateChanges = render::stats::getSamplerStats(samplers.stateChanges).average;
 				uint32_t draws = render::stats::getSamplerStats(samplers.draws).average;
-				uint32_t verts = render::stats::getSamplerStats(samplers.verts).average;
+				uint32_t verts = render::stats::getSamplerStats(samplers.verts).average / 1000;
 
 				std::stringstream buffer;
 				buffer << "States/Draws: " << stateChanges << " / " << draws << std::endl;
-				buffer << "Verts: " << verts << std::endl;
+				buffer << "Verts: " << verts << "k" << std::endl;
 				ImGui::Text(buffer.str().c_str());
 			}
 		});
@@ -90,11 +89,16 @@ namespace render::pass::world
 				}
 				ImGui::SliderFloat("##TimeOfDayChangeSpeed", &worldSettings.timeOfDayChangeSpeed, 0, 1, "%.3f Time Speed", ImGuiSliderFlags_Logarithmic);
 				ImGui::PopItemWidth();
+				ImGui::VerticalSpacing();
 
 				ImGui::PushStyleColorDebugText();
 				ImGui::Checkbox("Draw World", &worldSettings.drawWorld);
 				ImGui::Checkbox("Draw VOBs/MOBs", &worldSettings.drawStaticObjects);
 				ImGui::Checkbox("Draw Sky", &worldSettings.drawSky);
+				ImGui::VerticalSpacing();
+				ImGui::Checkbox("Enable Frustum Culling", &worldSettings.enableFrustumCulling);
+				ImGui::Checkbox("Update Frustum Culling", &worldSettings.updateFrustumCulling);
+				ImGui::VerticalSpacing();
 				ImGui::Checkbox("Debug Shader", &worldSettings.debugWorldShaderEnabled);
 				ImGui::Checkbox("Debug Single Draw", &worldSettings.debugSingleDrawEnabled);
 				ImGui::BeginDisabled(!worldSettings.debugSingleDrawEnabled);
@@ -128,6 +132,13 @@ namespace render::pass::world
 	void updateObjects(float deltaTime)
 	{
 		updateTimeOfDay(worldSettings.timeOfDay + (worldSettings.timeOfDayChangeSpeed * deltaTime));
+	}
+
+	void updateCameraFrustum(const BoundingFrustum& cameraFrustum)
+	{
+		if (worldSettings.enableFrustumCulling && worldSettings.updateFrustumCulling) {
+			chunkgrid::updateCamera(camera::getFrustum());
+		}
 	}
 
 	const WorldSettings& getWorldSettings() {
@@ -225,6 +236,9 @@ namespace render::pass::world
 	{
 		DrawStats stats;
 
+		uint32_t drawn = 0;
+		uint32_t skipped = 0;
+
 		for (auto& mesh : meshes) {
 			if (GetTex != nullptr) {
 				ID3D11ShaderResourceView* srv = GetTex(mesh);
@@ -232,18 +246,20 @@ namespace render::pass::world
 			}
 			util::setVertexBuffers(d3d, GetVbs(mesh));
 
-			if (mesh.vertexCount < 1000) {
+			// TODO cutoff should be adjustable in GUI
+			uint32_t ignoreChunkVertThreshold = 1000;
+			if (!worldSettings.enableFrustumCulling || mesh.vertexCount <= ignoreChunkVertThreshold) {
 				// for small number of verts per batch we ignore the clusters to save draw calls
-				// TODO cutoff should be adjustable in GUI
 				stats += draw(d3d, mesh.vertexCount, 0);
 				currentDrawCall++;
 			}
 			else {
+				// TODO when chunkgrid is spacial-sorted we should combine un-interruppted chunks into single draw calls 
+				// TODO also chunks with very few verts should just be enabled
+
 				const std::vector<ChunkVertCluster>& vertClusters = mesh.vertClusters;
 				uint32_t nextStartIndex = 0;
 				for (uint32_t i = 0; i < vertClusters.size(); i++) {
-
-					// TODO only draw clusters whose bb intersects camera
 
 					uint32_t startIndex = nextStartIndex;
 					uint32_t vertCount;
@@ -254,6 +270,13 @@ namespace render::pass::world
 						nextStartIndex = vertClusters[i + 1].vertStartIndex;
 						vertCount = nextStartIndex - startIndex;
 					}
+
+					const ChunkIndex& chunkIndex = vertClusters[i].pos;
+					if (!chunkgrid::intersectsCamera(chunkIndex)) {
+						skipped++;
+						continue;
+					}
+					drawn++;
 
 					vertCount = (uint32_t)(vertCount * worldSettings.debugDrawVertAmount);
 					vertCount -= (vertCount % 3);

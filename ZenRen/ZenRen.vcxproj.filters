@@ -110,6 +110,7 @@
     <ClCompile Include="src\render\pass\PassSky.cpp" />
     <ClCompile Include="src\assets\AssetCache.cpp" />
     <ClCompile Include="src\render\pass\PassWorldLoader.cpp" />
+    <ClCompile Include="src\render\pass\PassWorldChunkGrid.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Util.h">
@@ -177,5 +178,6 @@
     <ClInclude Include="src\render\Primitives.h" />
     <ClInclude Include="src\assets\AssetCache.h" />
     <ClInclude Include="src\render\pass\PassWorldLoader.h" />
+    <ClInclude Include="src\render\pass\PassWorldChunkGrid.h" />
   </ItemGroup>
 </Project>

@@ -9,8 +9,6 @@
 
 namespace render
 {
-    const std::array<VEC3, 2> bboxInfinite = { VEC3 {-FLT_MAX,-FLT_MAX,-FLT_MAX}, VEC3 {FLT_MAX,FLT_MAX,FLT_MAX} };
-
     template <typename T> bool isZero(const T& vec3, float threshold)
     {
         return std::abs(vec3.x) <= threshold && std::abs(vec3.y) <= threshold && std::abs(vec3.z) <= threshold;

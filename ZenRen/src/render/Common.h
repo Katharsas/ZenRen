@@ -29,19 +29,15 @@ namespace render
 		auto operator<=>(const TexInfo&) const = default;
 	};
 
-	const float chunkSizePerDim = 200;
-	// TODO we need to also save the Chunks themselves (and provide a method for bbox merging to update chunks)
+	// TODO make adjustable for reload, implement level selection and changing vdf path with load button
+	// TODO should be based on vertex density by default (make "auto" setting available)
+	const float chunkSizePerDim = 145;// optimized for G1, ideally we would first caluclate the bounds of the worldmesh and then use middlepoint and size
 
 	struct ChunkIndex {
 		int16_t x;
 		int16_t y;
 
 		auto operator<=>(const ChunkIndex&) const = default;
-	};
-
-	struct Chunk {
-		ChunkIndex pos;
-		std::array<VEC3, 2> bbox;
 	};
 
 	struct ChunkVertCluster {

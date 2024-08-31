@@ -12,6 +12,7 @@ namespace render::camera {
 	{
 		XMMATRIX view;
 		XMMATRIX projection;
+		BoundingFrustum frustum;
 	};
 
 	struct CameraLocation
@@ -50,6 +51,10 @@ namespace render::camera {
 		// pre-transposed for HLSL usage
 		return XMMatrixTranspose(matrices.projection);
 	}
+	BoundingFrustum getFrustum()
+	{
+		return matrices.frustum;
+	}
 
 	void init() {
 		location = g2NewWorldCity;
@@ -60,13 +65,24 @@ namespace render::camera {
 	}
 
 	void updateCamera(bool reverseZ, BufferSize& viewportSize, float viewDistance) {
+		
+		//reverseZ = false;
 		// Set view & projection matrix
 		matrices.view = XMMatrixLookAtLH(location.position, location.target, location.up);
 
 		const float aspectRatio = static_cast<float>(viewportSize.width) / viewportSize.height;
 		const float nearZ = 0.1f;
 		const float farZ = viewDistance;
+		// we use LH (Y-up) instead of RH (Z-up) for now
 		matrices.projection = XMMatrixPerspectiveFovLH(0.4f * 3.14f, aspectRatio, reverseZ ? farZ : nearZ, reverseZ ? nearZ : farZ);
+		
+		// BoundingFrustum does not support z-reversed or RH
+		XMMATRIX projectionForFrustum = reverseZ ? XMMatrixPerspectiveFovLH(0.4f * 3.14f, aspectRatio, nearZ, farZ) : matrices.projection;
+
+		// update frustum
+		BoundingFrustum::CreateFromMatrix(matrices.frustum, projectionForFrustum);
+		XMVECTOR determinant;
+		matrices.frustum.Transform(matrices.frustum, XMMatrixInverse(&determinant, matrices.view));
 	}
 
 	void moveCameraDepth(float amount) {
