@@ -29,11 +29,6 @@ using namespace Microsoft::WRL;
 
 #include "imgui/imgui.h"
 
-//#include <vdfs/fileIndex.h>
-//#include <zenload/zenParser.h>
-
-#define DEBUG_D3D11
-
 namespace render
 {
 	using namespace ::render::pass;
@@ -281,11 +276,20 @@ namespace render
 		// all feature levels that will be checked in order, we only care about 11_0
 		const D3D_FEATURE_LEVEL requiredLevels[] = { D3D_FEATURE_LEVEL_11_0 };
 
+		UINT creationFlags = 0;
+#if defined(_DEBUG)
+		// enable debug layer
+		creationFlags |= D3D11_CREATE_DEVICE_DEBUG;
+		LOG(INFO) << "D3D11 debug layer enabled!";
+#else
+		LOG(INFO) << "D3D11 debug layer disabled.";
+#endif
+
 		HRESULT hr = D3D11CreateDevice(
 			nullptr,
 			D3D_DRIVER_TYPE_HARDWARE,
 			nullptr,
-			D3D11_CREATE_DEVICE_DEBUG,//TODO this should be disabled for more performance in prod releases
+			creationFlags,
 			requiredLevels,
 			_countof(requiredLevels),
 			D3D11_SDK_VERSION,

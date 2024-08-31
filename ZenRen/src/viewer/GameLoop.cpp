@@ -17,7 +17,7 @@ namespace viewer
 {
 	struct Settings {
 		bool frameLimiterEnabled = true;
-		int32_t frameLimit = 60;
+		int32_t frameLimit = 120;
 	}
 	settings;
 

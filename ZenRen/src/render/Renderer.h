@@ -49,7 +49,7 @@ namespace render
 	};
 
 	struct VertexBuffer {
-		const uint32_t stride = -1;
+		uint32_t stride = -1;
 		ID3D11Buffer* buffer = nullptr;
 	};
 

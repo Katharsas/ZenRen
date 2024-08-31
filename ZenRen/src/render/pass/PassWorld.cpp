@@ -224,20 +224,24 @@ namespace render::pass::world
 			stats.draws++;
 		}
 
+		currentDrawCall++;
 		return stats;
 	}
 
+	// Mesh - the type of the mesh, usually MeshBatch
+	// VbCount - how many vertex buffer slots are used by a mesh
+	// GetVbs - function that returns each of those vertex buffers per mesh
+	// GetTex - function that returns texture per mesh
+	// clusteredMesh - true if meshes should be frustum culled based on grid cell index (requires "vertClusters" member)
 	template<
 		typename Mesh, int VbCount,
 		GetVertexBuffers<Mesh, VbCount> GetVbs,
-		GetTexSrv<Mesh> GetTex
+		GetTexSrv<Mesh> GetTex,
+		bool clusteredMesh
 	>
 	DrawStats drawVertexBuffers(D3d d3d, const vector<Mesh>& meshes)
 	{
 		DrawStats stats;
-
-		uint32_t drawn = 0;
-		uint32_t skipped = 0;
 
 		for (auto& mesh : meshes) {
 			if (GetTex != nullptr) {
@@ -247,42 +251,52 @@ namespace render::pass::world
 			util::setVertexBuffers(d3d, GetVbs(mesh));
 
 			// TODO cutoff should be adjustable in GUI
-			uint32_t ignoreChunkVertThreshold = 1000;
-			if (!worldSettings.enableFrustumCulling || mesh.vertexCount <= ignoreChunkVertThreshold) {
+			uint32_t ignoreAllChunksVertThreshold = 1000;
+			if (!clusteredMesh || !worldSettings.enableFrustumCulling || mesh.vertexCount <= ignoreAllChunksVertThreshold) {
 				// for small number of verts per batch we ignore the clusters to save draw calls
 				stats += draw(d3d, mesh.vertexCount, 0);
-				currentDrawCall++;
 			}
 			else {
-				// TODO when chunkgrid is spacial-sorted we should combine un-interruppted chunks into single draw calls 
-				// TODO also chunks with very few verts should just be enabled
+				uint32_t ignoreChunkVertThreshold = 500;
+				const vector<ChunkVertCluster>& vertClusters = mesh.vertClusters;
 
-				const std::vector<ChunkVertCluster>& vertClusters = mesh.vertClusters;
-				uint32_t nextStartIndex = 0;
+				// TODO since max number of cells is known, we could probably re-use a single static vector for all meshes
+				vector<std::pair<uint32_t, uint32_t>> vertRanges;
+				vertRanges.reserve(vertClusters.size());
+				
+				bool rangeActive = false;
+				uint32_t rangeStart = 0;
+
+				// TODO chunks with very few verts should be allowed to be enabled if range is active currently, if that helps joining ranges (test!)
+
 				for (uint32_t i = 0; i < vertClusters.size(); i++) {
-
-					uint32_t startIndex = nextStartIndex;
-					uint32_t vertCount;
-					if (i + 1 == vertClusters.size()) {
-						vertCount = mesh.vertexCount - startIndex;
-					}
-					else {
-						nextStartIndex = vertClusters[i + 1].vertStartIndex;
-						vertCount = nextStartIndex - startIndex;
-					}
-
 					const ChunkIndex& chunkIndex = vertClusters[i].pos;
-					if (!chunkgrid::intersectsCamera(chunkIndex)) {
-						skipped++;
-						continue;
+					bool currentChunkActive = chunkgrid::intersectsCamera(chunkIndex);
+
+					if (!rangeActive && currentChunkActive) {
+						// range start
+						rangeStart = vertClusters[i].vertStartIndex;
+						rangeActive = true;
 					}
-					drawn++;
+					if (rangeActive && !currentChunkActive) {
+						// range end
+						rangeActive = false;
+						vertRanges.push_back({ rangeStart, vertClusters[i].vertStartIndex });
+					}
+				}
+				// end last range
+				if (rangeActive) {
+					rangeActive = false;
+					vertRanges.push_back({ rangeStart, mesh.vertexCount });
+				}
+
+				for (const auto [startIncl, endExcl] : vertRanges) {
+					uint32_t vertCount = endExcl - startIncl;
 
 					vertCount = (uint32_t)(vertCount * worldSettings.debugDrawVertAmount);
 					vertCount -= (vertCount % 3);
 
-					stats += draw(d3d, vertCount, startIndex);
-					currentDrawCall++;
+					stats += draw(d3d, vertCount, startIncl);
 				}
 			}
 
@@ -299,20 +313,20 @@ namespace render::pass::world
 		if (worldSettings.drawWorld) {
 			d3d.annotation->BeginEvent(L"World");
 			if (bindTex) {
-				stats += drawVertexBuffers<MeshBatch, VbCount, GetVbs, batchGetTex>(d3d, world.meshBatchesWorld);
+				stats += drawVertexBuffers<MeshBatch, VbCount, GetVbs, batchGetTex, true>(d3d, world.meshBatchesWorld);
 			}
 			else {
-				stats += drawVertexBuffers<MeshBatch, VbCount, GetVbs, nullptr>(d3d, world.meshBatchesWorld);
+				stats += drawVertexBuffers<MeshBatch, VbCount, GetVbs, nullptr, true>(d3d, world.meshBatchesWorld);
 			}
 			d3d.annotation->EndEvent();
 		}
 		if (worldSettings.drawStaticObjects) {
 			d3d.annotation->BeginEvent(L"Objects");
 			if (bindTex) {
-				stats += drawVertexBuffers<MeshBatch, VbCount, GetVbs, batchGetTex>(d3d, world.meshBatchesObjects);
+				stats += drawVertexBuffers<MeshBatch, VbCount, GetVbs, batchGetTex, false>(d3d, world.meshBatchesObjects);
 			}
 			else {
-				stats += drawVertexBuffers<MeshBatch, VbCount, GetVbs, nullptr>(d3d, world.meshBatchesObjects);
+				stats += drawVertexBuffers<MeshBatch, VbCount, GetVbs, nullptr, false>(d3d, world.meshBatchesObjects);
 			}
 			d3d.annotation->EndEvent();
 		}
@@ -328,7 +342,7 @@ namespace render::pass::world
 		d3d.deviceContext->PSSetShader(nullptr, 0, 0);
 		d3d.deviceContext->VSSetConstantBuffers(1, 1, &cbs.cameraCb);
 
-		drawVertexBuffers<PrepassMeshes, 1, prepassGetVbPos, nullptr>(d3d, world.prepassMeshes);
+		drawVertexBuffers<PrepassMeshes, 1, prepassGetVbPos, nullptr, true>(d3d, world.prepassMeshes);
 		d3d.annotation->EndEvent();
 	}
 
