@@ -14,17 +14,18 @@ namespace assets
 {
     void loadWorldMesh(
         render::VERT_CHUNKS_BY_MAT& target,
-        ZenLib::ZenLoad::zCMesh* worldMesh);
+        ZenLib::ZenLoad::zCMesh* worldMesh,
+        bool debugChecksEnabled = false);
     
     void loadInstanceMesh(
-        render::VERTEX_DATA_BY_MAT& target,
+        render::VERT_CHUNKS_BY_MAT& target,
         const ZenLib::ZenLoad::zCProgMeshProto& mesh,
         const ZenLib::ZenLoad::PackedMesh packedMesh,
         const render::StaticInstance& instance,
         bool debugChecksEnabled = false);
 
     void loadInstanceMeshLib(
-        render::VERTEX_DATA_BY_MAT& target,
+        render::VERT_CHUNKS_BY_MAT& target,
         const MeshLibData& libData,
         const render::StaticInstance & instance,
         bool debugChecksEnabled = false);

@@ -85,6 +85,9 @@ inline std::ostream& operator <<(std::ostream& os, const NORMAL_UV_LUV& that)
 	return os << "[NOR:" << that.normal << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
 }
 
+// TODO create union of uvLightmap + colLight with single bit flag ti differentiate
+// TODO move uvDiffuse into TEX_INDEX
+// TODO define input layout in structs
 struct NORMAL_CL_UV_LUV_STATIC_LIGHT {
 	VEC3 normal;
 	UV uvDiffuse;

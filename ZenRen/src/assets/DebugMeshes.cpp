@@ -53,7 +53,7 @@ namespace assets
         return result;
     }
 
-    void loadInstanceMeshBboxDebugVisual(unordered_map<Material, VEC_VERTEX_DATA>& target, const StaticInstance& instance)
+    void loadInstanceMeshBboxDebugVisual(VERT_CHUNKS_BY_MAT& target, const StaticInstance& instance)
     {
         vector<VERTEX_POS> facesPos;
         vector<VERTEX_OTHER> facesOther;
@@ -96,7 +96,7 @@ namespace assets
         return result;
     }
 
-    void loadPointDebugVisual(unordered_map<Material, VEC_VERTEX_DATA>& target, const VEC3& pos, const VEC3& scale, const D3DXCOLOR& color)
+    void loadPointDebugVisual(VERT_CHUNKS_BY_MAT& target, const VEC3& pos, const VEC3& scale, const D3DXCOLOR& color)
     {
         vector<VERTEX_POS> facesPos;
         vector<VERTEX_OTHER> facesOther;
@@ -134,7 +134,7 @@ namespace assets
         return result;
     }
 
-    void loadLineDebugVisual(unordered_map<Material, VEC_VERTEX_DATA>& target, const VEC3& posStart, VEC3& posEnd, const D3DXCOLOR& color)
+    void loadLineDebugVisual(VERT_CHUNKS_BY_MAT& target, const VEC3& posStart, VEC3& posEnd, const D3DXCOLOR& color)
     {
         vector<VERTEX_POS> facesPos;
         vector<VERTEX_OTHER> facesOther;

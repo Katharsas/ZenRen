@@ -107,7 +107,7 @@ namespace assets
         }
     }
 
-    bool loadInstanceMesh(unordered_map<Material, VEC_VERTEX_DATA>& target, VDFS::FileIndex& vdf, const StaticInstance& instance)
+    bool loadInstanceMesh(VERT_CHUNKS_BY_MAT& target, VDFS::FileIndex& vdf, const StaticInstance& instance)
     {
         using namespace FormatsCompiled;
 
@@ -417,7 +417,7 @@ namespace assets
             LOG(INFO) << "VOB loading disabled!";
         }
 
-        VERTEX_DATA_BY_MAT staticMeshData;
+        VERT_CHUNKS_BY_MAT staticMeshData;
         for (auto& vob : vobs) {
             auto& visualname = vob.meshName;
 
@@ -436,16 +436,19 @@ namespace assets
             }
         }
 
+        VERTEX_DATA_BY_MAT dynamicMeshData;
+
         LOG(INFO) << "Meshes loaded!";
 
         const auto duration = std::chrono::high_resolution_clock::now() - now;
         LOG(INFO) << "Loading finished in: " << duration / std::chrono::milliseconds(1) << " ms.";
 
-        RenderData result;
-        result.isOutdoorLevel = isOutdoorLevel;
-        result.worldMesh = worldMeshData;
-        result.staticMeshes = staticMeshData;
-        result.worldMeshLightmaps = lightmaps;
-        return result;
+        return RenderData {
+            .isOutdoorLevel = isOutdoorLevel,
+            .worldMesh = worldMeshData,
+            .staticMeshes = staticMeshData,
+            .dynamicMeshes = dynamicMeshData,
+            .worldMeshLightmaps = lightmaps
+        };
 	}
 }

@@ -33,7 +33,8 @@ namespace render
 	struct RenderData {
 		bool isOutdoorLevel;
 		VERT_CHUNKS_BY_MAT worldMesh;
-		VERTEX_DATA_BY_MAT staticMeshes;
+		VERT_CHUNKS_BY_MAT staticMeshes;
+		VERTEX_DATA_BY_MAT dynamicMeshes;
 		std::vector<InMemoryTexFile> worldMeshLightmaps;
 	};
 

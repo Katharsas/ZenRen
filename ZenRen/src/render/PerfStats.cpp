@@ -22,7 +22,7 @@ namespace render::stats
 	}
 
 	const int32_t sampleSize = 1000; // max number of frames before samples are averaged to update stats
-	const int32_t maxDurationMillis = 1000; // max ms duration before samples are averaged to update stats
+	const int32_t maxDurationMillis = 500; // max ms duration before samples are averaged to update stats
 
 	vector<array<uint32_t, sampleSize>> sampleBuffers;
 	vector<pair<int32_t, steady_clock::time_point>> lastUpdated;

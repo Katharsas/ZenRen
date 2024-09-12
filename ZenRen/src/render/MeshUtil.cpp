@@ -44,9 +44,27 @@ namespace render
         return VEC4{ result.x, result.y, result.z, result.w };
     }
 
-    XMVECTOR calcFlatFaceNormal(const array<XMVECTOR, 3>& posXm) {
+    XMVECTOR centroidPos(const array<XMVECTOR, 3>& posXm)
+    {
+        const static float oneThird = 1.f / 3.f;
+        return XMVectorScale(XMVectorAdd(XMVectorAdd(posXm[0], posXm[1]), posXm[2]), oneThird);
+    }
+
+    XMVECTOR calcFlatFaceNormal(const array<XMVECTOR, 3>& posXm)
+    {
         // counter-clockwise winding, flip XMVector3Cross argument order for clockwise winding
         return  XMVector3Cross(XMVectorSubtract(posXm[2], posXm[0]), XMVectorSubtract(posXm[1], posXm[0]));
+    }
+
+    ChunkIndex toChunkIndex(XMVECTOR posXm)
+    {
+        const static XMVECTOR chunkSize = toXM4Pos(VEC3{ chunkSizePerDim, chunkSizePerDim, chunkSizePerDim });
+        XMVECTOR indexXm = XMVectorFloor(XMVectorDivide(posXm, chunkSize));
+
+        XMFLOAT4 result;
+        XMStoreFloat4(&result, indexXm);
+
+        return { (int16_t)result.x, (int16_t)result.z };
     }
 
     void warnIfNotNormalized(const XMVECTOR& source)

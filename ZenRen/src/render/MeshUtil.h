@@ -32,7 +32,9 @@ namespace render
     VEC3 toVec3(const DirectX::XMVECTOR& xm4);
     VEC4 toVec4(const DirectX::XMVECTOR& xm4);
 
+    DirectX::XMVECTOR centroidPos(const std::array<DirectX::XMVECTOR, 3>& posXm);
     DirectX::XMVECTOR calcFlatFaceNormal(const std::array<DirectX::XMVECTOR, 3>& posXm);
+    ChunkIndex toChunkIndex(DirectX::XMVECTOR posXm);
 
     inline std::ostream& operator <<(std::ostream& os, const DirectX::XMVECTOR& that)
     {
@@ -45,10 +47,32 @@ namespace render
     void insert(VERTEX_DATA_BY_MAT& target, const Material& material, const C1& positions, const C2& normalsAndUvs)
     {
         auto& meshData = ::util::getOrCreateDefault(target, material);
-        auto vertCountBefore = meshData.vecPos.size();
 
         meshData.vecPos.insert(meshData.vecPos.end(), positions.begin(), positions.end());
         meshData.vecOther.insert(meshData.vecOther.end(), normalsAndUvs.begin(), normalsAndUvs.end());
+    }
+
+    template <typename C1, typename C2>
+    void insert(VERT_CHUNKS_BY_MAT& target, const Material& material, const C1& positions, const C2& normalsAndUvs)
+    {
+        std::unordered_map<ChunkIndex, VEC_VERTEX_DATA>& meshData = ::util::getOrCreateDefault(target, material);
+        
+        for (uint32_t i = 0; i < positions.size(); i += 3) {
+            const ChunkIndex chunkIndex = toChunkIndex(centroidPos({
+                toXM4Pos(positions[i]),
+                toXM4Pos(positions[i + 1]),
+                toXM4Pos(positions[i + 2])
+            }));
+            VEC_VERTEX_DATA& chunkData = ::util::getOrCreateDefault(meshData, chunkIndex);
+
+            // TODO copied from MeshFromVdfLoader for now, clean up
+            chunkData.vecPos.push_back(positions[i]);
+            chunkData.vecPos.push_back(positions[i + 1]);
+            chunkData.vecPos.push_back(positions[i + 2]);
+            chunkData.vecOther.push_back(normalsAndUvs[i]);
+            chunkData.vecOther.push_back(normalsAndUvs[i + 1]);
+            chunkData.vecOther.push_back(normalsAndUvs[i + 2]);
+        }
     }
 
     void warnIfNotNormalized(const DirectX::XMVECTOR& source);

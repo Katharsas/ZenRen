@@ -443,7 +443,7 @@ namespace render::pass::world
 		sortByVertCount(world.meshBatchesWorld);// improves performance
 		LOG(INFO) << "Level Loaded - World Mesh       - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
 		
-		loadResult = loadVertexData(d3d, world.meshBatchesObjects, data.staticMeshes);
+		loadResult = loadVertexDataBatched(d3d, world.meshBatchesObjects, data.staticMeshes, texturesPerBatch);
 		LOG(INFO) << "Level Loaded - Static Instances - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
 
 		// since single textures have been copied to texture arrays, we can release them

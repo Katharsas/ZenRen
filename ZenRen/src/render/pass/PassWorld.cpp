@@ -241,6 +241,12 @@ namespace render::pass::world
 	>
 	DrawStats drawVertexBuffers(D3d d3d, const vector<Mesh>& meshes)
 	{
+		// TODO separate draw distance / camera frustum for worldmesh vs vobs (smaller for vobs)
+		// TODO select closest chunks (by adjustable distance, but at least the 4 closest) and render them first for early-z discards
+		// TODO fix view-coordinate normal lighting and move to pixel shader so lighting can profit from early-z
+		// TODO check if loading textures in lower res improces performance
+		//   - if yes, load textures arrays twice, once with reduced resolution (256 or lower?) and use low-res textures for non-near chunks (-> GRM)
+
 		DrawStats stats;
 
 		for (auto& mesh : meshes) {
@@ -257,7 +263,7 @@ namespace render::pass::world
 				stats += draw(d3d, mesh.vertexCount, 0);
 			}
 			else {
-				uint32_t ignoreChunkVertThreshold = 500;
+				uint32_t ignoreChunkVertThreshold = 500;// TODO
 				const vector<ChunkVertCluster>& vertClusters = mesh.vertClusters;
 
 				// TODO since max number of cells is known, we could probably re-use a single static vector for all meshes
@@ -323,10 +329,10 @@ namespace render::pass::world
 		if (worldSettings.drawStaticObjects) {
 			d3d.annotation->BeginEvent(L"Objects");
 			if (bindTex) {
-				stats += drawVertexBuffers<MeshBatch, VbCount, GetVbs, batchGetTex, false>(d3d, world.meshBatchesObjects);
+				stats += drawVertexBuffers<MeshBatch, VbCount, GetVbs, batchGetTex, true>(d3d, world.meshBatchesObjects);
 			}
 			else {
-				stats += drawVertexBuffers<MeshBatch, VbCount, GetVbs, nullptr, false>(d3d, world.meshBatchesObjects);
+				stats += drawVertexBuffers<MeshBatch, VbCount, GetVbs, nullptr, true>(d3d, world.meshBatchesObjects);
 			}
 			d3d.annotation->EndEvent();
 		}

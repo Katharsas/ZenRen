@@ -21,40 +21,6 @@ namespace assets
 
     const float zeroThreshold = 0.000001f;
 
-    void posToXM4(const array<ZenLoad::WorldVertex, 3>& zenFace, array<XMVECTOR, 3>& target) {
-        for (uint32_t i = 0; i < 3; i++) {
-            const auto& zenVert = zenFace[i];
-            target[i] = toXM4Pos(zenVert.Position);
-        }
-    }
-
-    int32_t wrapModulo(int32_t positiveOrNegative, int32_t modulo)
-    {
-        return ((positiveOrNegative % modulo) + modulo) % modulo;
-    }
-
-    XMMATRIX inversedTransposed(const XMMATRIX& source) {
-        const XMMATRIX transposed = XMMatrixTranspose(source);
-        return XMMatrixInverse(nullptr, transposed);
-    }
-
-    VEC3 transformDir(const XMVECTOR& source, const XMMATRIX& transform, bool debugChecksEnabled = false)
-    {
-        if (debugChecksEnabled) {
-            warnIfNotNormalized(source);
-        }
-        // XMVector3TransformNormal is hardcoded to use w=0, but might still output unnormalized normals when matrix has non-uniform scaling
-        XMVECTOR result;
-        result = XMVector3TransformNormal(source, transform);
-        result = XMVector3Normalize(result);
-        return toVec3(result);
-    }
-
-    VEC3 transformPos(const XMVECTOR& source, const XMMATRIX& transform)
-    {
-        XMVECTOR pos = XMVector4Transform(source, transform);
-        return toVec3(pos);
-    }
 
     const array<ZenLoad::WorldVertex, 3> getFaceVerts(
         const vector<ZenLoad::WorldVertex>& verts,
@@ -68,6 +34,88 @@ namespace assets
         };
     }
 
+    template<bool transform>
+    void posToXM4(const array<ZenLoad::WorldVertex, 3>& zenFace, array<XMVECTOR, 3>& target, const XMMATRIX& posTransform = XMMatrixIdentity()) {
+        for (uint32_t i = 0; i < 3; i++) {
+            const auto& zenVert = zenFace[i];
+            if (transform) {
+                target[i] = XMVector4Transform(toXM4Pos(zenVert.Position), posTransform);
+            }
+            else {
+                target[i] = toXM4Pos(zenVert.Position);
+            }
+        }
+    }
+
+    struct NormalsStats {
+        uint32_t total = 0;
+        uint32_t zero = 0;
+        uint32_t extreme = 0;
+
+        auto operator+=(const NormalsStats& rhs)
+        {
+            total += rhs.total;
+            zero += rhs.zero;
+            extreme += rhs.extreme;
+        };
+    };
+
+    void logNormalStats(const NormalsStats& normalStats, const std::string& meshName)
+    {
+        if (normalStats.zero > 0) {
+            LOG(WARNING) << "Normals: " << util::leftPad("'" + std::to_string(normalStats.zero) + "/" + std::to_string(normalStats.total), 9) << "' are ZERO:  " << meshName;
+        }
+        if (normalStats.extreme > 0) {
+            LOG(WARNING) << "Normals: " << util::leftPad("'" + std::to_string(normalStats.extreme) + "/" + std::to_string(normalStats.total), 9) << "' are WRONG: " << meshName << " (over 90 degrees off recalc. flat normal)";
+        }
+    }
+
+    void transformDir(XMVECTOR& target, const XMVECTOR& source, const XMMATRIX& transform)
+    {
+        // XMVector3TransformNormal is hardcoded to use w=0, but might still output unnormalized normals when matrix has non-uniform scaling
+        target = XMVector3TransformNormal(source, transform);
+        target = XMVector3Normalize(target);
+    }
+
+    template<bool transform, bool debugChecksEnabled>
+    NormalsStats normalToXM4(array<XMVECTOR, 3>& target, const array<ZenLoad::WorldVertex, 3>& zenFace, const array<XMVECTOR, 3>& facePosXm, const XMMATRIX& normalTransform = XMMatrixIdentity())
+    {
+        NormalsStats normalStats = { .total = 3 };
+
+        XMVECTOR flatNormalXm;
+        if (debugChecksEnabled) {
+            flatNormalXm = calcFlatFaceNormal(facePosXm);
+        }
+
+        for (uint32_t i = 0; i < 3; i++) {
+            const auto& zenVert = zenFace[i];
+            if (debugChecksEnabled && isZero(zenVert.Normal, zeroThreshold)) {
+                target[i] = flatNormalXm;
+                normalStats.zero++;
+            }
+            else {
+                target[i] = toXM4Dir(zenVert.Normal);
+                if (debugChecksEnabled) {
+                    warnIfNotNormalized(target[i]);
+                }
+                if (transform) {
+                    transformDir(target[i], target[i], normalTransform);
+                }
+            }
+
+            if (debugChecksEnabled) {
+                XMVECTOR angleXm = XMVector3AngleBetweenNormals(flatNormalXm, target[i]);
+                float normalFlatnessRadian = XMVectorGetX(angleXm);
+                float normalFlatnessDegrees = normalFlatnessRadian * (180.f / 3.141592653589793238463f);
+                if (normalFlatnessDegrees > 90) {
+                    normalStats.extreme++;
+                }
+            }
+        }
+
+        return normalStats;
+    }
+
 
     Material toMaterial(const ZenLoad::zCMaterialData& material)
     {
@@ -76,7 +124,6 @@ namespace assets
     }
 
     void insertFace(VEC_VERTEX_DATA& target, const array<VERTEX_POS, 3>& facePos, const array<VERTEX_OTHER, 3>& faceOther) {
-        // TODO find fastest way to insert in debug mode
         target.vecPos.push_back(facePos[0]);
         target.vecPos.push_back(facePos[1]);
         target.vecPos.push_back(facePos[2]);
@@ -95,23 +142,6 @@ namespace assets
         XMFLOAT3 max = corners[4];
 
         return { toVec3(min), toVec3(max) };
-    }
-
-    XMVECTOR centroidPos(array<XMVECTOR, 3> face)
-    {
-        const static float oneThird = 1.f / 3.f;
-        return XMVectorScale(XMVectorAdd(XMVectorAdd(face[0], face[1]), face[2]), oneThird);
-    }
-
-    ChunkIndex toChunkIndex(XMVECTOR posXm)
-    {
-        const static XMVECTOR chunkSize = toXM4Pos(VEC3{ chunkSizePerDim, chunkSizePerDim, chunkSizePerDim });
-        XMVECTOR indexXm = XMVectorFloor(XMVectorDivide(posXm, chunkSize));
-
-        XMFLOAT4 result;
-        XMStoreFloat4(&result, indexXm);
-
-        return { (int16_t) result.x, (int16_t) result.z };
     }
 
     bool isSubmeshEmptyAndValidate(const ZenLoad::PackedMesh::SubMesh& submesh, bool expectLigtmaps)
@@ -140,12 +170,15 @@ namespace assets
 
     void loadWorldMesh(
         VERT_CHUNKS_BY_MAT& target,
-        ZenLoad::zCMesh* worldMesh, uint32_t loadIndex)
+        ZenLoad::zCMesh* worldMesh,
+        bool debugChecksEnabled, uint32_t loadIndex)
     {
         ZenLoad::PackedMesh packedMesh;
         worldMesh->packMesh(packedMesh, G_ASSET_RESCALE);
 
         LOG(DEBUG) << "World Mesh: Loading " << packedMesh.subMeshes.size() << " Sub-Meshes.";
+
+        NormalsStats normalStats;
 
         for (const auto& submesh : packedMesh.subMeshes) {
             if (isSubmeshEmptyAndValidate(submesh, true)) {
@@ -170,17 +203,25 @@ namespace assets
                 }
 
                 array<XMVECTOR, 3> facePosXm;
-                posToXM4(zenFace, facePosXm);
+                posToXM4<false>(zenFace, facePosXm);
+
+                // normals
+                array<XMVECTOR, 3> faceNormalsXm;
+                if (debugChecksEnabled) {
+                    normalStats += normalToXM4<false, true>(faceNormalsXm, zenFace, facePosXm);
+                }
+                else {
+                    normalStats += normalToXM4<false, false>(faceNormalsXm, zenFace, facePosXm);
+                }
 
                 array<VERTEX_POS, 3> facePos;
                 array<VERTEX_OTHER, 3> faceOther;
 
                 for (uint32_t i = 0; i < 3; i++) {
                     const auto& zenVert = zenFace[i];
-                    VERTEX_POS pos;
-                    pos = toVec3(facePosXm[i]);
+                    VERTEX_POS pos = toVec3(facePosXm[i]);
                     VERTEX_OTHER other;
-                    other.normal = from(zenVert.Normal);
+                    other.normal = toVec3(faceNormalsXm[i]);
                     other.uvDiffuse = from(zenVert.TexCoord);
                     other.colLight = fromSRGB(D3DXCOLOR(zenVert.Color));
                     //other.colLight = D3DXCOLOR(1, 1, 1, 0.f);
@@ -208,58 +249,38 @@ namespace assets
                 }
 
                 const ChunkIndex chunkIndex = toChunkIndex(centroidPos(facePosXm));
-                VEC_VERTEX_DATA& chunkData = ::util::getOrCreateDefault(materialData, chunkIndex);// this function is faster for getting existing
+                VEC_VERTEX_DATA& chunkData = ::util::getOrCreateDefault(materialData, chunkIndex);
                 insertFace(chunkData, facePos, faceOther);
 
                 faceIndex++;
             }
         }
+
+        if (debugChecksEnabled) {
+            logNormalStats(normalStats, "LEVEL_MESH");
+        }
     }
 
     void loadWorldMesh(
         VERT_CHUNKS_BY_MAT& target,
-        ZenLoad::zCMesh* worldMesh)
+        ZenLoad::zCMesh* worldMesh,
+        bool debugChecksEnabled)
     {
         uint32_t instances = 1;
         for (uint32_t i = 0; i < instances; ++i) {
-            loadWorldMesh(target, worldMesh, i);
+            loadWorldMesh(target, worldMesh, i, debugChecksEnabled);
         }
     }
 
-    uint8_t normalToXM4(const array<ZenLoad::WorldVertex, 3>& zenFace, array<XMVECTOR, 3>& target, const XMVECTOR& faceNormalXm, bool debugChecksEnabled) {
-        uint8_t zeroNormals = 0;
-        for (uint32_t i = 0; i < 3; i++) {
-            const auto& zenVert = zenFace[i];
-            if (debugChecksEnabled && isZero(zenVert.Normal, zeroThreshold)) {
-                target[i] = faceNormalXm;
-                zeroNormals++;
-            }
-            else {
-                target[i] = toXM4Dir(zenVert.Normal);
-            }
-        }
-        return zeroNormals;
-    }
-
-    uint8_t normalAngleCheck(const array<XMVECTOR, 3>& normalsXm, const XMVECTOR& faceNormalXm, bool debugChecksEnabled) {
-        uint8_t wrongNormals = 0;
-        if (debugChecksEnabled) {
-            for (int32_t i = 0; i < 3; i++) {
-                XMVECTOR angleXm = XMVector3AngleBetweenNormals(faceNormalXm, normalsXm[i]);
-                float normalFlatnessRadian = XMVectorGetX(angleXm);
-                float normalFlatnessDegrees = normalFlatnessRadian * (180.f / 3.141592653589793238463f);
-                if (normalFlatnessDegrees > 90) {
-                    wrongNormals++;
-                }
-            }
-        }
-        return wrongNormals;
+    XMMATRIX inversedTransposed(const XMMATRIX& source) {
+        const XMMATRIX transposed = XMMatrixTranspose(source);
+        return XMMatrixInverse(nullptr, transposed);
     }
 
     unordered_set<string> processedVisuals;
 
 	void loadInstanceMesh(
-        VERTEX_DATA_BY_MAT& target,
+        VERT_CHUNKS_BY_MAT& target,
         const ZenLib::ZenLoad::zCProgMeshProto& mesh,
         const ZenLib::ZenLoad::PackedMesh packedMesh,
         const StaticInstance& instance,
@@ -269,47 +290,44 @@ namespace assets
         // TODO share code with world mesh loading if possible
         XMMATRIX normalTransform = inversedTransposed(instance.transform);
 
-        uint32_t totalNormals = 0;
-        uint32_t zeroNormals = 0;
-        uint32_t extremeNormals = 0;
+        NormalsStats normalStats;
 
         for (const auto& submesh : packedMesh.subMeshes) {
             if (isSubmeshEmptyAndValidate(submesh, false)) {
                 continue;
             }
 
-            // at least in debug, resize & at-assignment is much faster than reserve & insert/copy, and we don't need temp array for flipping face order
             uint32_t indicesCount = submesh.indices.size();
-            vector<VERTEX_POS> facesPos(indicesCount);
-            vector<VERTEX_OTHER> facesOther(indicesCount);
+
+            const Material& mat = toMaterial(submesh.material);
+            unordered_map<ChunkIndex, VEC_VERTEX_DATA>& materialData = ::util::getOrCreateDefault(target, mat);
 
             for (uint32_t indicesIndex = 0; indicesIndex < indicesCount; indicesIndex += 3) {
                 
                 const array zenFace = getFaceVerts(packedMesh.vertices, submesh.indices, indicesIndex);
 
                 // positions
-                array<XMVECTOR, 3> posXm;
-                posToXM4(zenFace, posXm);
+                array<XMVECTOR, 3> facePosXm;
+                posToXM4<true>(zenFace, facePosXm, instance.transform);
 
                 // normals
-                totalNormals += 3;
-                XMVECTOR faceNormalXm;
+                array<XMVECTOR, 3> faceNormalsXm;
                 if (debugChecksEnabled) {
-                    faceNormalXm = calcFlatFaceNormal(posXm);
+                    normalStats += normalToXM4<true, true>(faceNormalsXm, zenFace, facePosXm, instance.transform);
                 }
-                array<XMVECTOR, 3> normalsXm;
-                zeroNormals += normalToXM4(zenFace, normalsXm, faceNormalXm, debugChecksEnabled);
+                else {
+                    normalStats += normalToXM4<true, false>(faceNormalsXm, zenFace, facePosXm, instance.transform);
+                }
 
-                // detect wrong normals
-                extremeNormals += normalAngleCheck(normalsXm, faceNormalXm, debugChecksEnabled);
+                array<VERTEX_POS, 3> facePos;
+                array<VERTEX_OTHER, 3> faceOther;
 
                 // transform
                 for (uint32_t i = 0; i < 3; i++) {
                     const auto& zenVert = zenFace[i];
-                    VERTEX_POS pos;
-                    pos = transformPos(posXm[i], instance.transform);
+                    VERTEX_POS pos = toVec3(facePosXm[i]);
                     VERTEX_OTHER other;
-                    other.normal = transformDir(normalsXm[i], normalTransform, debugChecksEnabled);
+                    other.normal = toVec3(faceNormalsXm[i]);
                     other.uvDiffuse = from(zenVert.TexCoord);
                     other.uvLightmap = { 0, 0, -1 };
                     other.colLight = instance.colLightStatic;
@@ -318,31 +336,25 @@ namespace assets
 
                     // flip faces (seems like zEngine uses counter-clockwise winding, while we use clockwise winding)
                     // TODO use D3D11_RASTERIZER_DESC FrontCounterClockwise instead?
-                    facesPos.at(indicesIndex + (2 - i)) = pos;
-                    facesOther.at(indicesIndex + (2 - i)) = other;
+                    facePos.at(2 - i) = pos;
+                    faceOther.at(2 - i) = other;
                 }
-            }
 
-            const Material& material = toMaterial(submesh.material);
-            insert(target, material, facesPos, facesOther);
+                const ChunkIndex chunkIndex = toChunkIndex(centroidPos(facePosXm));
+                VEC_VERTEX_DATA& chunkData = ::util::getOrCreateDefault(materialData, chunkIndex);
+                insertFace(chunkData, facePos, faceOther);
+            }
         }
 
         if (debugChecksEnabled) {
             const auto& visualname = instance.meshName;
-            if (processedVisuals.find(visualname) == processedVisuals.end()) {
-                if (zeroNormals > 0) {
-                    LOG(WARNING) << "Normals: " << util::leftPad("'" + std::to_string(zeroNormals) + "/" + std::to_string(totalNormals), 9) << "' are ZERO:  " << visualname;
-                }
-                if (extremeNormals > 0) {
-                    LOG(WARNING) << "Normals: " << util::leftPad("'" + std::to_string(extremeNormals) + "/" + std::to_string(totalNormals), 9) << "' are WRONG: " << visualname << " (over 90 degrees off recalc. flat normal)";
-                }
-            }
+            logNormalStats(normalStats, visualname);
             processedVisuals.insert(visualname);
         }
 	}
 
     void loadInstanceMeshLib(
-        VERTEX_DATA_BY_MAT& target,
+        VERT_CHUNKS_BY_MAT& target,
         const MeshLibData& libData,
         const StaticInstance& instance,
         bool debugChecksEnabled)
