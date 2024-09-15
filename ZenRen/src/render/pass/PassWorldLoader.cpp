@@ -36,6 +36,7 @@ namespace render::pass::world
 	};
 
 	const TEX_INDEX texturesPerBatch = 512;
+	const uint32_t vertCountPerBatch = (20 * 1024 * 1024) / sizeof(VERTEX_OTHER);// 20 MB divided by biggest buffer element size
 
 	World world;
 
@@ -164,7 +165,7 @@ namespace render::pass::world
 		target.push_back(batch);
 	}
 
-	vector<pair<TexInfo, vector<pair<Material, const VERT_CHUNKS*>>>> groupByTexId(D3d d3d, const VERT_CHUNKS_BY_MAT& meshData, TEX_INDEX maxTexturesPerBatch)
+	vector<pair<TexInfo, vector<pair<Material, const VERT_CHUNKS *>>>> groupByTexId(D3d d3d, const VERT_CHUNKS_BY_MAT& meshData, TEX_INDEX maxTexturesPerBatch)
 	{
 		// load and bucket all materials so textures that are texture-array-compatible are grouped in a single bucket
 		unordered_map<TexInfo, vector<Material>> texBuckets;
@@ -245,6 +246,38 @@ namespace render::pass::world
 		return result;
 	}
 
+	vector<pair<uint32_t, vector<pair<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>>>>> splitByVertCount(
+		const vector<pair<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>>>& batchData, uint32_t maxVertCount)
+	{
+		vector<pair<uint32_t, vector<pair<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>>>>> result;
+
+		vector<pair<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>>> currentBatch;
+		uint32_t currentBatchVertCount = 0;
+
+		for (const auto& [chunkIndex, vertDataByMat] : batchData) {
+
+			uint32_t chunkVertCount = 0;
+			for (const auto& [material, vertData] : vertDataByMat) {
+				chunkVertCount += vertData.vecPos.size();
+			}
+
+			// we never split a single chunk, so if the first chunk of a batch has more than maxVertCount verts we accept that
+			if (currentBatchVertCount != 0 && (currentBatchVertCount + chunkVertCount) > maxVertCount) {
+				result.push_back({ currentBatchVertCount, currentBatch });
+				currentBatch.clear();
+				currentBatchVertCount = 0;
+			}
+			currentBatch.push_back({ chunkIndex, vertDataByMat });
+			currentBatchVertCount += chunkVertCount;
+		}
+
+		if (currentBatchVertCount != 0) {
+			result.push_back({ currentBatchVertCount, currentBatch });
+		}
+
+		return result;
+	}
+
 	pair<VEC_VERTEX_DATA_BATCH, LoadResult> flattenIntoBatch(const vector<pair<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>>>& batchData)
 	{
 		LoadResult result;
@@ -302,11 +335,20 @@ namespace render::pass::world
 		for (const auto& [texInfo, batchData] : batchedMeshData) {
 
 			vector<pair<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>>> batchDataByChunk = groupAndSortByChunkIndex(batchData);
+			
+			// split current batch into multiple smaller batches along chunk boundaries if it contains too many verts to prevent OOM crashes
+			vector<pair<uint32_t, vector<pair<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>>>>> batchDataSplit =
+				splitByVertCount(batchDataByChunk, vertCountPerBatch);
 
-			const auto [batchDataFlat, batchLoadResult] = flattenIntoBatch(batchDataByChunk);
-			result += batchLoadResult;
+			batchDataByChunk.clear();// lots of memory that are no longer needed
 
-			loadRenderBatch(d3d, target, texInfo, batchDataFlat);
+			for (const auto& [vertCount, batchData] : batchDataSplit) {
+				const auto [batchDataFlat, batchLoadResult] = flattenIntoBatch(batchData);
+
+				assert(vertCount == batchLoadResult.verts);
+				result += batchLoadResult;
+				loadRenderBatch(d3d, target, texInfo, batchDataFlat);
+			}
 		}
 
 		return result;
@@ -400,7 +442,7 @@ namespace render::pass::world
 		}
 		else if (optionalVdfIndex.has_value()) {
 			if (::util::endsWith(level, ".zen")) {
-				data = assets::loadZen(level, optionalVdfIndex.value());
+				assets::loadZen(data, level, optionalVdfIndex.value());
 				levelDataFound = true;
 			}
 			else {

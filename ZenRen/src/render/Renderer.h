@@ -31,7 +31,7 @@ namespace render
 	};
 
 	struct RenderData {
-		bool isOutdoorLevel;
+		bool isOutdoorLevel = false;
 		VERT_CHUNKS_BY_MAT worldMesh;
 		VERT_CHUNKS_BY_MAT staticMeshes;
 		VERTEX_DATA_BY_MAT dynamicMeshes;

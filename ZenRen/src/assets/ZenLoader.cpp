@@ -373,7 +373,7 @@ namespace assets
         return statics;
     }
 
-    RenderData loadZen(string& zenFilename, VDFS::FileIndex* vdf)
+    void loadZen(render::RenderData& out, string& zenFilename, VDFS::FileIndex* vdf)
     {
         const auto now = std::chrono::high_resolution_clock::now();
 
@@ -399,8 +399,7 @@ namespace assets
 
         vector<InMemoryTexFile> lightmaps = loadZenLightmaps(worldMesh);
 
-        VERT_CHUNKS_BY_MAT worldMeshData;
-        loadWorldMesh(worldMeshData, parser.getWorldMesh());
+        loadWorldMesh(out.worldMesh, parser.getWorldMesh());
 
         LOG(INFO) << "Zen parsed!";
 
@@ -410,7 +409,7 @@ namespace assets
         bool isOutdoorLevel = world.bspTree.mode == ZenLoad::zCBspTreeData::TreeMode::Outdoor;
         vector<StaticInstance> vobs;
         if (loadStaticMeshes) {
-            vobs = loadVobs(world.rootVobs, worldMeshData, lightsStatic, isOutdoorLevel);
+            vobs = loadVobs(world.rootVobs, out.worldMesh, lightsStatic, isOutdoorLevel);
             LOG(INFO) << "VOBs loaded!";
         }
         else {
@@ -421,34 +420,29 @@ namespace assets
         for (auto& vob : vobs) {
             auto& visualname = vob.meshName;
 
-            bool loaded = loadInstanceMesh(staticMeshData, *vdf, vob);
+            bool loaded = loadInstanceMesh(out.staticMeshes, *vdf, vob);
         }
 
         if (debugStaticLights) {
             for (auto& light : lightsStatic) {
                 float scale = light.range / 10.f;
-                loadPointDebugVisual(staticMeshData, light.pos, { scale, scale, scale });
+                loadPointDebugVisual(out.staticMeshes, light.pos, { scale, scale, scale });
             }
         }
         if (debugStaticLightRays) {
             for (auto& ray : debugLightToVobRays) {
-                loadLineDebugVisual(staticMeshData, ray.posStart, ray.posEnd, ray.color);
+                loadLineDebugVisual(out.staticMeshes, ray.posStart, ray.posEnd, ray.color);
             }
         }
 
-        VERTEX_DATA_BY_MAT dynamicMeshData;
+        //VERTEX_DATA_BY_MAT dynamicMeshData;
 
         LOG(INFO) << "Meshes loaded!";
 
         const auto duration = std::chrono::high_resolution_clock::now() - now;
         LOG(INFO) << "Loading finished in: " << duration / std::chrono::milliseconds(1) << " ms.";
 
-        return RenderData {
-            .isOutdoorLevel = isOutdoorLevel,
-            .worldMesh = worldMeshData,
-            .staticMeshes = staticMeshData,
-            .dynamicMeshes = dynamicMeshData,
-            .worldMeshLightmaps = lightmaps
-        };
+        out.isOutdoorLevel = isOutdoorLevel;
+        out.worldMeshLightmaps = lightmaps;
 	}
 }

@@ -6,6 +6,6 @@
 
 namespace assets
 {
-    render::RenderData loadZen(std::string& zenFilename, ZenLib::VDFS::FileIndex* vdf);
+    void loadZen(render::RenderData& out, std::string& zenFilename, ZenLib::VDFS::FileIndex* vdf);
 }
 
