@@ -2,7 +2,7 @@
 
 #include "render/Renderer.h"
 
-#include "octree_attcs/octree.h"
+#include <octree.h>
 
 namespace assets
 {

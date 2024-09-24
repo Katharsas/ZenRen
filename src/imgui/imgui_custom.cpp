@@ -6,7 +6,7 @@
  * https://github.com/ocornut/imgui/issues/1496#issuecomment-655048353
  */
 
-#include "imgui/imgui_internal.h"
+#include <imgui_internal.h>
 
 void ImGui::VerticalSpacing(float height)
 {

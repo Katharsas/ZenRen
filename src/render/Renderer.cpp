@@ -27,7 +27,7 @@ using namespace Microsoft::WRL;
 #include "../Util.h"
 #include "Gui.h"
 
-#include "imgui/imgui.h"
+#include <imgui.h>
 
 namespace render
 {

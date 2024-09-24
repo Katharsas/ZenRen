@@ -20,8 +20,7 @@
 #include <memory.h>
 #include <tchar.h>
 
-
-// TODO: reference additional headers your program requires here
+// commonly used std headers
 #include <stdint.h>
 #include <string>
 #include <unordered_set>
@@ -29,10 +28,11 @@
 #include <array>
 #include <optional>
 
+// commonly used libraries
+#include <g3log/g3log.hpp>
+
 // TODO disable SSE, measure performance so we know if this is even worth it compared to normal optimization
 //#define _XM_NO_INTRINSICS_ 
 #include <DirectXMath.h>
 #include <DirectXPackedVector.h>
 #include <DirectXCollision.h>
-
-#include "g3log/g3log.hpp"

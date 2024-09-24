@@ -10,7 +10,7 @@
 #include "render/Renderer.h"
 #include "render/Camera.h"
 #include "assets/AssetFinder.h"
-#include "imgui/imgui.h"
+#include <imgui.h>
 
 
 namespace viewer
@@ -31,6 +31,8 @@ namespace viewer
 
 	void init(HWND hWnd, Arguments args, uint32_t width, uint32_t height)
 	{
+		LOG(INFO) << "Current working dir: " << std::filesystem::current_path();
+
 		enablePreciseTimerResolution();
 		initMicrosleep();
 

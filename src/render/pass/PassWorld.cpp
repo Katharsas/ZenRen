@@ -15,7 +15,7 @@
 
 // TODO move to RenderDebugGui
 #include "../Gui.h"
-#include "imgui/imgui.h"
+#include <imgui.h>
 #include "imgui/imgui_custom.h"
 
 namespace render::pass::world

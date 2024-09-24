@@ -5,7 +5,7 @@
 
 #include "../Util.h"
 
-#include "magic_enum/magic_enum.hpp"
+#include <magic_enum.hpp>
 #include "DirectXTex.h"
 
 namespace render {

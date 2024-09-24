@@ -1,0 +1,12 @@
+[submodule "lib/g3log"]
+	path = lib/g3log
+	url = https://github.com/KjellKod/g3log
+[submodule "lib/DirectXMath"]
+	path = lib/DirectXMath
+	url = https://github.com/microsoft/DirectXMath
+[submodule "lib/ZenLib"]
+	path = lib/ZenLib
+	url = https://github.com/ataulien/ZenLib
+[submodule "lib/DirectXTex"]
+	path = lib/DirectXTex
+	url = https://github.com/microsoft/DirectXTex

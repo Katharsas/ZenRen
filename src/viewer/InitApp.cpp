@@ -14,7 +14,7 @@
 #include "g3log/logworker.hpp"
 
 #include <shellapi.h>
-#include <imgui/imgui.h>
+#include <imgui.h>
 #include <iostream>
 #include <fstream>
 
@@ -246,6 +246,8 @@ HWND InitInstance(HINSTANCE hInstance, int nCmdShow)
 		nullptr, nullptr, hInstance, nullptr);
 
 	if (!hWnd) {
+		DWORD errorMessageID = ::GetLastError();
+		LOG(INFO) << "CreateWindowExW Error-ID: " << errorMessageID;
 		return FALSE;
 	}
 

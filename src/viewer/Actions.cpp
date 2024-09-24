@@ -6,7 +6,7 @@
 #include "Util.h"
 #include "render/Camera.h"
 #include "render/Gui.h"
-#include "imgui/imgui.h"
+#include <imgui.h>
 
 namespace viewer
 {

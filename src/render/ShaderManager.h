@@ -20,7 +20,7 @@ namespace render
 
 		void clearAll();
 
-		const std::string folder = std::string("Shaders");
+		const std::string folder = std::string("shaders");
 		const std::string extension = std::string(".hlsl");
 
 		const std::string filePath(const std::string shaderName);

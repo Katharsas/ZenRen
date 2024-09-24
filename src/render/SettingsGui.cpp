@@ -1,9 +1,11 @@
 #include "stdafx.h"
 #include "SettingsGui.h"
 
+#include <imgui.h>
+
 #include "Gui.h"
-#include "imgui/imgui.h"
 #include "imgui/imgui_custom.h"
+
 
 namespace render::gui::settings {
 

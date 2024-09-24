@@ -2,8 +2,8 @@
 
 #include "dx11.h"
 
+#include <magic_enum.hpp>
 #include "Common.h"
-#include "magic_enum/magic_enum.hpp"
 
 namespace render
 {
