@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "PassWorldLoader.h"
 
+#include "render/Loader.h"
 #include "PassWorldChunkGrid.h"
 
 #include "assets/AssetCache.h"
@@ -10,6 +11,7 @@
 #include "assets/TexFromVdfLoader.h"
 
 #include "Util.h"
+#include "Win.h"
 #include "render/RenderUtil.h"
 
 namespace render::pass::world

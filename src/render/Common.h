@@ -1,8 +1,8 @@
 #pragma once
 
-#include "dx11.h"
 #include "Primitives.h"
 
+#include <dxgiformat.h>
 #include <string>
 #include <ostream>
 #include <vector>
@@ -96,6 +96,7 @@ namespace render
 		hash ^= hasher(value) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
 	}
 }
+
 namespace std
 {
 	using namespace render;
@@ -164,26 +165,4 @@ namespace render
 			return { vertData[this->vertIndex], vertData[this->vertIndex + 1], vertData[this->vertIndex + 2] };
 		}
 	};
-
-	struct BufferSize {
-		uint32_t width;
-		uint32_t height;
-
-		BufferSize operator*(const float scalar) const
-		{
-			return { (uint32_t)((width * scalar) + 0.5f), (uint32_t)((height * scalar) + 0.5f) };
-		}
-	};
-
-	void release(IUnknown* dx11object);
-	void release(const std::vector<IUnknown*>& dx11objects);
-	void initViewport(BufferSize& size, D3D11_VIEWPORT* viewport);
-	
-	float fromSRGB(const float channel);
-	D3DXCOLOR fromSRGB(const D3DXCOLOR color);
-	D3DXCOLOR greyscale(const float channel);
-	D3DXCOLOR multiplyColor(D3DXCOLOR color, const float factor);
-
-	template<typename T> T add(const T& vec1, const T& vec2);
-	template<typename T> T mul(const T& vec, float scalar);
 }

@@ -33,7 +33,7 @@ namespace render::pass::sky
 
     __declspec(align(16))
     struct CbSkyLayer {
-        D3DXCOLOR light;// original only uses values other than 1 on overlay
+        COLOR light;// original only uses values other than 1 on overlay
         float alpha;
         uint32_t blurDisabled;
     };
@@ -41,7 +41,7 @@ namespace render::pass::sky
     __declspec(align(16))
     struct CbSkyLayerSettings {
         // Note: smallest type for constant buffer values is 32 bit; cannot use bool or uint_16 without packing
-        D3DXCOLOR colBackground;
+        COLOR colBackground;
         CbSkyLayer texLayers[2];
     };
 
@@ -172,7 +172,7 @@ namespace render::pass::sky
         }
     }
 
-    void updateSkyLayers(D3d d3d, const array<SkyTexState, 2>& layerStates, const D3DXCOLOR& skyBackground, float timeOfDay, bool swapLayers)
+    void updateSkyLayers(D3d d3d, const array<SkyTexState, 2>& layerStates, const COLOR& skyBackground, float timeOfDay, bool swapLayers)
     {
         float delta1 = timeOfDay - lastTimeOfDay;
         float delta2 = timeOfDay + 1 - lastTimeOfDay;

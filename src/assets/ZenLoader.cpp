@@ -17,7 +17,6 @@
 #include "FindGroundFace.h"
 #include "StaticLightFromVobLights.h"
 
-#include "DirectXTex.h"
 #include "zenload/zCMesh.h"
 #include "zenload/zenParser.h"
 #include "zenload/ztex2dds.h"
@@ -136,7 +135,7 @@ namespace assets
             if (debugInstanceMeshBboxCenter) {
                 auto center = toVec3(bboxCenter(instance.bbox));
                 auto scale = toVec3(0.7f * XMVectorAbs(toXM4Pos(instance.bbox[1]) - toXM4Pos(instance.bbox[0])));
-                loadPointDebugVisual(target, center, scale, D3DXCOLOR(0, 0, 1, 1));
+                loadPointDebugVisual(target, center, scale, COLOR(0, 0, 1, 1));
             }
 
             return true;
@@ -188,7 +187,7 @@ namespace assets
         return flattenVobTree(vobs, target, filter);
     }
 
-    inline std::ostream& operator <<(std::ostream& os, const D3DXCOLOR& that)
+    inline std::ostream& operator <<(std::ostream& os, const COLOR& that)
     {
         return os << "[R:" << that.r << " G:" << that.g << " B:" << that.b << " A:" << that.a << "]";
     }
@@ -212,7 +211,7 @@ namespace assets
             Light light = {
                 toVec3(toXM4Pos(vob.position) * G_ASSET_RESCALE),
                 vob.zCVobLight.lightStatic,
-                fromSRGB(D3DXCOLOR(vob.zCVobLight.color)),
+                fromSRGB(COLOR(vob.zCVobLight.color)),
                 vob.zCVobLight.range * G_ASSET_RESCALE,
             };
 
@@ -223,7 +222,7 @@ namespace assets
         return lights;
     }
 
-    D3DXCOLOR interpolateColor(const VEC3& pos, const VERT_CHUNKS_BY_MAT& meshData, const VertKey& vertKey)
+    COLOR interpolateColor(const VEC3& pos, const VERT_CHUNKS_BY_MAT& meshData, const VertKey& vertKey)
     {
         auto& vecVertData = vertKey.get(meshData);
         auto& vecPos = vecVertData.vecPos;
@@ -236,10 +235,10 @@ namespace assets
         float v0Contrib = 1 - (v0Distance / totalDistance);
         float v1Contrib = 1 - (v1Distance / totalDistance);
         float v2Contrib = 1 - (v2Distance / totalDistance);
-        D3DXCOLOR v0Color = others[vertIndex + 0].colLight;
-        D3DXCOLOR v1Color = others[vertIndex + 1].colLight;
-        D3DXCOLOR v2Color = others[vertIndex + 2].colLight;
-        D3DXCOLOR colorAverage = ((v0Color * v0Contrib) + (v1Color * v1Contrib) + (v2Color * v2Contrib)) / 2.f;
+        COLOR v0Color = others[vertIndex + 0].colLight;
+        COLOR v1Color = others[vertIndex + 1].colLight;
+        COLOR v2Color = others[vertIndex + 2].colLight;
+        COLOR colorAverage = mul(add(add(mul(v0Color, v0Contrib), mul(v1Color, v1Contrib)), mul(v2Color, v2Contrib)), 0.5f);
         return colorAverage;
     }
 
@@ -288,7 +287,7 @@ namespace assets
 
                 instance.dirLightStatic = -1 * XMVectorSet(1, -0.5, -1.0, 0);
 
-                D3DXCOLOR colLight;
+                COLOR colLight;
                 const XMVECTOR center = bboxCenter(instance.bbox);
                 const std::optional<VertKey> vertKey = getGroundFaceAtPos(center, worldMeshData, worldFaceLookup);
 
@@ -319,9 +318,9 @@ namespace assets
                         instance.dirLightStatic = optLight.value().dirInverted;
                     }
                     else {
-                        colLight = D3DXCOLOR(0, 0, 0, 1);// no lights reached this vob, so its black
+                        colLight = COLOR(0, 0, 0, 1);// no lights reached this vob, so its black
                         if (debugStaticLightRays) {
-                            colLight = D3DXCOLOR(0, 1, 0, 1);
+                            colLight = COLOR(0, 1, 0, 1);
                         }
                     }
                     resolvedStaticLight++;
@@ -340,18 +339,18 @@ namespace assets
                             bool isVobIndoor = false;
 
                             float minLight = isVobIndoor ? fromSRGB(0.2f) : fromSRGB(0.5f);
-                            colLight = colLight * (1.f - minLight) + greyscale(minLight);
+                            colLight = add(mul(colLight, (1.f - minLight)), greyscale(minLight));
                             // currently this results in light values between between 0.22 and 0.99 
                         }
                     }
                     else {
-                        colLight = fromSRGB(D3DXCOLOR(0.63f, 0.63f, 0.63f, 1));// fallback lightness of (160, 160, 160)
+                        colLight = fromSRGB(COLOR(0.63f, 0.63f, 0.63f, 1));// fallback lightness of (160, 160, 160)
                     }
                     colLight.a = 1;// indicates that this VOB receives full sky light
                 }
 
                 if (debugTintVobStaticLight) {
-                    colLight = D3DXCOLOR((colLight.r / 3.f) * 2.f, colLight.g, colLight.b, colLight.a);
+                    colLight = COLOR((colLight.r / 3.f) * 2.f, colLight.g, colLight.b, colLight.a);
                 }
 
                 instance.colLightStatic = colLight;

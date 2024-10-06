@@ -4,6 +4,8 @@
 
 namespace render::util
 {
+	void initViewport(BufferSize& size, D3D11_VIEWPORT* viewport);
+
 	void dumpVerts(const std::string& matName, const std::vector<VERTEX_POS>& vertPos, const std::vector<NORMAL_UV_LUV>& vertOther);
 	std::string getVramUsage(IDXGIAdapter3* adapter);
 

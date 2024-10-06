@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../dx11.h"
+#include "../WinDx.h"
 #include "../Renderer.h"
 
 namespace render::pass::world

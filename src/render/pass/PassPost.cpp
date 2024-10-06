@@ -237,7 +237,7 @@ namespace render::pass::post
 	}
 
 	void initViewport(BufferSize& size) {
-		initViewport(size, &viewport);
+		util::initViewport(size, &viewport);
 	}
 
 	void initLinearSampler(D3d d3d, bool pointSampling)

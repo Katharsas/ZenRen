@@ -1,9 +1,17 @@
 #pragma once
 
-#include "dx11.h"
 #include <ostream>
 
-inline std::ostream& operator <<(std::ostream& os, const D3DXCOLOR& that)
+struct COLOR {
+	union {
+		struct { float r, g, b, a; };
+		float vec[4];
+	};
+	COLOR() {};
+	COLOR(uint32_t argb);
+	COLOR(float r, float g, float b, float a);
+};
+inline std::ostream& operator <<(std::ostream& os, const COLOR& that)
 {
 	return os << "[R:" << that.r << " G:" << that.g << " B:" << that.b << " A:" << that.a << "]";
 }
@@ -63,7 +71,7 @@ inline std::ostream& operator <<(std::ostream& os, const ARRAY_UV& that)
 
 struct POS_COLOR {
 	VEC3 position;
-	D3DXCOLOR color;
+	COLOR color;
 };
 
 struct POS_UV {
@@ -92,7 +100,7 @@ struct NORMAL_CL_UV_LUV_STATIC_LIGHT {
 	VEC3 normal;
 	UV uvDiffuse;
 	ARRAY_UV uvLightmap;
-	D3DXCOLOR colLight;
+	COLOR colLight;
 	VEC3 dirLight;
 	float lightSun;
 };
@@ -102,3 +110,25 @@ inline std::ostream& operator <<(std::ostream& os, const NORMAL_CL_UV_LUV_STATIC
 }
 
 typedef uint32_t TEX_INDEX;
+
+namespace render {
+
+	struct BufferSize {
+		uint32_t width;
+		uint32_t height;
+
+		BufferSize operator*(const float scalar) const
+		{
+			return { (uint32_t)((width * scalar) + 0.5f), (uint32_t)((height * scalar) + 0.5f) };
+		}
+	};
+
+	float fromSRGB(const float channel);
+	COLOR fromSRGB(const COLOR color);
+	COLOR greyscale(const float channel);
+	COLOR multiplyColor(COLOR color, const float factor);
+
+	template<typename T> T add(const T& vec1, const T& vec2);
+	template<typename T> T sub(const T& vec1, const T& vec2);
+	template<typename T> T mul(const T& vec, float scalar);
+}

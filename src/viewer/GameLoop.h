@@ -1,5 +1,6 @@
 #pragma once
 #include "Args.h"
+#include "Win.h"
 
 namespace viewer
 {

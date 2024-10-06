@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include "dx11.h"
+#include "WinDx.h"
 #include "Shader.h"
 
 namespace render

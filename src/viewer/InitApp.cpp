@@ -13,6 +13,7 @@
 #include "Input.h"
 #include "g3log/logworker.hpp"
 
+#include "Win.h"
 #include <shellapi.h>
 #include <imgui.h>
 #include <iostream>

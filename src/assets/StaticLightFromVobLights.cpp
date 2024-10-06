@@ -54,7 +54,7 @@ namespace assets
         auto intersectedBoxes = lightLookup.tree.RangeSearch<shouldFullyContain>(searchBox);
 
         int32_t contributingLightCount = 0;
-        D3DXCOLOR color = D3DXCOLOR(0.f, 0.f, 0.f, 1.f);
+        COLOR color = COLOR(0.f, 0.f, 0.f, 1.f);
         XMVECTOR candidateLightDir = XMVectorSet(0, 0, 0, 0);// TODO this is actually not necessary, but fixes warnings
         float candidateScore = 0;
 
@@ -72,7 +72,7 @@ namespace assets
                     contributingLightCount++;
                     float weight = 1.f - (dist / (light.range * 1.0f));
                     weight = fromSRGB(weight);
-                    color += (light.color * weight);
+                    color = add(color, mul(light.color, weight));
                     float perceivedLum = (light.color.r * 0.299f + light.color.g * 0.587f + light.color.b * 0.114f);
                     float score = weight * perceivedLum;
                     if (score > candidateScore) {
@@ -81,7 +81,7 @@ namespace assets
                     }
                 }
                 if (dist < debugStaticLightRaysMaxDist) {
-                    debugLightToVobRays.push_back({ light.pos, pos, intersectedWorld ? D3DXCOLOR(0.f, 0.f, 1.f, 0.5f) : D3DXCOLOR(1.f, 0.f, 0.f, 0.5f) });
+                    debugLightToVobRays.push_back({ light.pos, pos, intersectedWorld ? COLOR(0.f, 0.f, 1.f, 0.5f) : COLOR(1.f, 0.f, 0.f, 0.5f) });
                 }
             }
         }

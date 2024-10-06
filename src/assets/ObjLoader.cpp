@@ -102,7 +102,7 @@ namespace assets
 						other.uvDiffuse = { 0, 0 };
 					}
 
-					other.colLight = D3DXCOLOR( 1, 1, 1, 1 );
+					other.colLight = COLOR( 1, 1, 1, 1 );
 					other.uvLightmap = { 0, 0 };
 
 					// Wavefront .obj verts are stored counter-clockwise, so we switch to clockwise

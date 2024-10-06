@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Win.h"
+
 namespace viewer::input
 {
 	#define MK_AXIS_X 0x8000

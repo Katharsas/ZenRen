@@ -1,6 +1,6 @@
 #pragma once
 
-#include "dx11.h"
+#include "WinDx.h"
 
 #include <magic_enum.hpp>
 #include "Common.h"
@@ -20,7 +20,7 @@ namespace render
 		SkyTex tex;
 		float alpha;
 		UV uvSpeed = { 0, 0 };
-		D3DXCOLOR texlightColor = greyscale(1);
+		COLOR texlightColor = greyscale(1);
 	};
 	inline std::ostream& operator <<(std::ostream& os, const SkyTexState& that)
 	{
@@ -29,7 +29,7 @@ namespace render
 
 	std::array<SkyTexState, 2> getSkyLayers(float timeOfDay);
 	boolean getSwapLayers(float timeOfDay);
-	D3DXCOLOR getSkyLightFromIntensity(float intensity, float currentTime = defaultTime);
-	D3DXCOLOR getSkyColor(float currentTime = defaultTime);
+	COLOR getSkyLightFromIntensity(float intensity, float currentTime = defaultTime);
+	COLOR getSkyColor(float currentTime = defaultTime);
 }
 

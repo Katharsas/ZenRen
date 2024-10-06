@@ -8,9 +8,6 @@
 #include <numeric>
 #include <exception>
 
-#include <shlobj_core.h>
-#include <comdef.h>
-
 namespace util
 {
 	using std::string;
@@ -105,46 +102,12 @@ namespace util
 		return false;
 	}
 
-	std::string getUserFolderPath()
-	{
-		wchar_t* out;
-		SHGetKnownFolderPath(FOLDERID_Profile, 0, 0, &out);
-		std::wstring wide = out;
-		CoTaskMemFree(out);
-		return wideToUtf8(wide);
-	}
-
 	std::string replaceExtension(const std::string_view filename, const std::string_view extension) {
 		size_t lastdot = filename.find_last_of(".");
 		if (lastdot == std::string::npos) {
 			return string(filename) + string(extension);
 		}
 		return string(filename.substr(0, lastdot)) + string(extension);
-	}
-
-	bool handleHr(const HRESULT& hr, const std::string& message, bool throwOnError) {
-		bool failed = FAILED(hr);
-		if (failed) {
-			_com_error err(hr);
-			std::wstring errorMessageW = std::wstring(err.ErrorMessage());
-			std::string errorMessage = util::wideToUtf8(errorMessageW);
-
-			LOG(WARNING) << message;
-			LOG(WARNING) << errorMessage;
-
-			if (throwOnError) {
-				throw std::exception((message + "\n" + errorMessage).c_str());
-			}
-		}
-		return !failed;
-	}
-
-	bool warnOnError(const HRESULT& hr, const std::string& message) {
-		return handleHr(hr, message, false);
-	}
-
-	bool throwOnError(const HRESULT& hr, const std::string& message) {
-		return handleHr(hr, message, true);
 	}
 
 	void throwError(const std::string& message) {

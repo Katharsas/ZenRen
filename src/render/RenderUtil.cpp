@@ -3,6 +3,17 @@
 
 namespace render::util {
 
+	void initViewport(BufferSize& size, D3D11_VIEWPORT* viewport) {
+		ZeroMemory(viewport, sizeof(D3D11_VIEWPORT));
+
+		viewport->TopLeftX = 0.f;
+		viewport->TopLeftY = 0.f;
+		viewport->Width = (float)size.width;
+		viewport->Height = (float)size.height;
+		viewport->MinDepth = 0.f;
+		viewport->MaxDepth = 1.f;
+	}
+
 	void dumpVerts(const std::string& matName, const std::vector<VERTEX_POS>& vertPos, const std::vector<NORMAL_UV_LUV>& vertOther) {
 		std::ostringstream buffer;
 		buffer << matName << std::endl;

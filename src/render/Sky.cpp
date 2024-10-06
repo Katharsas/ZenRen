@@ -26,12 +26,12 @@ namespace render
 
 	struct SkyState {
 		float timeKey;
-		D3DXCOLOR lightColor;// same as polyColor
-		D3DXCOLOR skyColor;// same as fogColor
+		COLOR lightColor;// same as polyColor
+		COLOR skyColor;// same as fogColor
 	};
 
-	D3DXCOLOR fromSRGB(uint8_t r, uint8_t g, uint8_t b) {
-		return D3DXCOLOR(
+	COLOR fromSRGB(uint8_t r, uint8_t g, uint8_t b) {
+		return COLOR(
 			fromSRGB(r / 256.f),
 			fromSRGB(g / 256.f),
 			fromSRGB(b / 256.f),
@@ -45,7 +45,7 @@ namespace render
 	// G1 defines an additional texture brightness color (domeColor1) in SkyState, however it is hardcoded to not be used by base night layer (star texture)
 	// and it is effectively set to 255 for any time other than night time, which means it only ever affects the night overlay (night clouds texture).
 	// G1 hardcodes re-scaling of domeColor1 to range 128 - 255.
-	const D3DXCOLOR nightCloudColor = fromSRGB((255 + 55) / 2, (255 + 55) / 2, (255 + 155) / 2);
+	const COLOR nightCloudColor = fromSRGB((255 + 55) / 2, (255 + 55) / 2, (255 + 155) / 2);
 
 	// We assume that all state arrays have same length and use same timeKeys in same order as defined here.
 	// In theory, we don't need to put time keys into every state struct, but this makes state definitions more readable.
@@ -119,8 +119,8 @@ namespace render
 		return { interpolate(last.u, next.u, delta), interpolate(last.v, next.v, delta) };
 	}
 
-	D3DXCOLOR interpolate(D3DXCOLOR last, D3DXCOLOR next, float delta) {
-		return last + (next - last) * delta;
+	COLOR interpolate(COLOR last, COLOR next, float delta) {
+		return add(last, mul(sub(next, last), delta));
 	}
 
 	CurrentTimeKeys getTimeKeysInterpolated(float timeKey)
@@ -218,13 +218,13 @@ namespace render
 		return timeOfDay >= timekey::day_start || timeOfDay <= timekey::day_end;
 	}
 
-	D3DXCOLOR getSkyLightFromIntensity(float intensity, float currentTime)
+	COLOR getSkyLightFromIntensity(float intensity, float currentTime)
 	{
 		SkyState sky = getSkyState(currentTime);
 		return multiplyColor(sky.lightColor, intensity);
 	}
 
-	D3DXCOLOR getSkyColor(float currentTime)
+	COLOR getSkyColor(float currentTime)
 	{
 		return getSkyState(currentTime).skyColor;
 	}

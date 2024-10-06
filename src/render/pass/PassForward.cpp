@@ -5,6 +5,7 @@
 #include "../Sky.h"
 #include "PassSky.h"
 #include "PassWorld.h"
+#include "../RenderUtil.h"
 
 namespace render::pass::forward
 {
@@ -13,7 +14,7 @@ namespace render::pass::forward
 	__declspec(align(16))
 	struct CbGlobalSettings {
 		// Note: smallest type for constant buffer values is 32 bit; cannot use bool or uint_16 without packing
-		D3DXCOLOR skyLight;
+		COLOR skyLight;
 		int32_t multisampleTransparency;
 		int32_t distantAlphaDensityFix;
 		uint32_t outputType;
@@ -106,7 +107,7 @@ namespace render::pass::forward
 		d3d.deviceContext->RSSetViewports(1, &viewport);
 
 		// clear the back buffer to background color
-		d3d.deviceContext->ClearRenderTargetView(targetRtv, world::getBackgroundColor());
+		d3d.deviceContext->ClearRenderTargetView(targetRtv, world::getBackgroundColor().vec);
 
 		// clear depth and stencil buffer
 		const float zFar = settings.reverseZ ? 0.0f : 1.0f;
@@ -206,7 +207,7 @@ namespace render::pass::forward
 
 	void initViewport(BufferSize& size)
 	{
-		initViewport(size, &viewport);
+		util::initViewport(size, &viewport);
 	}
 
 	void initDepthBuffer(D3d d3d, BufferSize& size, uint32_t multisampleCount, bool reverseZ)

@@ -223,8 +223,8 @@ namespace assets
                     VERTEX_OTHER other;
                     other.normal = toVec3(faceNormalsXm[i]);
                     other.uvDiffuse = from(zenVert.TexCoord);
-                    other.colLight = fromSRGB(D3DXCOLOR(zenVert.Color));
-                    //other.colLight = D3DXCOLOR(1, 1, 1, 0.f);
+                    other.colLight = fromSRGB(COLOR(zenVert.Color));
+                    //other.colLight = COLOR(1, 1, 1, 0.f);
                     other.dirLight = { -100.f, -100.f, -100.f };// value that is easy to check as not normalized in shader
                     other.lightSun = hasLightmap ? 0.f : 1.0f;
 

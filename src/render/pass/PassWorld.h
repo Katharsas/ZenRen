@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../dx11.h"
+#include "../WinDx.h"
 #include "../Settings.h"
 #include "../Renderer.h"
 #include "../ShaderManager.h"
@@ -31,7 +31,7 @@ namespace render::pass::world
 	const WorldSettings& getWorldSettings();
 	void initLinearSampler(D3d d3d, RenderSettings& settings);
 	void init(D3d d3d);
-	D3DXCOLOR getBackgroundColor();
+	COLOR getBackgroundColor();
 	void drawSky(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs);
 	void drawPrepass(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs);
 	void drawWorld(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs);
