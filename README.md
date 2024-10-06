@@ -61,3 +61,19 @@ Simple, high performance DirectX11.1 renderer for Gothic assets (VDF or single f
 ![Oldcamp](Screenshots/oldcamp.jpg)
 ![Swampcamp](Screenshots/swampcamp.jpg)
 ![YBerions Temple](Screenshots/yberion_temple.jpg)
+
+## License
+
+**Copyright (c) 2024 - Jan Mothes**
+
+This project's first-party code is "source available" for now.
+
+### Third-Party
+- lib/DirectXMath - MIT
+- lib/DirectXTex - MIT
+- lib/g3log - Public Domain / Unlicense
+- lib/imgui - MIT
+- lib/magic_enum - MIT
+- lib/tinyobj - MIT
+- lib/ZenKit - MIT
+- lib/ZenLib - MIT
