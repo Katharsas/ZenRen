@@ -98,6 +98,11 @@ namespace viewer
 		ActionDigitalOnToggle { "CAMERA_TURN_ANALOG", [](bool isActive) -> void {
 			viewer::input::toggleFixedHiddenCursorMode(isActive);
 		} },
+		ActionDigitalOnToggle { "GUI_TOGGLE_VISIBLE", [](bool isActive) -> void {
+			if (!isActive) {
+				render::gui::onToggleVisible();
+			}
+		} },
 	};
 	std::array actionsAnalog{
 		ActionAnalog {
@@ -129,6 +134,10 @@ namespace viewer
 	}
 
 	void setDefaultInputMap() {
+		bindActionToKey(ACTION_GUI_SEPARATOR + "General");
+		bindActionToKey(ACTION_GUI_SEPARATOR);
+		bindActionToKey("GUI_TOGGLE_VISIBLE", { InputDevice::KEYBOARD, VK_F11 });
+		bindActionToKey(ACTION_GUI_SEPARATOR);
 		bindActionToKey(ACTION_GUI_SEPARATOR + "Camera");
 		bindActionToKey(ACTION_GUI_SEPARATOR);
 		bindActionToKey("CAMERA_MOVE_FORWARDS", input::button('W'));
@@ -151,7 +160,7 @@ namespace viewer
 	void initActions() {
 		setDefaultInputMap();
 
-		render::addWindow("Keybinds", {
+		render::gui::addWindow("Keybinds", {
 			[]() -> void {
 				if (ImGui::BeginTable("keybinds", 2, ImGuiTableFlags_SizingFixedFit)) {
 					for (const auto& actionname : actionsForGui) {

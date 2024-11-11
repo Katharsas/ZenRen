@@ -8,7 +8,9 @@
 namespace util
 {
 	bool warnOnError(const HRESULT& hr, const std::string& message);
+	bool warnOnError(const HRESULT& hr);
 	bool throwOnError(const HRESULT& hr, const std::string& message);
+	bool throwOnError(const HRESULT& hr);
 
 	std::string getUserFolderPath();
 }

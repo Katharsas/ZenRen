@@ -35,6 +35,7 @@ namespace render {
 		ID3D11Device* device;
 		ID3D11DeviceContext* deviceContext;
 		ID3DUserDefinedAnnotation* annotation;
+		std::optional<ID3D11Debug*> debug = {};
 	};
 
 	void release(IUnknown* dx11object);

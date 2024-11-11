@@ -79,9 +79,15 @@ namespace render
 		ID3D11Buffer* cameraCb = nullptr;
 	};
 
+	struct LoadWorldResult {
+		bool loaded = false;
+		bool isOutdoorLevel = false;
+	};
+
 	void initD3D(HWND hWnd, const BufferSize& changedSize);
-	void loadLevel(std::string& level);
+	bool loadLevel(const std::optional<std::string>& level, bool defaultSky = true);
 	void onWindowResize(const BufferSize& changedSize);
+	void onWindowDpiChange(float dpiScale);
 	// Clean up DirectX and COM
 	void cleanD3D();
 	void update(float deltaTime);

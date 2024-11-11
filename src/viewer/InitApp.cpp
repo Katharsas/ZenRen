@@ -1,5 +1,4 @@
-﻿// ZenRen.cpp : Defines the entry point for the application.
-//
+﻿// TODO rename to Main.cpp
 
 #include "stdafx.h"
 #include "InitApp.h"
@@ -325,6 +324,15 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 	//	break;
 	case WM_DESTROY:
 		PostQuitMessage(0);
+		break;
+	case WM_DPICHANGED:
+		{
+			WORD upperWord = (uint16_t)(wParam >> 16);
+			WORD lowerWord = (uint16_t)wParam;
+			assert(upperWord == lowerWord);
+			float dpiScale = upperWord / 96.f;
+			viewer::onWindowDpiChanged(dpiScale);
+		}
 		break;
 	default:
 		return DefWindowProcW(hWnd, message, wParam, lParam);

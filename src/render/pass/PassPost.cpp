@@ -2,7 +2,6 @@
 #include "PassPost.h"
 
 #include "../Renderer.h"
-#include "../Settings.h"
 #include "../Shader.h"
 #include "../RenderUtil.h"
 
@@ -41,6 +40,7 @@ namespace render::pass::post
 
 	void clean()
 	{
+		toneMappingQuad.release();
 		release(std::vector<IUnknown*> {
 			samplerState,
 
@@ -122,8 +122,8 @@ namespace render::pass::post
 		d3d.deviceContext->PSSetShaderResources(0, 1, &srv);
 	}
 
-	void resolveAndPresent(D3d d3d, IDXGISwapChain1* swapchain) {
-
+	void resolveAndPresent(D3d d3d, IDXGISwapChain1* swapchain)
+	{
 		// TODO
 		//d3d.deviceContext->OMSetRenderTargets(1, &backBuffer, nullptr);
 
@@ -133,13 +133,12 @@ namespace render::pass::post
 
 	void initDownsampleBuffers(D3d d3d, BufferSize& size)
 	{
-		release(multisampleTex);
 		release(multisampleRtv);
-		release(resolvedTex);
+		release(multisampleTex);
 		release(resolvedSrv);
+		release(resolvedTex);
 
 		auto format = DXGI_FORMAT_R8G8B8A8_UNORM;
-
 		{
 			// TEX
 			D3D11_TEXTURE2D_DESC desc = CD3D11_TEXTURE2D_DESC(format, size.width, size.height);
@@ -175,6 +174,7 @@ namespace render::pass::post
 	{
 		release(multisampleDepthView);
 		release(depthStateNone);
+		HRESULT hr;
 
 		// create depth buffer
 		D3D11_TEXTURE2D_DESC depthTexDesc = CD3D11_TEXTURE2D_DESC(
@@ -190,7 +190,8 @@ namespace render::pass::post
 		depthTexDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
 
 		ID3D11Texture2D* depthTex;
-		d3d.device->CreateTexture2D(&depthTexDesc, nullptr, &depthTex);
+		hr = d3d.device->CreateTexture2D(&depthTexDesc, nullptr, &depthTex);
+		::util::throwOnError(hr);
 
 		CD3D11_DEPTH_STENCIL_VIEW_DESC depthViewDesc = CD3D11_DEPTH_STENCIL_VIEW_DESC(
 			D3D11_DSV_DIMENSION_TEXTURE2DMS
@@ -199,32 +200,35 @@ namespace render::pass::post
 		depthViewDmsDesc.UnusedField_NothingToDefine = 0;
 		depthViewDesc.Texture2DMS = depthViewDmsDesc;
 		//depthViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DMS;
-		d3d.device->CreateDepthStencilView(depthTex, &depthViewDesc, &multisampleDepthView);
-		depthTex->Release();
+		hr = d3d.device->CreateDepthStencilView(depthTex, &depthViewDesc, &multisampleDepthView);
+		::util::throwOnError(hr);
+
+		hr = depthTex->Release();
+		::util::throwOnError(hr);
 
 		// create and set depth state
 		D3D11_DEPTH_STENCIL_DESC depthStateDesc;
 		ZeroMemory(&depthStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
 		depthStateDesc.DepthEnable = FALSE;
 
-		d3d.device->CreateDepthStencilState(&depthStateDesc, &depthStateNone);
+		hr = d3d.device->CreateDepthStencilState(&depthStateDesc, &depthStateNone);
+		::util::throwOnError(hr);
 	}
 
 	void initBackBuffer(D3d d3d, IDXGISwapChain1* swapchain)
 	{
-		if (backBufferTex != nullptr) {
-			backBufferTex->Release();
-		}
-		if (backBufferRtv != nullptr) {
-			backBufferRtv->Release();
-		}
+		release(backBufferRtv);
+		release(backBufferTex);
+		HRESULT hr;
 
 		// Preserve the existing buffer count and format.
 		// Automatically choose the width and height to match the client rect for HWNDs.
-		swapchain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, 0);
+		hr = swapchain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, 0);
+		::util::warnOnError(hr);
 
 		// get the address of the back buffer
-		swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBufferTex);
+		hr = swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBufferTex);
+		::util::throwOnError(hr);
 
 		// since swapchain itself was described to be linear, we need to trigger sRGB conversion
 		D3D11_RENDER_TARGET_VIEW_DESC rtvDesc = CD3D11_RENDER_TARGET_VIEW_DESC(
@@ -232,8 +236,8 @@ namespace render::pass::post
 			DXGI_FORMAT_R8G8B8A8_UNORM_SRGB
 		);
 		// use the texture address to create the render target
-		d3d.device->CreateRenderTargetView(backBufferTex, &rtvDesc, &backBufferRtv);
-		//texture->Release();
+		hr = d3d.device->CreateRenderTargetView(backBufferTex, &rtvDesc, &backBufferRtv);
+		::util::throwOnError(hr);
 	}
 
 	void initViewport(BufferSize& size) {
@@ -242,9 +246,7 @@ namespace render::pass::post
 
 	void initLinearSampler(D3d d3d, bool pointSampling)
 	{
-		if (samplerState != nullptr) {
-			samplerState->Release();
-		}
+		release(samplerState);
 
 		D3D11_SAMPLER_DESC samplerDesc = CD3D11_SAMPLER_DESC();
 		ZeroMemory(&samplerDesc, sizeof(samplerDesc));

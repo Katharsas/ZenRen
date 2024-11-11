@@ -2,6 +2,7 @@
 
 #include "../Common.h"
 #include "../Settings.h"
+#include "../WinDx.h"
 #include "../ShaderManager.h"
 
 namespace render::pass::post

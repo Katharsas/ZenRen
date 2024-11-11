@@ -33,6 +33,8 @@ namespace render
 {
 	using namespace ::render::pass;
 
+	HWND windowHandle;
+
 	// global declarations
 	struct Dx12 {
 		bool isAvailable = false;// true if DXGI 1.4 (IDXGIFactory4) is available
@@ -143,17 +145,18 @@ namespace render
 
 	void initD3D(HWND hWnd, const BufferSize& startSize)
 	{
+		windowHandle = hWnd;
 		clientSize = startSize;
 		updateRenderSize();
 
-		render::addInfo("", {
+		render::gui::addInfo("", {
 			[]() -> void {
 				const std::string vram = "VRAM: " + render::util::getVramUsage(dx12.adapter);
 				ImGui::Text(vram.c_str());
 			}
 		});
 
-		initDeviceAndSwapChain(hWnd);
+		initDeviceAndSwapChain(windowHandle);
 
 		RenderDirtyFlags flags;
 		flags.onInit();
@@ -161,7 +164,7 @@ namespace render
 		post::initDepthBuffer(d3d, clientSize);
 		post::initConstantBuffers(d3d);
 
-		initGui(hWnd, d3d);
+		gui::init(windowHandle, d3d);
 
 		camera::init();
 		forward::initConstantBuffers(d3d);
@@ -171,13 +174,23 @@ namespace render
 		gui::settings::init(settings);
 	}
 
-	void loadLevel(std::string& level)
+	bool loadLevel(const std::optional<std::string>& level, bool defaultSky)
 	{
-		world::loadWorld(d3d, level);
-		sky::loadSky(d3d);// TODO only if outdoor (by world)
+		bool loaded = false;
+		if (level.has_value()) {
+			const auto [loaded, isOutdoorLevel] = world::loadWorld(d3d, level.value());
+			if (loaded) {
+				defaultSky = isOutdoorLevel;
+			}
+		}
+		if (defaultSky) {
+			sky::loadSky(d3d);
+		}
+		return loaded;
 	}
 
-	void onWindowResize(const BufferSize& changedSize) {
+	void onWindowResize(const BufferSize& changedSize)
+	{
 		clientSize = changedSize;
 		updateRenderSize();
 
@@ -191,30 +204,46 @@ namespace render
 		}
 	}
 
+	void onWindowDpiChange(float dpiScale)
+	{
+		gui::onWindowDpiChange(windowHandle);
+	}
+
 	void cleanD3D()
 	{
 		swapchain->SetFullscreenState(FALSE, nullptr);    // switch to windowed mode
 
-		cleanGui();
-
 		// close and release all existing COM objects
-		if (dx12.isAvailable) {
-			dx12.adapter->Release();
-		}
+
+		d3d.deviceContext->ClearState();
+		d3d.deviceContext->Flush();
+
+		gui::clean();
 
 		delete shaders;
 
 		world::clean();
-
-		swapchain->Release();
 		
 		post::clean();
 		forward::clean();
 
-		d3d.deviceContext->Flush();
+		swapchain->Release();
+
+		if (dx12.isAvailable) {
+			dx12.adapter->Release();
+		}
 
 		d3d.device->Release();
 		d3d.deviceContext->Release();
+		d3d.annotation->Release();
+
+		if (d3d.debug.has_value()) {
+			d3d.debug.value()->ReportLiveDeviceObjects(
+				D3D11_RLDO_FLAGS::D3D11_RLDO_DETAIL
+				| D3D11_RLDO_FLAGS::D3D11_RLDO_IGNORE_INTERNAL);
+			LOG(INFO) << "Reported all relevant remaining objects.";
+			d3d.debug.value()->Release();
+		}
 	}
 
 	void update(float deltaTime)
@@ -262,7 +291,7 @@ namespace render
 		// gui does not output shading information so it goes to real sRGB backbuffer as well
 		settingsPrevious = settings;
 		d3d.annotation->BeginEvent(L"imgui");
-		drawGui();
+		gui::draw();
 		d3d.annotation->EndEvent();
 
 		post::resolveAndPresent(d3d, swapchain);
@@ -270,6 +299,8 @@ namespace render
 
 	void initDeviceAndSwapChain(HWND hWnd)
 	{
+		// TODO HR handling
+
 		ComPtr<ID3D11Device> device_11_0;
 		ComPtr<ID3D11DeviceContext> deviceContext_11_0;
 
@@ -348,6 +379,14 @@ namespace render
 		d3d.device = device_11_0.Detach();
 		d3d.deviceContext = deviceContext_11_0.Detach();
 
+		// debugging - named render phases
 		d3d.deviceContext->QueryInterface(__uuidof(ID3DUserDefinedAnnotation), (void**)&d3d.annotation);
+
+		// debugging - named resources and cleanup checks
+		ID3D11Debug* debug;
+		d3d.device->QueryInterface(__uuidof(ID3D11Debug), (void**)&debug);
+		if (debug != nullptr) {
+			d3d.debug = debug;
+		}
 	}
 }

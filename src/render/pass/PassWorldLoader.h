@@ -18,6 +18,6 @@ namespace render::pass::world
 
 	extern World world;
 
-	void clearLevel();
-	void loadLevel(D3d d3d, const std::string& level);
+	void clearZenLevel();
+	LoadWorldResult loadZenLevel(D3d d3d, const std::string& level);
 }

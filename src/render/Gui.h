@@ -2,23 +2,37 @@
 
 #include "WinDx.h"
 
-namespace render
+namespace render::gui
 {
-	const float GUI_PANEL_WIDTH = 280;
-	const float GUI_PANEL_PADDING = 8;
-	const float GUI_ELEMENT_WIDTH = GUI_PANEL_WIDTH - (2 * GUI_PANEL_PADDING);
-	const float INPUT_FLOAT_WIDTH = 50;
+	struct GuiConstants {
+		float panelWidth = 200;
+		float panelPadding = 6;
+		float elementWidth = panelWidth - (2 * panelPadding) - 12;
+		float inputFloatWidth = 45;
+
+		GuiConstants scale(float scaleFactor) const {
+			return {
+				.panelWidth = scaleFactor * panelWidth,
+				.panelPadding = scaleFactor * panelPadding,
+				.elementWidth = scaleFactor * elementWidth,
+				.inputFloatWidth = scaleFactor * inputFloatWidth
+			};
+		}
+	};
 
 	struct GuiComponent
 	{
 		const std::function<void()> buildGui;
 	};
 
+	GuiConstants& constants();
+	void onToggleVisible();
 	void addWindow(const std::string& windowName, GuiComponent guiComponent);
 	void addSettings(const std::string& groupName, GuiComponent guiComponent);
 	void addInfo(const std::string& groupName, GuiComponent guiComponent);
-	void initGui(HWND hWnd, D3d d3d);
-	void drawGui();
-	void cleanGui();
+	void init(HWND hWnd, D3d d3d);
+	void onWindowDpiChange(HWND hWnd);
+	void draw();
+	void clean();
 }
 

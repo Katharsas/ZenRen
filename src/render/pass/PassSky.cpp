@@ -249,4 +249,14 @@ namespace render::pass::sky
         // TODO this should probably be dynamic, see https://www.gamedev.net/forums/topic/673486-difference-between-d3d11-usage-default-and-d3d11-usage-dynamic/
         util::createConstantBuffer<CbSkyLayerSettings>(d3d, &skyLayerSettingsCb, D3D11_USAGE_DEFAULT);
     }
+
+    void clean()
+    {
+        mesh.release();
+        for (auto skyTexture : skyTextures) {
+            delete skyTexture.tex;
+        }
+        release(linearSamplerState);
+        release(skyLayerSettingsCb);
+    }
 }

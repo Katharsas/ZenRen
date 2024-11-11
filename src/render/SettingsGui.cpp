@@ -22,7 +22,7 @@ namespace render::gui::settings {
 	{
 		addSettings("Renderer", {
 			[&]()  -> void {
-				ImGui::PushItemWidth(GUI_ELEMENT_WIDTH);
+				ImGui::PushItemWidth(constants().elementWidth);
 				ImGui::SliderFloat("##ViewDistance", &settings.viewDistance, 1, 2000, "%.0f View Distance");
 				ImGui::PopItemWidth();
 
@@ -55,7 +55,7 @@ namespace render::gui::settings {
 
 		addSettings("Resolution", {
 			[&]()  -> void {
-				ImGui::PushItemWidth(INPUT_FLOAT_WIDTH);
+				ImGui::PushItemWidth(constants().inputFloatWidth);
 				ImGui::InputFloat("Resolution Scaling", &settings.resolutionScaling, 0, 0, "%.2f");
 				ImGui::PopItemWidth();
 				ImGui::PushStyleColorDebugText();
@@ -124,7 +124,7 @@ namespace render::gui::settings {
 
 		addSettings("Image", {
 			[&]() -> void {
-				ImGui::PushItemWidth(GUI_ELEMENT_WIDTH);
+				ImGui::PushItemWidth(constants().elementWidth);
 				ImGui::SliderFloat("##Gamma", &settings.gamma, 0.5, 1.5, "%.3f Gamma");
 				float f = settings.brightness * 100;
 				if (ImGui::SliderFloat("##Min", &f, -1, 1, "%.2f Min Brightness")) {

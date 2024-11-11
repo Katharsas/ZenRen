@@ -151,8 +151,10 @@ namespace render::pass::world
 				d3d.deviceContext->CopySubresourceRegion(targetTex, (currentTex * info.mipLevels) + mipLevel, 0, 0, 0, source, mipLevel, NULL);
 			}
 
+			release(source);
 			currentTex++;
 		}
+		release(targetTex);
 	}
 
 	void loadRenderBatch(D3d d3d, vector<MeshBatch>& target, TexInfo batchInfo, const VEC_VERTEX_DATA_BATCH& batchData)
@@ -397,7 +399,7 @@ namespace render::pass::world
 		return result;
 	}
 
-	void clearLevel()
+	void clearZenLevel()
 	{
 		for (auto& mesh : world.meshBatchesWorld) {
 			mesh.release();
@@ -419,7 +421,7 @@ namespace render::pass::world
 		release(world.lightmapTexArray);
 	}
 
-	void loadLevel(D3d d3d, const string& levelStr)
+	LoadWorldResult loadZenLevel(D3d d3d, const string& levelStr)
 	{
 		bool levelDataFound = false;
 		RenderData data;
@@ -456,10 +458,10 @@ namespace render::pass::world
 		}
 
 		if (!levelDataFound) {
-			return;
+			return { .loaded = false };
 		}
 
-		clearLevel();
+		clearZenLevel();
 		world.isOutdoorLevel = data.isOutdoorLevel;
 		{
 			vector<vector<uint8_t>> ddsRaws;
@@ -495,5 +497,10 @@ namespace render::pass::world
 			delete tex.second;
 		}
 		textureCache.clear();
+
+		return {
+			.loaded = true,
+			.isOutdoorLevel = world.isOutdoorLevel
+		};
 	}
 }

@@ -43,13 +43,13 @@ namespace viewer
 			render::stats::createTimeSampler()
 		};
 
-		render::addInfo("", {
+		render::gui::addInfo("", {
 			[]() -> void {
 				uint32_t fullTime = render::stats::getTimeSamplerStats(frameTimes.full).average;
 				uint32_t updateTime = render::stats::getTimeSamplerStats(frameTimes.update).average;
 				uint32_t renderTime = render::stats::getTimeSamplerStats(frameTimes.render).average;
 				
-				const int32_t fpsReal = 1000000 / fullTime;
+				const int32_t fpsReal = fullTime == 0 ? 0 : (1000000 / fullTime);
 
 				std::stringstream buffer;
 				buffer << "FPS:  " << util::leftPad(std::to_string(fpsReal), 4) << std::endl;
@@ -66,10 +66,10 @@ namespace viewer
 				ImGui::Text(buffer.str().c_str());
 			}
 		});
-		render::addSettings("FPS Limiter", {
+		render::gui::addSettings("FPS Limiter", {
 			[]() -> void {
 				ImGui::Checkbox("Enabled", &settings.frameLimiterEnabled);
-				ImGui::PushItemWidth(render::INPUT_FLOAT_WIDTH);
+				ImGui::PushItemWidth(render::gui::constants().inputFloatWidth);
 				ImGui::InputInt("FPS Limit", &settings.frameLimit, 0);
 				if (settings.frameLimit < 10) {
 					settings.frameLimit = 10;
@@ -90,9 +90,13 @@ namespace viewer
 		
 		render::initD3D(hWnd, { width, height });
 
-		if (args.level.has_value()) {
-			render::loadLevel(args.level.value());
+		if (!args.level.has_value()) {
+			LOG(WARNING) << "No level file argument specified! Loading empty level!";
 		}
+		// disable sky by default if there are no assets to take sky textures from
+		bool defaultSky = args.vdfFilesRoot.has_value() || args.assetFilesRoot.has_value();
+		render::loadLevel(args.level, defaultSky);
+
 
 		LOG(DEBUG) << "Statistics in microseconds";
 
@@ -135,8 +139,13 @@ namespace viewer
 
 	void onWindowResized(uint32_t width, uint32_t height)
 	{
-		LOG(DEBUG) << "Resizing game window! Width: " << width << ", Height: " << height;
+		LOG(DEBUG) << "Window size change! Width: " << width << ", Height: " << height;
 		render::onWindowResize({ width, height });
+	}
+
+	void onWindowDpiChanged(float dpiScale) {
+		LOG(DEBUG) << "Window DPI change! Scale: " << dpiScale;
+		render::onWindowDpiChange(dpiScale);
 	}
 
 	void execute()

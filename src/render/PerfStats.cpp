@@ -29,17 +29,16 @@ namespace render::stats
 	vector<Stats> lastStats;
 
 
-	int32_t divideOrZero(float dividend, int32_t divisor)
+	uint32_t divideOrZero(uint64_t dividend, uint32_t divisor)
 	{
 		if (divisor == 0) return 0;
-		else return static_cast<int32_t>(dividend / divisor);
+		else return (uint32_t)((dividend / (double)divisor) + .5f);
 	}
 
 	uint32_t average(const std::array<uint32_t, sampleSize>& samples, uint32_t sampleCount)
 	{
 		uint64_t sum = std::accumulate(samples.begin(), (samples.begin() + sampleCount), (uint64_t) 0);
-		return (uint32_t) ((sum / (double) sampleCount) + .5f);
-		
+		return divideOrZero(sum, sampleCount);
 	}
 
 	void updateStats(SamplerId id, int32_t currentSampleCount)

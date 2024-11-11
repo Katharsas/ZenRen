@@ -40,7 +40,7 @@ if (BUILD_MODE STREQUAL Debug)
 elseif (BUILD_MODE STREQUAL Release)
     message(STATUS "BuildMode: Release" )
 else()
-    message(FATAL_ERROR "Only 'Debug' or 'Release' build type supported!")
+    message(FATAL_ERROR "Only 'Debug' or 'Release' build type supported! Make sure to pass -DCMAKE_CONFIGURATION_TYPES=<type>")
 endif()
 
 ####### General options
@@ -99,7 +99,7 @@ message(STATUS "############## EXECUTABLE ##############")
 
 link_directories(${DXSDK_LIB_DIR})
 
-file(GLOB_RECURSE PROJECT_SRC CONFIGURE_DEPENDS "src/*.h" "src/*.cpp" "src/*.rc")
+file(GLOB_RECURSE PROJECT_SRC CONFIGURE_DEPENDS "src/*.h" "src/*.cpp" "src/*.rc" "src/app.manifest")
 add_executable(${PROJECT_NAME} WIN32 ${PROJECT_SRC})
 
  if (MSVC)

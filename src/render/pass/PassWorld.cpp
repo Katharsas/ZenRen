@@ -65,7 +65,7 @@ namespace render::pass::world
 			stats::createSampler(), stats::createSampler(), stats::createSampler()
 		};
 
-		render::addInfo("World", {
+		render::gui::addInfo("World", {
 			[]() -> void {
 				uint32_t stateChanges = render::stats::getSamplerStats(samplers.stateChanges).average;
 				uint32_t draws = render::stats::getSamplerStats(samplers.draws).average;
@@ -78,9 +78,9 @@ namespace render::pass::world
 			}
 		});
 
-		addSettings("World", {
+		render::gui::addSettings("World", {
 			[&]() -> void {
-				ImGui::PushItemWidth(GUI_ELEMENT_WIDTH);
+				ImGui::PushItemWidth(gui::constants().elementWidth);
 				// Lables starting with ## are hidden
 				float timeOfDay = worldSettings.timeOfDay;
 				bool changed = ImGui::DragFloat("##TimeOfDay", &timeOfDay, .002f, 0, 0, "%.3f TimeOfDay");
@@ -109,7 +109,7 @@ namespace render::pass::world
 		});
 
 		// TODO move to RenderDebugGui
-		addWindow("Lightmaps", {
+		render::gui::addWindow("Lightmaps", {
 			[&]() -> void {
 				ImGui::PushItemWidth(60);
 				ImGui::InputInt("Lightmap Index", &selectedDebugTexture, 0);
@@ -118,15 +118,15 @@ namespace render::pass::world
 				float zoom = 2.0f;
 				if (world.debugTextures.size() >= 1) {
 					if (selectedDebugTexture >= 0 && selectedDebugTexture < (int32_t) world.debugTextures.size()) {
-						ImGui::Image(world.debugTextures.at(selectedDebugTexture)->GetResourceView(), { 256 * zoom, 256 * zoom });
+						ImGui::Image((ImTextureID)world.debugTextures.at(selectedDebugTexture)->GetResourceView(), { 256 * zoom, 256 * zoom });
 					}
 				}
 			}
 		});
 	}
 
-	void loadWorld(D3d d3d, const std::string& level) {
-		loadLevel(d3d, level);
+	LoadWorldResult loadWorld(D3d d3d, const std::string& level) {
+		return loadZenLevel(d3d, level);
 	}
 
 	void updateObjects(float deltaTime)
@@ -410,7 +410,8 @@ namespace render::pass::world
 
 	void clean()
 	{
-		clearLevel();
+		sky::clean();
+		clearZenLevel();
 		release(linearSamplerState);
 	}
 }

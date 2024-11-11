@@ -25,7 +25,7 @@ namespace render::pass::world
 		int32_t debugSingleDrawIndex = 0;
 	};
 
-	void loadWorld(D3d d3d, const std::string& level);
+	LoadWorldResult loadWorld(D3d d3d, const std::string& level);
 	void updateObjects(float deltaTime);
 	void updateCameraFrustum(const DirectX::BoundingFrustum& cameraFrustum);
 	const WorldSettings& getWorldSettings();

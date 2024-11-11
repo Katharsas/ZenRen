@@ -122,6 +122,10 @@ namespace render {
 			return { (uint32_t)((width * scalar) + 0.5f), (uint32_t)((height * scalar) + 0.5f) };
 		}
 	};
+	inline std::ostream& operator <<(std::ostream& os, const BufferSize& that)
+	{
+		return os << "[W:" << that.width << " H:" << that.height << "]";
+	}
 
 	float fromSRGB(const float channel);
 	COLOR fromSRGB(const COLOR color);

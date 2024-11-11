@@ -25,12 +25,34 @@ namespace util
 		return !failed;
 	}
 
+	bool handleHr(const HRESULT& hr, bool throwOnError) {
+		bool failed = FAILED(hr);
+		if (failed) {
+			_com_error err(hr);
+			std::wstring errorMessageW = std::wstring(err.ErrorMessage());
+			std::string errorMessage = util::wideToUtf8(errorMessageW);
+
+			LOG(WARNING) << errorMessage;
+
+			if (throwOnError) {
+				throw std::exception(errorMessage.c_str());
+			}
+		}
+		return !failed;
+	}
+
 	bool warnOnError(const HRESULT& hr, const std::string& message) {
 		return handleHr(hr, message, false);
+	}
+	bool warnOnError(const HRESULT& hr) {
+		return handleHr(hr, false);
 	}
 
 	bool throwOnError(const HRESULT& hr, const std::string& message) {
 		return handleHr(hr, message, true);
+	}
+	bool throwOnError(const HRESULT& hr) {
+		return handleHr(hr, true);
 	}
 
 	std::string getUserFolderPath()

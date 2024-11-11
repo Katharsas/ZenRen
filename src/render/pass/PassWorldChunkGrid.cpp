@@ -111,8 +111,6 @@ namespace render::pass::world::chunkgrid
 
 	void updateCamera(const BoundingFrustum& cameraFrustum)
 	{
-		assert(sizeFinalized);
-
 		for (uint32_t i = 0; i < chunks.size(); i++) {
 			auto& [exists, existingBbox] = chunks[i];
 			chunksIntersectCamera[i] = exists && cameraFrustum.Intersects(existingBbox);
