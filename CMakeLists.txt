@@ -115,6 +115,15 @@ add_executable(${PROJECT_NAME} WIN32 ${PROJECT_SRC})
             # Not using generator expression here since it does not work with ninja ($ has to be replaced with $$)
             SET_TARGET_PROPERTIES(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS "/GL")
             SET_TARGET_PROPERTIES(${PROJECT_NAME} PROPERTIES LINK_FLAGS "/LTCG")
+    else()
+        # speed up debug builds by disabling basic runtime checks and enabling limited inlining
+        # (see https://dirtyhandscoding.github.io/posts/fast-debug-in-visual-c.html)
+
+        # C/C++ -> Code Generation -> Basic Runtime Checks -> Default
+        string(REPLACE "/RTC1" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+
+        # C/C++ -> Optimization -> Inline Function Expansion -> Only __inline
+        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Ob1")
     endif()
 
     if (CMAKE_GENERATOR MATCHES "Visual Studio")
