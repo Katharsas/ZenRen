@@ -4,7 +4,7 @@
 #include "InitApp.h"
 
 #include "conio.h"
-#include "../resource.h"
+#include "win_resources/resource.h"
 
 #include "../Util.h"
 #include "Args.h"
@@ -28,8 +28,8 @@ WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
 WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 
 // Default client size
-uint32_t windowClientWidth = 1366;
-uint32_t windowClientHeight = 768;
+uint16_t windowClientWidth = 1366;
+uint16_t windowClientHeight = 768;
 
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);

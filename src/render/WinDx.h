@@ -25,10 +25,7 @@
 
 #include <d3d11_1.h>
 #include <d3d11.h>
-#include <d3dx11.h>
-
-//#include <d3d10_1.h> TODO remove
-//#include <d3dx10.h>
+//#include <d3dx11.h>
 
 namespace render {
 	struct D3d {
@@ -38,6 +35,15 @@ namespace render {
 		std::optional<ID3D11Debug*> debug = {};
 	};
 
-	void release(IUnknown* dx11object);
+	void release(IUnknown *const dx11object);
 	void release(const std::vector<IUnknown*>& dx11objects);
+
+	template<typename T>
+	void release(T* const dx11object)
+	{
+		// we could also do "template<typename T> requires std::is_base_of<IUnknown, T>::value",
+		// but this should give us better errors since the Dx.h declaration accepts objects of any type.
+		static_assert(std::is_base_of<IUnknown, T>::value);
+		release((IUnknown* const)dx11object);
+	}
 }

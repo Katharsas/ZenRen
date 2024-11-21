@@ -9,6 +9,7 @@
 namespace assets
 {
 	using namespace DirectX;
+	using namespace zenkit;
 	using namespace ZenLib;
 	using namespace ZenLib::ZenLoad;
 	using ::render::TexId;
@@ -17,45 +18,91 @@ namespace assets
 	using ::std::unordered_map;
 	using ::util::createOrGet;
 
+	unordered_map<string, MultiResolutionMesh> cacheMeshesZkit;
+	unordered_map<string, ModelHierarchy> cacheMdh;
+	unordered_map<string, ModelMesh> cacheModelMeshesZkit;
+	unordered_map<string, Model> cacheModelsZkit;
+
 	unordered_map<string, MeshData> cacheMeshes;
 	unordered_map<string, MeshLibData> cacheMeshLibs;
 
 	vector<string> cacheTexNames;
 	unordered_map<int32_t, TexId> cacheTexNameHashToIds;
 
-	const MeshData& getOrParseMesh(VDFS::FileIndex& vdf, const string& meshName, bool pack)
+	// TODO T must have load method
+	template<typename T>
+	bool loadVisualZkit(T& parseTarget, const string& assetName)
+	{
+		//LOG(DEBUG) << "Loading: " << assetName;
+		const auto& assetFileOpt = assets::getIfExists(assetName);
+		if (assetFileOpt.has_value()) {
+			auto visualData = assets::getData(assetFileOpt.value());
+			auto read = zenkit::Read::from(visualData.data, visualData.size);
+			parseTarget.load(read.get());
+			return true;
+		}
+		return false;
+	}
+
+	std::optional<const MultiResolutionMesh*> getOrParseMrm(const string& assetName)
+	{
+		auto [it, wasInserted] = cacheMeshesZkit.try_emplace(assetName);
+		MultiResolutionMesh& result = it->second;
+		if (wasInserted) {
+			if (!loadVisualZkit(result, assetName)) {
+				return std::nullopt;
+			}
+		}
+		return &result;
+	}
+
+	std::optional<const ModelHierarchy*> getOrParseMdh(const string& assetName)
+	{
+		auto [it, wasInserted] = cacheMdh.try_emplace(assetName);
+		ModelHierarchy& result = it->second;
+		if (wasInserted) {
+			if (!loadVisualZkit(result, assetName)) {
+				return std::nullopt;
+			}
+		}
+		return &result;
+	}
+
+	std::optional<const ModelMesh*> getOrParseMdm(const string& assetName)
+	{
+		auto [it, wasInserted] = cacheModelMeshesZkit.try_emplace(assetName);
+		ModelMesh& result = it->second;
+		if (wasInserted) {
+			if (!loadVisualZkit(result, assetName)) {
+				return std::nullopt;
+			}
+		}
+		return &result;
+	}
+
+	std::optional<const Model*> getOrParseMdl(const string& assetName)
+	{
+		auto [it, wasInserted] = cacheModelsZkit.try_emplace(assetName);
+		Model& result = it->second;
+		if (wasInserted) {
+			if (!loadVisualZkit(result, assetName)) {
+				return std::nullopt;
+			}
+		}
+		return &result;
+	}
+
+	const MeshData& getOrParseMesh(const Vfs& vfs, const string& meshName)
 	{
 		return createOrGet<string, MeshData>(cacheMeshes, meshName, [&](MeshData& ref) {
-			//LOG(DEBUG) << "Loading: " << meshName;
-			ref.hasPacked = pack;
-			ref.mesh = ZenLoad::zCProgMeshProto(meshName, vdf);
-			if (pack) {
-				ref.mesh.packMesh(ref.packed, render::G_ASSET_RESCALE);
-			}
+			ref.mesh = ZenLoad::zCProgMeshProto(meshName, *vfs.zlib);
 		});
 	}
 
-	const MeshLibData& getOrParseMeshLib(VDFS::FileIndex& vdf, const string& meshName, bool pack)
+	const MeshLibData& getOrParseMeshLib(const Vfs& vfs, const string& meshName)
 	{
 		return createOrGet<string, MeshLibData>(cacheMeshLibs, meshName, [&](MeshLibData& ref) {
-			//LOG(DEBUG) << "Loading: " << meshName;
-			ref.hasPacked = pack;
-			ref.meshLib = ZenLoad::zCModelMeshLib(meshName, vdf, render::G_ASSET_RESCALE);
-			if (pack) {
-				{
-					uint32_t count = ref.meshLib.getMeshes().size();
-					ref.meshesPacked.resize(count);
-					for (uint32_t i = 0; i < count; ++i) {
-						ref.meshLib.getMeshes()[i].getMesh().packMesh(ref.meshesPacked[i], render::G_ASSET_RESCALE);
-					}
-				} {
-					uint32_t count = ref.meshLib.getAttachments().size();
-					ref.attachementsPacked.resize(count);
-					for (uint32_t i = 0; i < count; ++i) {
-						ref.meshLib.getAttachments()[i].second.packMesh(ref.attachementsPacked[i], render::G_ASSET_RESCALE);
-					}
-				}
-			}
+			ref.meshLib = ZenLoad::zCModelMeshLib(meshName, *vfs.zlib, render::G_ASSET_RESCALE);
 		});
 	}
 

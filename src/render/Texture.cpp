@@ -2,13 +2,15 @@
 #include "Texture.h"
 
 #include <comdef.h>
-
 #include "../Util.h"
-
 #include <magic_enum.hpp>
+
+#include "WinDx.h"
 #include "DirectXTex.h"
+#include "render/d3d/Other.h"
 
 namespace render {
+	using std::string_view;
 	using DirectX::ScratchImage;
 	using DirectX::TexMetadata;
 	using DirectX::DDSMetaData;
@@ -17,12 +19,13 @@ namespace render {
 	const std::array formatsNoAlpha = { DXGI_FORMAT::DXGI_FORMAT_BC1_UNORM };
 	const std::array formatsWithAlpha = { DXGI_FORMAT::DXGI_FORMAT_BC2_UNORM };
 
-	bool throwOnError(const HRESULT& hr, const std::string& message) {
-		return util::throwOnError(hr, "Texture Load Error: " + message);
+	bool throwOnError(const HRESULT& hr, string_view message) {
+		return ::util::throwOnError(hr, "Texture Load Error: " + std::string(message));
 	}
-	void throwError(const std::string& message) {
-		util::throwError("Texture Load Error: " + message);
+	void throwError(string_view message) {
+		::util::throwError("Texture Load Error: " + std::string(message));
 	}
+
 
 	void resizeIfOtherSize(ScratchImage* image, int32_t width, int32_t height, const std::string& name) {
 		const TexMetadata& metadata = image->GetMetadata();
@@ -47,7 +50,7 @@ namespace render {
 		return expectedCount == image->GetImageCount();
 	}
 
-	void createMipmapsIfMissing(ScratchImage* image, const std::string& name) {
+	void createMipmapsIfMissing(ScratchImage* image, string_view name) {
 		if (!hasExpectedMipmapCount(image)) {
 			ScratchImage imageWithMips;
 			auto hr = GenerateMipMaps(image->GetImages(), image->GetImageCount(), image->GetMetadata(), DirectX::TEX_FILTER_DEFAULT, 0, imageWithMips);
@@ -57,7 +60,7 @@ namespace render {
 		}
 	}
 
-	bool hasAlphaData(const DDSMetaData& ddPixelFormat, const TexMetadata metadata, const std::string& name) {
+	bool hasAlphaData(const DDSMetaData& ddPixelFormat, const TexMetadata metadata, string_view name) {
 		bool isCompressed = ddPixelFormat.fourCC != 0x0;
 		if (!isCompressed) {
 			return (ddPixelFormat.flags & MASK_DDPF_ALPHAPIXELS) == 1;
@@ -75,7 +78,7 @@ namespace render {
 				}
 			}
 			auto formatString = std::string(magic_enum::enum_name(metadata.format));
-			throwError("Failed to determine if texture '" + name + "' uses alpha or not! Unrecognized format: " + formatString);
+			throwError("Failed to determine if texture '" + std::string(name) + "' uses alpha or not! Unrecognized format: " + formatString);
 			__assume(false);
 		}
 	}
@@ -128,7 +131,7 @@ namespace render {
 		return resourceView;
 	}
 
-	void createSetSrv(D3d d3d, const ScratchImage& image, const std::string& name, bool sRgb, ID3D11ShaderResourceView** ppSrv) {
+	void createSetSrv(D3d d3d, const ScratchImage& image, string_view name, bool sRgb, ID3D11ShaderResourceView** ppSrv) {
 		// TODO Maybe we should just create a DX Texture object and do the SRV ourselves.
 		auto sRgbFlag = sRgb ? DirectX::CREATETEX_FORCE_SRGB : DirectX::CREATETEX_IGNORE_SRGB;
 		auto hr = DirectX::CreateShaderResourceViewEx(
@@ -148,24 +151,29 @@ namespace render {
 		// format for correct color space is determined by DirectX::CreateShaderResourceViewEx, so we cannot get it from ScratchImage
 		D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
 		srv->GetDesc(&srvDesc);
-		info.format = srvDesc.Format;
+		info.format = (uint32_t) srvDesc.Format;
 
 		return info;
 	}
 
+	Texture::Texture(D3d d3d, const assets::FileData&& file, bool sRgb)
+	{
+
+	}
+
 	Texture::Texture(D3d d3d, const std::string& sourceFile, bool sRgb)
 	{
-		auto name = util::asciiToLower(sourceFile);
-		std::wstring sourceFileW = util::utf8ToWide(name);
+		auto name = ::util::asciiToLower(sourceFile);
+		std::wstring sourceFileW = ::util::utf8ToWide(name);
 		HRESULT hr;
 		ScratchImage image;
 		TexMetadata metadata;
 
-		if (util::endsWith(name, ".tga")) {
+		if (::util::endsWith(name, ".tga")) {
 			hr = LoadFromTGAFile(sourceFileW.c_str(), DirectX::TGA_FLAGS_ALLOW_ALL_ZERO_ALPHA, &metadata, image);
 			throwOnError(hr, name);
 		}
-		else if (util::endsWith(name, ".png")) {
+		else if (::util::endsWith(name, ".png")) {
 			hr = LoadFromWICFile(sourceFileW.c_str(), DirectX::WIC_FLAGS_NONE, &metadata, image);
 			throwOnError(hr, name);
 		}
@@ -182,7 +190,7 @@ namespace render {
 		info = createInfo(image, hasAlpha, resourceView);
 	}
 
-	Texture::Texture(D3d d3d, std::vector<uint8_t>& ddsRaw, bool isGothicZTex, const std::string& name, bool sRgb)
+	Texture::Texture(D3d d3d, std::vector<uint8_t>& ddsRaw, bool isGothicZTex, string_view name, bool sRgb)
 	{
 		HRESULT hr;
 		ScratchImage image;

@@ -1,8 +1,9 @@
 #include "stdafx.h"
 #include "PassSky.h"
 
+#include "../WinDx.h"
 #include "../Renderer.h"
-#include "../RenderUtil.h"
+#include "render/d3d/Buffer.h"
 #include "../MeshUtil.h"
 #include "../Camera.h"
 #include "assets/AssetFinder.h"
@@ -102,20 +103,21 @@ namespace render::pass::sky
     Texture* loadSkyTexture(D3d d3d, std::string texName)
     {
         // TODO centralize code duplication with world, move into separate texture cache?
-        Texture* texture = nullptr;
-        auto optionalVdfIndex = assets::getVdfIndex();
-        if (optionalVdfIndex.has_value()) {
-            std::string zTexName = ::util::replaceExtension(texName, "-c.tex");// compiled textures have -C suffix
-
-            if (optionalVdfIndex.value()->hasFile(zTexName)) {
-                InMemoryTexFile tex = assets::loadTex(zTexName, optionalVdfIndex.value());
-                texture = new Texture(d3d, tex.ddsRaw, true, zTexName);
+        auto sourceAssetOpt = assets::getIfExists(texName);
+        if (sourceAssetOpt.has_value()) {
+            auto fileData = assets::getData(sourceAssetOpt.value());
+            return new Texture(d3d, std::move(fileData));
+        }
+        texName = ::util::replaceExtension(texName, "-c.tex");// compiled textures have -C suffix
+        auto compiledAssetOpt = assets::getIfExists(texName);
+        if (compiledAssetOpt.has_value()) {
+            auto optionalTex = assets::loadTex(compiledAssetOpt.value());
+            if (optionalTex.has_value()) {
+                return new Texture(d3d, optionalTex.value().ddsRaw, true, texName);
             }
+
         }
-        if (!texture) {
-            texture = new Texture(d3d, ::util::toString(assets::DEFAULT_TEXTURE));
-        }
-        return texture;
+        return new Texture(d3d, ::util::toString(assets::DEFAULT_TEXTURE));
     }
 
     void loadSky(D3d d3d)
@@ -130,7 +132,7 @@ namespace render::pass::sky
             }
 
             mesh.vertexCount = facesPos.size();
-            util::createVertexBuffer(d3d, &mesh.vbPos.buffer, facesPos);
+            d3d::createVertexBuf(d3d, &mesh.vbPos.buffer, facesPos);
         } {
             // textures
             // TODO original game has (and mods could have even more) sky variants (A0, A1, ..)
@@ -160,7 +162,7 @@ namespace render::pass::sky
         }
         
         assert(mesh.vertexCount == facesOther.size());
-        util::createVertexBuffer(d3d, mesh.vbUvs, facesOther);// TODO we should probably update the buffer instead of recreating it
+        d3d::createVertexBuf(d3d, mesh.vbUvs, facesOther);// TODO we should probably update the buffer instead of recreating it
     }
 
     void swapUvsIfSwapOccured(bool swapLayers) {
@@ -238,7 +240,7 @@ namespace render::pass::sky
         }
         
         // vertex buffer
-        util::setVertexBuffers(d3d, array { mesh.vbPos , mesh.vbUvs });
+        d3d::setVertexBuffers(d3d, array { mesh.vbPos , mesh.vbUvs });
         d3d.deviceContext->Draw(mesh.vertexCount, 0);
 
         d3d.annotation->EndEvent();
@@ -247,7 +249,7 @@ namespace render::pass::sky
     void initConstantBuffers(D3d d3d)
     {
         // TODO this should probably be dynamic, see https://www.gamedev.net/forums/topic/673486-difference-between-d3d11-usage-default-and-d3d11-usage-dynamic/
-        util::createConstantBuffer<CbSkyLayerSettings>(d3d, &skyLayerSettingsCb, D3D11_USAGE_DEFAULT);
+        d3d::createConstantBuf<CbSkyLayerSettings>(d3d, &skyLayerSettingsCb, BufferUsage::WRITE_GPU);
     }
 
     void clean()

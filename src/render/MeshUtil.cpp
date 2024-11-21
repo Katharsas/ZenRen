@@ -10,23 +10,11 @@ namespace render
     using namespace DirectX;
     using std::array;
 
-    XMMATRIX toXMM(const ZenLib::ZMath::Matrix& matrix)
+    DirectX::XMMATRIX toXMMatrix(const float * matrix)
     {
-        return XMMATRIX(matrix.mv);
+        return XMMATRIX(matrix);
     }
 
-    UV from(const ZenLib::ZMath::float2& source)
-    {
-        return UV{ source.x, source.y };
-    }
-    VEC3 from(const ZenLib::ZMath::float3& source)
-    {
-        return VEC3{ source.x, source.y, source.z };
-    }
-    VEC3 from(const ZenLib::ZMath::float3& source, float scale)
-    {
-        return VEC3{ source.x * scale, source.y * scale, source.z * scale };
-    }
     VEC3 toVec3(const XMFLOAT3& xmf3)
     {
         return VEC3{ xmf3.x, xmf3.y, xmf3.z };
@@ -42,6 +30,19 @@ namespace render
         XMFLOAT4 result;
         XMStoreFloat4(&result, xm4);
         return VEC4{ result.x, result.y, result.z, result.w };
+    }
+
+    bool isZero(const XMVECTOR& vec, float threshold)
+    {
+        XMVECTOR almostZero = DirectX::XMVectorReplicate(threshold);
+        uint32_t comparisonResult;
+        XMVectorEqualR(&comparisonResult, XMVectorGreater(vec, almostZero), DirectX::XMVectorZero());
+        return XMComparisonAllTrue(comparisonResult);
+    }
+
+    XMVECTOR bboxCenter(const array<XMVECTOR, 2>& bbox)
+    {
+        return 0.5f * (bbox[0] + bbox[1]);
     }
 
     XMVECTOR centroidPos(const array<XMVECTOR, 3>& posXm)
@@ -76,5 +77,17 @@ namespace render
         if (nearEqual.x != 0 || nearEqual.y != 0 || nearEqual.z != 0 || nearEqual.w != 0) {
             LOG(INFO) << "Vector was not normalized! " << source << "  |  " << normalized << "  |  " << nearEqualXm;
         }
+    }
+
+    void printXMMatrix(const XMMATRIX& matrix)
+    {
+        XMFLOAT4X4 tmp;
+        XMStoreFloat4x4(&tmp, matrix);
+        LOG(DEBUG) << "Matrix:";
+        constexpr const char* f = "    {:7.2f}, {:7.2f}, {:7.2f}, {:7.2f}";
+        LOG(DEBUG) << std::format(f, tmp._11, tmp._12, tmp._13, tmp._14);
+        LOG(DEBUG) << std::format(f, tmp._21, tmp._22, tmp._23, tmp._24);
+        LOG(DEBUG) << std::format(f, tmp._31, tmp._32, tmp._33, tmp._34);
+        LOG(DEBUG) << std::format(f, tmp._41, tmp._42, tmp._43, tmp._44);
     }
 }

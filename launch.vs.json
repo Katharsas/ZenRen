@@ -1,0 +1,18 @@
+{
+  "version": "0.2.1",
+  "defaults": {},
+  "configurations": [
+    {
+      "type": "default",
+      "project": "CMakeLists.txt",
+      "projectTarget": "zenren.exe",
+      "name": "zenren.exe",
+      "currentDir": "${workspaceRoot}/resources",
+      "args": [
+        "--noLog --rdp --level \u0022WORLD.ZEN\u0022 --vdfDir \u0022C:/Program Files (x86)/Steam/steamapps/common/Gothic\u0022"
+      ],
+      "args_g1": "--noLog --rdp --level \u0022WORLD.ZEN\u0022 --vdfDir \u0022C:/Program Files (x86)/Steam/steamapps/common/Gothic\u0022",
+      "args_g2": "--noLog --rdp --level \u0022NEWWORLD.ZEN\u0022 --vdfDir \u0022C:/Program Files (x86)/Steam/steamapps/common/Gothic II/Data\u0022"
+    }
+  ]
+}

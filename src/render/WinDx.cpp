@@ -3,7 +3,7 @@
 
 namespace render {
 
-	void release(IUnknown* dx11object) {
+	void release(IUnknown *const dx11object) {
 		if (dx11object != nullptr) {
 			dx11object->Release();
 		}

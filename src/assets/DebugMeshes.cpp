@@ -57,7 +57,7 @@ namespace assets
     {
         vector<VERTEX_POS> facesPos;
         vector<VERTEX_OTHER> facesOther;
-        const auto& bboxFacesXm = createBboxVerts(instance.bbox[0], instance.bbox[1], instance.transform);
+        const auto& bboxFacesXm = createBboxVerts(toVec3(instance.bbox[0]), toVec3(instance.bbox[1]), instance.transform);
         for (auto& posXm : bboxFacesXm) {
             const auto faceNormal = toVec3(calcFlatFaceNormal(posXm));
             for (int32_t i = 0; i < 3; i++) {

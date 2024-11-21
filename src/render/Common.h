@@ -1,11 +1,11 @@
 #pragma once
 
 #include "Primitives.h"
-
-#include <dxgiformat.h>
 #include <string>
 #include <ostream>
 #include <vector>
+
+//enum DXGI_FORMAT : int;
 
 namespace render
 {
@@ -18,15 +18,21 @@ namespace render
 	typedef NORMAL_CL_UV_LUV_STATIC_LIGHT VERTEX_OTHER;
 
 	struct TexInfo {
-		uint16_t width = -1;
-		uint16_t height = -1;
-		uint16_t mipLevels = -1;
+		// TODO make width/height of type BufferSize?
+		uint16_t width = 0;
+		uint16_t height = 0;
+		uint16_t mipLevels = 0;
 		bool hasAlpha = true;
 
 		// compression and color space
-		DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
+		// DXGI_FORMAT
+		uint32_t format = 0; // DXGI_FORMAT_UNKNOWN
 
 		auto operator<=>(const TexInfo&) const = default;
+
+		BufferSize getSize() {
+			return { (uint16_t) width, (uint16_t) height };
+		}
 	};
 
 	// TODO make adjustable for reload, implement level selection and changing vdf path with load button

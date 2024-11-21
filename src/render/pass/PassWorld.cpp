@@ -7,10 +7,12 @@
 #include "PassWorldLoader.h"
 #include "PassWorldChunkGrid.h"
 #include "PassSky.h"
-#include "../Camera.h"
-#include "../Sky.h"
-#include "../RenderUtil.h"
-#include "../PerfStats.h"
+
+#include "render/Camera.h"
+#include "render/Sky.h"
+#include "render/PerfStats.h"
+#include "render/d3d/Buffer.h"
+
 #include "Util.h"
 
 // TODO move to RenderDebugGui
@@ -24,6 +26,8 @@ namespace render::pass::world
 	using ::std::unordered_map;
 	using ::std::vector;
 	using ::std::array;
+
+	extern World world;
 
 	WorldSettings worldSettings;
 
@@ -147,6 +151,7 @@ namespace render::pass::world
 
 	void initLinearSampler(D3d d3d, RenderSettings& settings)
 	{
+		// TODO use Other.h
 		if (linearSamplerState != nullptr) {
 			linearSamplerState->Release();
 		}
@@ -254,7 +259,7 @@ namespace render::pass::world
 				ID3D11ShaderResourceView* srv = GetTex(mesh);
 				d3d.deviceContext->PSSetShaderResources(0, 1, &srv);
 			}
-			util::setVertexBuffers(d3d, GetVbs(mesh));
+			d3d::setVertexBuffers(d3d, GetVbs(mesh));
 
 			// TODO cutoff should be adjustable in GUI
 			uint32_t ignoreAllChunksVertThreshold = 1000;

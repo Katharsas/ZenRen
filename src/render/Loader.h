@@ -2,15 +2,29 @@
 
 #include "Common.h"
 
+namespace assets
+{
+	struct LoadDebugFlags {
+		bool vobsTint = false;
+		bool staticLights = false;
+		bool staticLightRays = false;
+		bool staticLightTintUnreached = false;
+	};
+}
 namespace render
 {
-	struct StaticInstance {
-		std::string meshName;
-		DirectX::XMMATRIX transform;
-		std::array<VEC3, 2> bbox;// pos_min, pos_max
+	struct VobLighting
+	{
+		DirectX::XMVECTOR direction;// pre-inverted
+		COLOR color;
 		bool receiveLightSun;
-		COLOR colLightStatic;
-		DirectX::XMVECTOR dirLightStatic;// pre-inverted
+	};
+
+	struct StaticInstance {
+		std::string meshName;// TODO rename to modelName or visualAsset or visualFile
+		DirectX::XMMATRIX transform;
+		std::array<DirectX::XMVECTOR, 2> bbox;// pos_min, pos_max
+		VobLighting lighting;
 	};
 
 	struct Light {

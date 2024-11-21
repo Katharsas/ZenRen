@@ -10,3 +10,6 @@
 [submodule "lib/DirectXTex"]
 	path = lib/DirectXTex
 	url = https://github.com/microsoft/DirectXTex
+[submodule "lib/ZenKit"]
+	path = lib/ZenKit
+	url = https://github.com/Katharsas/ZenKit

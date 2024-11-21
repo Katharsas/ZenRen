@@ -29,8 +29,11 @@ namespace viewer
 	}
 	frameTimes;
 
-	void init(HWND hWnd, Arguments args, uint32_t width, uint32_t height)
+	void init(HWND hWnd, Arguments args, uint16_t width, uint16_t height)
 	{
+		auto sampler = render::stats::TimeSampler();
+		sampler.start();
+
 		LOG(INFO) << "Current working dir: " << std::filesystem::current_path();
 
 		enablePreciseTimerResolution();
@@ -97,7 +100,7 @@ namespace viewer
 		bool defaultSky = args.vdfFilesRoot.has_value() || args.assetFilesRoot.has_value();
 		render::loadLevel(args.level, defaultSky);
 
-
+		sampler.logMillisAndRestart("Viewer initialized total");
 		LOG(DEBUG) << "Statistics in microseconds";
 
 		frameTimes.full.start();
@@ -137,7 +140,7 @@ namespace viewer
 		frameTimes.wait.sample();
 	}
 
-	void onWindowResized(uint32_t width, uint32_t height)
+	void onWindowResized(uint16_t width, uint16_t height)
 	{
 		LOG(DEBUG) << "Window size change! Width: " << width << ", Height: " << height;
 		render::onWindowResize({ width, height });

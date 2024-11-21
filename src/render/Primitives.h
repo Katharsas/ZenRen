@@ -1,6 +1,24 @@
 #pragma once
 
 #include <ostream>
+#include <concepts>
+#include <type_traits>
+
+template <typename C> concept RGBA = requires(C color) {
+	{ color.r } -> std::convertible_to<uint32_t>;
+	{ color.g } -> std::convertible_to<uint32_t>;
+	{ color.b } -> std::convertible_to<uint32_t>;
+	{ color.a } -> std::convertible_to<uint32_t>;
+};
+template <typename V> concept Vec3 = requires(V vec) {
+	{ vec.x } -> std::convertible_to<float>;
+	{ vec.y } -> std::convertible_to<float>;
+	{ vec.z } -> std::convertible_to<float>;
+};
+template <typename V> concept Vec2 = !Vec3<V> && requires(V vec) {
+	{ vec.x } -> std::convertible_to<float>;
+	{ vec.y } -> std::convertible_to<float>;
+};
 
 struct COLOR {
 	union {
@@ -10,11 +28,20 @@ struct COLOR {
 	COLOR() {};
 	COLOR(uint32_t argb);
 	COLOR(float r, float g, float b, float a);
+
+	template<RGBA Color>
+	COLOR(Color rgba) {
+		r = rgba.r;
+		g = rgba.g;
+		b = rgba.b;
+		a = rgba.a;
+	}
 };
 inline std::ostream& operator <<(std::ostream& os, const COLOR& that)
 {
 	return os << "[R:" << that.r << " G:" << that.g << " B:" << that.b << " A:" << that.a << "]";
 }
+static_assert(RGBA<COLOR>);
 
 struct UV {
 	union {
@@ -37,6 +64,7 @@ inline std::ostream& operator <<(std::ostream& os, const VEC2& that)
 {
 	return os << "[X=" << that.x << " Y=" << that.y << "]";
 }
+static_assert(Vec2<VEC2>);
 
 struct VEC3 {
 	union {
@@ -48,6 +76,7 @@ inline std::ostream& operator <<(std::ostream& os, const VEC3& that)
 {
 	return os << "[X=" << that.x << " Y=" << that.y << " Z=" << that.z << "]";
 }
+static_assert(Vec3<VEC3>);
 
 struct VEC4 {
 	union {
@@ -114,12 +143,16 @@ typedef uint32_t TEX_INDEX;
 namespace render {
 
 	struct BufferSize {
-		uint32_t width;
-		uint32_t height;
+		uint16_t width;
+		uint16_t height;
 
 		BufferSize operator*(const float scalar) const
 		{
-			return { (uint32_t)((width * scalar) + 0.5f), (uint32_t)((height * scalar) + 0.5f) };
+			return { (uint16_t)((width * scalar) + 0.5f), (uint16_t)((height * scalar) + 0.5f) };
+		}
+		operator std::tuple<uint16_t&, uint16_t&>()
+		{
+			return std::tuple<uint16_t&, uint16_t&>{width, height};
 		}
 	};
 	inline std::ostream& operator <<(std::ostream& os, const BufferSize& that)
@@ -129,6 +162,7 @@ namespace render {
 
 	float fromSRGB(const float channel);
 	COLOR fromSRGB(const COLOR color);
+	COLOR from4xUint8(uint8_t const* const rgba);
 	COLOR greyscale(const float channel);
 	COLOR multiplyColor(COLOR color, const float factor);
 

@@ -1,8 +1,10 @@
 #pragma once
 
-#include <string>
-#include "WinDx.h"
+#include "Dx.h"
 #include "Common.h"
+#include "assets/AssetFinder.h"
+
+#include <string>
 
 namespace render
 {
@@ -15,8 +17,10 @@ namespace render
 	class Texture
 	{
 	public:
+		// TODO
+		Texture(D3d d3d, const assets::FileData&& file, bool sRgb = true);
 		Texture(D3d d3d, const std::string& sourceFile, bool sRgb = true);
-		Texture(D3d d3d, std::vector<uint8_t>& ddsRaw, bool isGothicZTex, const std::string& name, bool sRgb = true);
+		Texture(D3d d3d, std::vector<uint8_t>& ddsRaw, bool isGothicZTex, std::string_view name, bool sRgb = true);
 		~Texture();
 		ID3D11ShaderResourceView* GetResourceView() const;
 		TexInfo getInfo() const;

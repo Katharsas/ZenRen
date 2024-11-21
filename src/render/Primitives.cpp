@@ -8,24 +8,28 @@ COLOR::COLOR(uint32_t argb) {
 	b = f * (float)(uint8_t)(argb >> 0);
 	a = f * (float)(uint8_t)(argb >> 24);
 }
-COLOR::COLOR(float r_, float g_, float b_, float a_) {
-	r = r_;
-	g = g_;
-	b = b_;
-	a = a_;
-}
+COLOR::COLOR(float r, float g, float b, float a) : r(r), g(g), b(b), a(a) {}
+
 
 namespace render {
-	float fromSRGB(const float channel) {
+	float fromSRGB(const float channel)
+	{
 		return (channel <= 0.04045f) ? (channel / 12.92f) : pow((channel + 0.055f) / 1.055f, 2.4f);
 	}
 
-	COLOR fromSRGB(const COLOR color) {
+	COLOR fromSRGB(const COLOR color)
+	{
 		return COLOR(
 			fromSRGB(color.r),
 			fromSRGB(color.g),
 			fromSRGB(color.b),
 			color.a);
+	}
+
+	COLOR from4xUint8(uint8_t const * const rgba)
+	{
+		const float f = 1.0f / 255.0f;
+		return COLOR(rgba[0] * f, rgba[1] * f, rgba[2] * f, rgba[3] * f);
 	}
 
 	COLOR greyscale(const float channel) {

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "WinDx.h"
+#include "Dx.h"
 #include "Common.h"
 #include "Texture.h"
 
@@ -84,7 +84,7 @@ namespace render
 		bool isOutdoorLevel = false;
 	};
 
-	void initD3D(HWND hWnd, const BufferSize& changedSize);
+	void initD3D(void* hWnd, const BufferSize& changedSize);
 	bool loadLevel(const std::optional<std::string>& level, bool defaultSky = true);
 	void onWindowResize(const BufferSize& changedSize);
 	void onWindowDpiChange(float dpiScale);

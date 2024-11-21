@@ -1,18 +1,20 @@
 #include "stdafx.h"
 #include "PassWorldLoader.h"
 
+#include "render/PerfStats.h"
 #include "render/Loader.h"
 #include "PassWorldChunkGrid.h"
 
 #include "assets/AssetCache.h"
 #include "assets/AssetFinder.h"
 #include "assets/ZenLoader.h"
+#include "assets/ZenKitLoader.h"
 #include "assets/ObjLoader.h"
 #include "assets/TexFromVdfLoader.h"
 
 #include "Util.h"
 #include "Win.h"
-#include "render/RenderUtil.h"
+#include "render/d3d/Buffer.h"
 
 namespace render::pass::world
 {
@@ -53,24 +55,24 @@ namespace render::pass::world
 
 	Texture* createTexture(D3d d3d, TexId texId)
 	{
-		const auto texName = ::assets::getTexName(texId);
+		std::string texName(::assets::getTexName(texId));
 
-		auto optionalFilepath = assets::existsAsFile(texName);
-		if (optionalFilepath.has_value()) {
-			auto path = *optionalFilepath.value();
-			return new Texture(d3d, ::util::toString(path));
+		// texture name is alwyas TGA, and assetFinder assumes we lookup with TGA extension even if file is not TGA (TODO change this maybe?)
+		// only if file could not be found as source file, we have to check for compiled variant because asset finder does not handle that
+		auto sourceAssetOpt = assets::getIfExists(texName);
+		if (sourceAssetOpt.has_value()) {
+			auto fileData = assets::getData(sourceAssetOpt.value());
+			return new Texture(d3d, std::move(fileData));
 		}
-
-		auto optionalVdfIndex = assets::getVdfIndex();
-		if (optionalVdfIndex.has_value()) {
-			std::string zTexName = ::util::replaceExtension(texName, "-c.tex");// compiled textures have -C suffix
-
-			if (optionalVdfIndex.value()->hasFile(zTexName)) {
-				InMemoryTexFile tex = assets::loadTex(zTexName, optionalVdfIndex.value());
-				return new Texture(d3d, tex.ddsRaw, true, zTexName);
+		texName = ::util::replaceExtension(texName, "-c.tex");// compiled textures have -C suffix
+		auto compiledAssetOpt = assets::getIfExists(texName);
+		if (compiledAssetOpt.has_value()) {
+			auto optionalTex = assets::loadTex(compiledAssetOpt.value());
+			if (optionalTex.has_value()) {
+				return new Texture(d3d, optionalTex.value().ddsRaw, true, texName);
 			}
-		}
 
+		}
 		return new Texture(d3d, ::util::toString(assets::DEFAULT_TEXTURE));
 	}
 
@@ -104,7 +106,7 @@ namespace render::pass::world
 		}
 		PrepassMeshes mesh;
 		mesh.vertexCount = allVerts.size();
-		util::createVertexBuffer(d3d, mesh.vbPos, allVerts);
+		d3d::createVertexBuf(d3d, mesh.vbPos, allVerts);
 		target.push_back(mesh);
 
 		return { 1, vertCount };
@@ -112,7 +114,7 @@ namespace render::pass::world
 
 	void initDxTextureArray(D3d d3d, ID3D11ShaderResourceView** targetSrv, const TexInfo& info, uint32_t arraySize)
 	{
-		D3D11_TEXTURE2D_DESC texDesc = CD3D11_TEXTURE2D_DESC(info.format, info.width, info.height);
+		D3D11_TEXTURE2D_DESC texDesc = CD3D11_TEXTURE2D_DESC((DXGI_FORMAT) info.format, info.width, info.height);
 		texDesc.MipLevels = info.mipLevels;
 		texDesc.ArraySize = arraySize;
 
@@ -122,7 +124,7 @@ namespace render::pass::world
 
 		D3D11_SHADER_RESOURCE_VIEW_DESC descSrv = CD3D11_SHADER_RESOURCE_VIEW_DESC(
 			D3D11_SRV_DIMENSION_TEXTURE2DARRAY,
-			info.format,
+			(DXGI_FORMAT) info.format,
 			0, info.mipLevels,
 			0, arraySize
 		);
@@ -162,9 +164,9 @@ namespace render::pass::world
 		MeshBatch batch;
 		batch.vertClusters = batchData.vertClusters;
 		batch.vertexCount = batchData.vecPos.size();
-		util::createVertexBuffer(d3d, batch.vbPos, batchData.vecPos);
-		util::createVertexBuffer(d3d, batch.vbOther, batchData.vecOther);
-		util::createVertexBuffer(d3d, batch.vbTexIndices, batchData.texIndices);
+		d3d::createVertexBuf(d3d, batch.vbPos, batchData.vecPos);
+		d3d::createVertexBuf(d3d, batch.vbOther, batchData.vecOther);
+		d3d::createVertexBuf(d3d, batch.vbTexIndices, batchData.texIndices);
 		createTexArray(d3d, &batch.texColorArray, batchInfo, batchData.texIndexedIds);
 		target.push_back(batch);
 	}
@@ -423,6 +425,11 @@ namespace render::pass::world
 
 	LoadWorldResult loadZenLevel(D3d d3d, const string& levelStr)
 	{
+		auto samplerTotal = render::stats::TimeSampler();
+		samplerTotal.start();
+		auto sampler = render::stats::TimeSampler();
+		sampler.start();
+
 		bool levelDataFound = false;
 		RenderData data;
 		string level = ::util::asciiToLower(levelStr);
@@ -431,22 +438,16 @@ namespace render::pass::world
 			LOG(WARNING) << "Level file format not supported: " << level;
 		}
 
-		auto optionalFilepath = assets::existsAsFile(level);
-		auto optionalVdfIndex = assets::getVdfIndex();
-
-		if (optionalFilepath.has_value()) {
-			if (::util::endsWith(level, ".obj")) {
-				//data = { true, assets::loadObj(::util::toString(*optionalFilepath.value())) };
-				levelDataFound = true;
-			}
-			else {
-				// TODO support loading ZEN files
-				LOG(WARNING) << "Loading from single level file not supported: " << level;
-			}
-		}
-		else if (optionalVdfIndex.has_value()) {
+		auto levelFileOpt = assets::getIfExists(level);
+		if (levelFileOpt.has_value()) {
 			if (::util::endsWith(level, ".zen")) {
-				assets::loadZen(data, level, optionalVdfIndex.value());
+				auto levelFile = levelFileOpt.value();
+				if (levelFile.node != nullptr) {
+					assets::loadZen2(data, levelFile);
+				}
+				else {
+					assets::loadZen(data, levelFile, assets::getVfsLegacy());
+				}
 				levelDataFound = true;
 			}
 			else {
@@ -461,6 +462,8 @@ namespace render::pass::world
 			return { .loaded = false };
 		}
 
+		sampler.logMillisAndRestart("Level: Loaded all data");
+
 		clearZenLevel();
 		world.isOutdoorLevel = data.isOutdoorLevel;
 		{
@@ -471,32 +474,43 @@ namespace render::pass::world
 				Texture* texture = new Texture(d3d, lightmap.ddsRaw, false, "lightmap_xxx");
 				world.debugTextures.push_back(texture);
 			}
-			world.lightmapTexArray = createShaderTexArray(d3d, ddsRaws, 256, 256, true);
+			if (!ddsRaws.empty()) {
+				world.lightmapTexArray = createShaderTexArray(d3d, ddsRaws, 256, 256, true);
+			}
 		}
+		sampler.logMillisAndRestart("Level: Uploaded lightmap textures");
 
 		// chunk grid
 		chunkgrid::updateSize(data.worldMesh);
+		chunkgrid::updateSize(data.staticMeshes);
 		uint32_t cellCount = chunkgrid::finalizeSize();
 		chunkgrid::updateMesh(data.worldMesh);
-		LOG(INFO) << "Level Loaded - Chunk Grid       - Cells: " << cellCount;
+		chunkgrid::updateMesh(data.staticMeshes);
+		LOG(INFO) << "Level: Computed Chunk Grid       - Cells: " << cellCount;
+		sampler.logMillisAndRestart("Level: Computed chunk grid");
 
 		LoadResult loadResult;
 		// TODO fix prepass
 		//loadResult = loadPrepassData(d3d, world.prepassMeshes, data.worldMesh);
-		LOG(INFO) << "Level Loaded - Depth Prepass    - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
-		
+		LOG(INFO) << "Level: Uploaded depth prepass    - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
+		sampler.logMillisAndRestart("Level: Uploaded depth prepass");
+
 		loadResult = loadVertexDataBatched(d3d, world.meshBatchesWorld, data.worldMesh, texturesPerBatch);
 		sortByVertCount(world.meshBatchesWorld);// improves performance
-		LOG(INFO) << "Level Loaded - World Mesh       - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
-		
+		LOG(INFO) << "Level: Uploaded world mesh       - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
+		sampler.logMillisAndRestart("Level: Uploaded world mesh");
+
 		loadResult = loadVertexDataBatched(d3d, world.meshBatchesObjects, data.staticMeshes, texturesPerBatch);
-		LOG(INFO) << "Level Loaded - Static Instances - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
+		LOG(INFO) << "Level: Uploaded static instances - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
+		sampler.logMillisAndRestart("Level: Uploaded static instances");
 
 		// since single textures have been copied to texture arrays, we can release them
 		for (auto& tex : textureCache) {
 			delete tex.second;
 		}
 		textureCache.clear();
+
+		samplerTotal.logMillisAndRestart("Level complete");
 
 		return {
 			.loaded = true,
