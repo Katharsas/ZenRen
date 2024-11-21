@@ -4,8 +4,6 @@ project(zenren)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# TODO fix UI scaling to be native again (imgui is blurry on increased scale settings)
-# TODO re-enable some optimizations for debug builds so loading is faster (measure!)
 # TODO fix VS generator
 
 message(STATUS "############## CMAKE START ##############")
@@ -90,6 +88,11 @@ add_subdirectory(lib/g3log)
 #add_subdirectory(lib/DirectXMath) # TODO this is header only so we don't need this right?
 add_subdirectory(lib/DirectXTex)
 
+option(ZK_BUILD_TESTS "" OFF)
+#option(ZK_ENABLE_INSTALL "" OFF)
+add_subdirectory(lib/ZenKit)
+
+#set(libsquish_POPULATED ON CACHE BOOL "") # fix error due to ZenKit already having fetched libsquish
 set(ZENLIB_BUILD_EXAMPLES OFF CACHE BOOL "")
 set(ZENLIB_BUILD_TESTS OFF CACHE BOOL "")
 add_subdirectory(lib/ZenLib)
@@ -102,6 +105,14 @@ link_directories(${DXSDK_LIB_DIR})
 file(GLOB_RECURSE PROJECT_SRC CONFIGURE_DEPENDS "src/*.h" "src/*.cpp" "src/*.rc" "src/app.manifest")
 add_executable(${PROJECT_NAME} WIN32 ${PROJECT_SRC})
 
+# Fix some cases of macro pollution from win32 header files
+#target_compile_definitions(${GAME_TARGET} PRIVATE
+#	WIN32_LEAN_AND_MEAN
+#	NOGDI
+#	NOUSER
+#	_CRT_SECURE_NO_WARNINGS
+#)
+
  if (MSVC)
     # Advanced -> Character Set -> Use Unicode
     target_compile_definitions(${PROJECT_NAME} PUBLIC UNICODE _UNICODE)
@@ -113,17 +124,17 @@ add_executable(${PROJECT_NAME} WIN32 ${PROJECT_SRC})
             # Advanced -> Whole Program Optimization -> Use Link Time Code Generation
             # (see https://stackoverflow.com/questions/48431918/wholeprogramoptimization-in-cmake)
             # Not using generator expression here since it does not work with ninja ($ has to be replaced with $$)
-            SET_TARGET_PROPERTIES(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS "/GL")
-            SET_TARGET_PROPERTIES(${PROJECT_NAME} PROPERTIES LINK_FLAGS "/LTCG")
+            # SET_TARGET_PROPERTIES(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS "/GL")
+            # SET_TARGET_PROPERTIES(${PROJECT_NAME} PROPERTIES LINK_FLAGS "/LTCG")
     else()
         # speed up debug builds by disabling basic runtime checks and enabling limited inlining
         # (see https://dirtyhandscoding.github.io/posts/fast-debug-in-visual-c.html)
 
         # C/C++ -> Code Generation -> Basic Runtime Checks -> Default
-        string(REPLACE "/RTC1" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+        # string(REPLACE "/RTC1" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
 
         # C/C++ -> Optimization -> Inline Function Expansion -> Only __inline
-        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Ob1")
+        # set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Ob1")
     endif()
 
     if (CMAKE_GENERATOR MATCHES "Visual Studio")
@@ -142,17 +153,21 @@ target_include_directories(${PROJECT_NAME} PRIVATE "src")
 target_include_directories(${PROJECT_NAME} PRIVATE "lib/g3log/src") 
 target_include_directories(${PROJECT_NAME} PRIVATE "lib/DirectXMath/Inc")
 target_include_directories(${PROJECT_NAME} PRIVATE "lib/DirectXTex/DirectXTex")
+target_include_directories(${PROJECT_NAME} PRIVATE "lib/ZenKit/include")
 target_include_directories(${PROJECT_NAME} PRIVATE "lib/ZenLib")
 target_include_directories(${PROJECT_NAME} PRIVATE "lib/magic_enum")
 target_include_directories(${PROJECT_NAME} PRIVATE "lib/octree_attcs")
 target_include_directories(${PROJECT_NAME} PRIVATE "lib/tinyobj")
 target_include_directories(${PROJECT_NAME} PRIVATE "${DXSDK_DIR}/Include")
 
+target_include_directories(${PROJECT_NAME} PUBLIC "lib/ZenKit/vendor/glm")
+
 #link static library into target (compiled source files)
 target_link_libraries(${PROJECT_NAME} PRIVATE g3log)
 target_link_libraries(${PROJECT_NAME} PRIVATE imgui)
 target_link_libraries(${PROJECT_NAME} PRIVATE DirectXTex)
 target_link_libraries(${PROJECT_NAME} PRIVATE utils vdfs zenload daedalus)
+target_link_libraries(${PROJECT_NAME} PRIVATE zenkit)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
     dxgi.lib dxguid.lib uuid.lib

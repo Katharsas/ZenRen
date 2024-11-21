@@ -21,7 +21,9 @@ namespace assets
 
 	std::unordered_map<string, const fs::path> assetNamesToPaths;
 	std::unordered_set<string> zensFoundInVdfs;
-	VDFS::FileIndex* vdf = nullptr;
+
+	bool useZenkit = false;
+	Vfs vfs;
 
 	string filenameWithTga(const string& filename) {
 		return util::replaceExtension(filename, ".tga");
@@ -39,18 +41,27 @@ namespace assets
 		}
 	}
 
-	std::optional<VDFS::FileIndex*> getVdfIndex() {
-		if (vdf != nullptr) {
-			return vdf;
+	std::optional<Vfs> getVfsIndex() {
+		if (vfs.initialized()) {
+			return vfs;
 		}
 		else {
 			return std::nullopt;
 		}
 	}
 
-	bool existsInVdf(VDFS::FileIndex* vdf, string& assetName) {
-		return vdf->hasFile(assetName);
-	}
+	//bool existsInVfs(Vfs vfs, string& assetName) {
+	//	if (vfs.zlib != nullptr) {
+	//		return vfs.zlib->hasFile(assetName);
+	//	}
+	//	else {
+	//		return vfs.zkit->find(assetName) != nullptr;
+	//	}
+	//}
+
+	//bool existsInVfs(VDFS::FileIndex* vfs, string& assetName) {
+	//	return vfs->hasFile(assetName);
+	//}
 
 	std::optional<const fs::path*> existsAsFile(const string_view assetName) {
 		auto it = assetNamesToPaths.find(string(assetName));
@@ -88,33 +99,64 @@ namespace assets
 		assets::initDebugTextures(&assetNamesToPaths);
 	}
 
-	void initVdfAssetSourceDir(fs::path& rootDir) {
-
-		VDFS::FileIndex::initVDFS("Foo");
-		if (vdf != nullptr) {
-			delete vdf;
-		}
-		vdf = new VDFS::FileIndex();
+	void initVdfAssetSourceDir(fs::path& rootDir)
+	{
 		LOG(INFO) << "Scanning dir for VDF files: " << util::toString(rootDir);
-
-		walkFilesRecursively(rootDir, [](const fs::path& path, const std::string& filename) -> void {
-			if (util::endsWith(filename, ".vdf")) {
-				LOG(DEBUG) << "Loading VDF: " << filename;
-				vdf->loadVDF(path.string());
+		{
+			if (vfs.zkit != nullptr) {
+				delete vfs.zkit;
 			}
-			if (util::endsWith(filename, ".mod")) {
-				LOG(DEBUG) << "Loading MOD: " << filename;
-				vdf->loadVDF(path.string());
+			vfs.zkit = new zenkit::Vfs();
+			
+			//walkFilesRecursively(rootDir, [](const fs::path& path, const std::string& filename) -> void {
+			//	if (util::endsWith(filename, ".vdf")) {
+			//		LOG(DEBUG) << "Loading VDF: " << filename;
+			//		vfs.zkit->mount_disk(path);
+			//	}
+			//	if (util::endsWith(filename, ".mod")) {
+			//		LOG(DEBUG) << "Loading MOD: " << filename;
+			//		vfs.zkit->mount_disk(path);
+			//	}
+			//});
+
+			//using ChildContainer = std::set<zenkit::VfsNode, zenkit::VfsNodeComparator>;
+
+			const auto& vdfFileList = vfs.zkit->root().children();
+			for (const auto& node : vdfFileList) {
+				LOG(INFO) << "VFS:  " << node.name();
+				//util::asciiToLowerMut(filename);
+				//if (util::endsWith(filename, ".zen")) {
+				//	zensFoundInVdfs.insert(filename);
+				//}
 			}
-		});
+		}
+		{
+			VDFS::FileIndex::initVDFS("Foo");
+			if (vfs.zlib != nullptr) {
+				delete vfs.zlib;
+			}
+			vfs.zlib = new VDFS::FileIndex();
+			
 
-		vdf->finalizeLoad();
+			walkFilesRecursively(rootDir, [](const fs::path& path, const std::string& filename) -> void {
+				if (util::endsWith(filename, ".vdf")) {
+					LOG(DEBUG) << "Loading VDF: " << filename;
+					vfs.zlib->loadVDF(path.string());
+				}
+				if (util::endsWith(filename, ".mod")) {
+					LOG(DEBUG) << "Loading MOD: " << filename;
+					vfs.zlib->loadVDF(path.string());
+				}
+			});
 
-		std::vector<string> vdfFileList = vdf->getKnownFiles();
-		for (auto& filename : vdfFileList) {
-			util::asciiToLowerMut(filename);
-			if (util::endsWith(filename, ".zen")) {
-				zensFoundInVdfs.insert(filename);
+			vfs.zlib->finalizeLoad();
+
+			std::vector<string> vdfFileList = vfs.zlib->getKnownFiles();
+			for (auto& filename : vdfFileList) {
+				util::asciiToLowerMut(filename);
+				if (util::endsWith(filename, ".zen")) {
+					zensFoundInVdfs.insert(filename);
+				}
 			}
 		}
 	}

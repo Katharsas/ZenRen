@@ -10,9 +10,9 @@ namespace assets
     using ::std::string;
     using ::std::vector;
 
-    InMemoryTexFile loadTex(const string& texFilename, const VDFS::FileIndex* vdf) {
+    InMemoryTexFile loadTex(const string& texFilename, const Vfs vfs) {
         vector<uint8_t> texRaw;
-        vdf->getFileData(texFilename, texRaw);
+        vfs.getFileData(texFilename, texRaw);
 
         InMemoryTexFile tex;
         int32_t message = ZenLoad::convertZTEX2DDS(texRaw, tex.ddsRaw, false, &tex.width, &tex.height);

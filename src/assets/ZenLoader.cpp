@@ -17,6 +17,7 @@
 #include "FindGroundFace.h"
 #include "StaticLightFromVobLights.h"
 
+#include "vdfs/fileIndex.h"
 #include "zenload/zCMesh.h"
 #include "zenload/zenParser.h"
 #include "zenload/ztex2dds.h"
@@ -372,11 +373,11 @@ namespace assets
         return statics;
     }
 
-    void loadZen(render::RenderData& out, string& zenFilename, VDFS::FileIndex* vdf)
+    void loadZen(render::RenderData& out, string& zenFilename, const Vfs vfs)
     {
         const auto now = std::chrono::high_resolution_clock::now();
 
-        auto parser = ZenLoad::ZenParser(zenFilename, *vdf);
+        auto parser = ZenLoad::ZenParser(zenFilename, *(vfs.zlib));
         if (parser.getFileSize() == 0)
         {
             LOG(FATAL) << "ZEN-File either not found or empty!";
@@ -419,7 +420,7 @@ namespace assets
         for (auto& vob : vobs) {
             auto& visualname = vob.meshName;
 
-            bool loaded = loadInstanceMesh(out.staticMeshes, *vdf, vob);
+            bool loaded = loadInstanceMesh(out.staticMeshes, *(vfs.zlib), vob);
         }
 
         if (debugStaticLights) {

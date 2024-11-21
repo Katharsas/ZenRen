@@ -103,12 +103,12 @@ namespace render::pass::sky
     {
         // TODO centralize code duplication with world, move into separate texture cache?
         Texture* texture = nullptr;
-        auto optionalVdfIndex = assets::getVdfIndex();
-        if (optionalVdfIndex.has_value()) {
+        auto optionalVfsIndex = assets::getVfsIndex();
+        if (optionalVfsIndex.has_value()) {
             std::string zTexName = ::util::replaceExtension(texName, "-c.tex");// compiled textures have -C suffix
 
-            if (optionalVdfIndex.value()->hasFile(zTexName)) {
-                InMemoryTexFile tex = assets::loadTex(zTexName, optionalVdfIndex.value());
+            if (optionalVfsIndex.value().hasFile(zTexName)) {
+                InMemoryTexFile tex = assets::loadTex(zTexName, optionalVfsIndex.value());
                 texture = new Texture(d3d, tex.ddsRaw, true, zTexName);
             }
         }

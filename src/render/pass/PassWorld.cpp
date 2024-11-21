@@ -25,6 +25,8 @@ namespace render::pass::world
 	using ::std::vector;
 	using ::std::array;
 
+	extern World world;
+
 	WorldSettings worldSettings;
 
 	ID3D11SamplerState* linearSamplerState = nullptr;

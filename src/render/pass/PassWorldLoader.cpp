@@ -61,11 +61,11 @@ namespace render::pass::world
 			return new Texture(d3d, ::util::toString(path));
 		}
 
-		auto optionalVdfIndex = assets::getVdfIndex();
+		auto optionalVdfIndex = assets::getVfsIndex();
 		if (optionalVdfIndex.has_value()) {
 			std::string zTexName = ::util::replaceExtension(texName, "-c.tex");// compiled textures have -C suffix
 
-			if (optionalVdfIndex.value()->hasFile(zTexName)) {
+			if (optionalVdfIndex.value().hasFile(zTexName)) {
 				InMemoryTexFile tex = assets::loadTex(zTexName, optionalVdfIndex.value());
 				return new Texture(d3d, tex.ddsRaw, true, zTexName);
 			}
@@ -432,7 +432,7 @@ namespace render::pass::world
 		}
 
 		auto optionalFilepath = assets::existsAsFile(level);
-		auto optionalVdfIndex = assets::getVdfIndex();
+		auto optionalVfsIndex = assets::getVfsIndex();
 
 		if (optionalFilepath.has_value()) {
 			if (::util::endsWith(level, ".obj")) {
@@ -444,9 +444,9 @@ namespace render::pass::world
 				LOG(WARNING) << "Loading from single level file not supported: " << level;
 			}
 		}
-		else if (optionalVdfIndex.has_value()) {
+		else if (optionalVfsIndex.has_value()) {
 			if (::util::endsWith(level, ".zen")) {
-				assets::loadZen(data, level, optionalVdfIndex.value());
+				assets::loadZen(data, level, optionalVfsIndex.value());
 				levelDataFound = true;
 			}
 			else {
