@@ -1,5 +1,6 @@
 #pragma once
 
+#include "WinDx.h"
 #include "Renderer.h"
 
 namespace render::util

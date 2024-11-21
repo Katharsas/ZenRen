@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "PassSky.h"
 
+#include "../WinDx.h"
 #include "../Renderer.h"
 #include "../RenderUtil.h"
 #include "../MeshUtil.h"
@@ -102,20 +103,21 @@ namespace render::pass::sky
     Texture* loadSkyTexture(D3d d3d, std::string texName)
     {
         // TODO centralize code duplication with world, move into separate texture cache?
-        Texture* texture = nullptr;
-        auto optionalVdfIndex = assets::getVdfIndex();
-        if (optionalVdfIndex.has_value()) {
-            std::string zTexName = ::util::replaceExtension(texName, "-c.tex");// compiled textures have -C suffix
-
-            if (optionalVdfIndex.value()->hasFile(zTexName)) {
-                InMemoryTexFile tex = assets::loadTex(zTexName, optionalVdfIndex.value());
-                texture = new Texture(d3d, tex.ddsRaw, true, zTexName);
+        auto sourceAssetOpt = assets::getIfExists(texName);
+        if (sourceAssetOpt.has_value()) {
+            auto fileData = assets::getData(sourceAssetOpt.value());
+            return new Texture(d3d, std::move(fileData));
+        }
+        texName = ::util::replaceExtension(texName, "-c.tex");// compiled textures have -C suffix
+        auto compiledAssetOpt = assets::getIfExists(texName);
+        if (compiledAssetOpt.has_value()) {
+            auto optionalTex = assets::loadTex(compiledAssetOpt.value());
+            if (optionalTex.has_value()) {
+                return new Texture(d3d, optionalTex.value().ddsRaw, true, texName);
             }
+
         }
-        if (!texture) {
-            texture = new Texture(d3d, ::util::toString(assets::DEFAULT_TEXTURE));
-        }
-        return texture;
+        return new Texture(d3d, ::util::toString(assets::DEFAULT_TEXTURE));
     }
 
     void loadSky(D3d d3d)

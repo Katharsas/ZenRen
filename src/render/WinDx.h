@@ -40,4 +40,7 @@ namespace render {
 
 	void release(IUnknown* dx11object);
 	void release(const std::vector<IUnknown*>& dx11objects);
+
+	void release(ID3D11Buffer* dx11object);
+	void release(ID3D11ShaderResourceView* dx11object);
 }

@@ -212,7 +212,7 @@ namespace render
 		return currentLayers;
 	}
 
-	boolean getSwapLayers(float timeOfDay)
+	bool getSwapLayers(float timeOfDay)
 	{
 		// TODO maybe move this bool into SkyState
 		return timeOfDay >= timekey::day_start || timeOfDay <= timekey::day_end;

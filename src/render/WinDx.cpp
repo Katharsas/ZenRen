@@ -14,4 +14,12 @@ namespace render {
 			release(object);
 		}
 	}
+
+	void release(ID3D11Buffer* dx11object) {
+		release((IUnknown*)dx11object);
+	}
+
+	void release(ID3D11ShaderResourceView* dx11object) {
+		release((IUnknown*)dx11object);
+	}
 }

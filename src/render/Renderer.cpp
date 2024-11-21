@@ -1,19 +1,12 @@
 #include "stdafx.h"
 #include "Renderer.h"
 
-// Directx 11 Renderer according to this tutorial:
-// http://www.directxtutorial.com/Lesson.aspx?lessonid=11-4-2
-// And this one:
-// https://www.braynzarsoft.net/viewtutorial/q16390-braynzar-soft-directx-11-tutorials
-//
-// Beefed up with whatever code i could find on the internet.
-// The renderer can optionally use some DX 12 functionality like flip model and VRAM stats.
-
 #include <wrl/client.h>
 #include <algorithm>
 
 using namespace Microsoft::WRL;
 
+#include "WinDx.h"
 #include "Settings.h"
 #include "SettingsGui.h"
 #include "Camera.h"
@@ -143,9 +136,9 @@ namespace render
 		//}
 	}
 
-	void initD3D(HWND hWnd, const BufferSize& startSize)
+	void initD3D(void* hWnd, const BufferSize& startSize)
 	{
-		windowHandle = hWnd;
+		windowHandle = (HWND) hWnd;
 		clientSize = startSize;
 		updateRenderSize();
 

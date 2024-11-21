@@ -15,18 +15,6 @@ namespace render
         return XMMATRIX(matrix.mv);
     }
 
-    UV from(const ZenLib::ZMath::float2& source)
-    {
-        return UV{ source.x, source.y };
-    }
-    VEC3 from(const ZenLib::ZMath::float3& source)
-    {
-        return VEC3{ source.x, source.y, source.z };
-    }
-    VEC3 from(const ZenLib::ZMath::float3& source, float scale)
-    {
-        return VEC3{ source.x * scale, source.y * scale, source.z * scale };
-    }
     VEC3 toVec3(const XMFLOAT3& xmf3)
     {
         return VEC3{ xmf3.x, xmf3.y, xmf3.z };
@@ -44,6 +32,13 @@ namespace render
         return VEC4{ result.x, result.y, result.z, result.w };
     }
 
+    bool isZero(const XMVECTOR& vec, float threshold)
+    {
+        XMVECTOR almostZero = DirectX::XMVectorReplicate(threshold);
+        uint32_t comparisonResult;
+        XMVectorEqualR(&comparisonResult, XMVectorGreater(vec, almostZero), DirectX::XMVectorZero());
+        return XMComparisonAllTrue(comparisonResult);
+    }
     XMVECTOR centroidPos(const array<XMVECTOR, 3>& posXm)
     {
         const static float oneThird = 1.f / 3.f;

@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <filesystem>
 
+#include "../render/PerfStats.h"
 #include "../Util.h"
 #include "render/RenderUtil.h"
 #include "render/MeshUtil.h"
@@ -17,6 +18,7 @@
 #include "FindGroundFace.h"
 #include "StaticLightFromVobLights.h"
 
+#include "vdfs/fileIndex.h"
 #include "zenload/zCMesh.h"
 #include "zenload/zenParser.h"
 #include "zenload/ztex2dds.h"
@@ -44,6 +46,8 @@ namespace assets
     bool debugTintVobStaticLight = false;
     bool debugStaticLights = false;
     bool debugStaticLightRays = false;
+
+    bool debugMeshLoading = false;
 
     namespace FormatsSource
     {
@@ -74,7 +78,7 @@ namespace assets
         return 0.5f * (toXM4Pos(bbox[0]) + toXM4Pos(bbox[1]));
     }
 
-    std::optional<string> getVobVisual(VDFS::FileIndex& vdf, const string& visual)
+    std::optional<string> getVobVisual(const string& visual)
     {
         using namespace FormatsSource;
         using namespace FormatsCompiled;
@@ -94,11 +98,11 @@ namespace assets
         else if (MDS.isExtOf(visual)) {
             // in this case, both MRM/MDM or MDL might exist
             meshFile = visualNoExt + MDL.str();
-            if (!vdf.hasFile(meshFile)) {
+            if (!assets::exists(meshFile)) {
                 meshFile = visualNoExt + MDM.str();
             }
         }
-        if (vdf.hasFile(meshFile)) {
+        if (assets::exists(meshFile)) {
             return meshFile;
         }
         else {
@@ -110,18 +114,18 @@ namespace assets
     {
         using namespace FormatsCompiled;
 
-        const auto meshNameOpt = getVobVisual(vdf, instance.meshName);
+        const auto meshNameOpt = getVobVisual(instance.meshName);
         if (meshNameOpt.has_value()) {
             const auto& meshName = meshNameOpt.value();
             
             // load meshes
             if (endsWithEither(meshName, { MRM, MDM })) {
                 const auto& mesh = getOrParseMesh(vdf, meshName, true);
-                loadInstanceMesh(target, mesh.mesh, mesh.packed, instance);
+                loadInstanceMesh(target, mesh.mesh, instance, debugMeshLoading);
             }
             else if (endsWithEither(meshName, { MDL })) {
                 const auto& meshLib = getOrParseMeshLib(vdf, meshName, true);
-                loadInstanceMeshLib(target, meshLib, instance);
+                loadInstanceMeshLib(target, meshLib, instance, debugMeshLoading);
             }
             else {
                 LOG(DEBUG) << "Visual type not supported! Skipping VOB " << meshName;
@@ -195,8 +199,8 @@ namespace assets
     array<VEC3, 2> bboxToVec3Scaled(const ZMath::float3 (& bbox)[2])
     {
         return {
-            from(bbox[0], G_ASSET_RESCALE),
-            from(bbox[1], G_ASSET_RESCALE)
+            toVec3(bbox[0], G_ASSET_RESCALE),
+            toVec3(bbox[1], G_ASSET_RESCALE)
         };
     }
 
@@ -372,11 +376,17 @@ namespace assets
         return statics;
     }
 
-    void loadZen(render::RenderData& out, string& zenFilename, VDFS::FileIndex* vdf)
+    void loadZen(render::RenderData& out, const FileHandle& file)
     {
-        const auto now = std::chrono::high_resolution_clock::now();
+        LOG(INFO) << "Loading World!";
 
-        auto parser = ZenLoad::ZenParser(zenFilename, *vdf);
+        auto samplerTotal = render::stats::TimeSampler();
+        samplerTotal.start();
+        auto sampler = render::stats::TimeSampler();
+        sampler.start();
+
+        auto fileData = assets::getData(file);
+        auto parser = ZenLoad::ZenParser((uint8_t*)fileData.data, fileData.size);
         if (parser.getFileSize() == 0)
         {
             LOG(FATAL) << "ZEN-File either not found or empty!";
@@ -387,20 +397,21 @@ namespace assets
         parser.readHeader();
 
         // Do something with the header, if you want.
-        LOG(INFO) << "Zen author: " << parser.getZenHeader().user;
-        LOG(INFO) << "Zen date: " << parser.getZenHeader().date;
-        LOG(INFO) << "Zen object count: " << parser.getZenHeader().objectCount;
+        LOG(INFO) << "    Zen author: " << parser.getZenHeader().user;
+        LOG(INFO) << "    Zen date: " << parser.getZenHeader().date;
+        LOG(INFO) << "    Zen object count: " << parser.getZenHeader().objectCount;
 
         ZenLoad::oCWorldData world;
         parser.readWorld(world);
-        
         ZenLoad::zCMesh* worldMesh = parser.getWorldMesh();
+        sampler.logMillisAndRestart("Loader: World data parsed");
+       
+
+        loadWorldMesh(out.worldMesh, parser.getWorldMesh(), debugMeshLoading);
+        sampler.logMillisAndRestart("Loader: World mesh loaded");
 
         vector<InMemoryTexFile> lightmaps = loadZenLightmaps(worldMesh);
-
-        loadWorldMesh(out.worldMesh, parser.getWorldMesh());
-
-        LOG(INFO) << "Zen parsed!";
+        sampler.logMillisAndRestart("Loader: World lightmaps loaded");
 
         vector<Light> lightsStatic = loadLights(world.rootVobs);
 
@@ -409,18 +420,20 @@ namespace assets
         vector<StaticInstance> vobs;
         if (loadStaticMeshes) {
             vobs = loadVobs(world.rootVobs, out.worldMesh, lightsStatic, isOutdoorLevel);
-            LOG(INFO) << "VOBs loaded!";
+            LOG(INFO) << "  VOBs loaded!";
         }
         else {
-            LOG(INFO) << "VOB loading disabled!";
+            LOG(INFO) << "  VOB loading disabled!";
         }
+        sampler.logMillisAndRestart("Loader: World VOB data loaded");
 
         VERT_CHUNKS_BY_MAT staticMeshData;
         for (auto& vob : vobs) {
             auto& visualname = vob.meshName;
 
-            bool loaded = loadInstanceMesh(out.staticMeshes, *vdf, vob);
+            //bool loaded = loadInstanceMesh(out.staticMeshes, *(vfs.zlib), vob);
         }
+        sampler.logMillisAndRestart("Loader: World VOB meshes loaded");
 
         if (debugStaticLights) {
             for (auto& light : lightsStatic) {
@@ -434,12 +447,8 @@ namespace assets
             }
         }
 
-        //VERTEX_DATA_BY_MAT dynamicMeshData;
-
-        LOG(INFO) << "Meshes loaded!";
-
-        const auto duration = std::chrono::high_resolution_clock::now() - now;
-        LOG(INFO) << "Loading finished in: " << duration / std::chrono::milliseconds(1) << " ms.";
+        sampler.logMillisAndRestart("Loader: World debug meshes loaded");
+        samplerTotal.logMillisAndRestart("World loaded in");
 
         out.isOutdoorLevel = isOutdoorLevel;
         out.worldMeshLightmaps = lightmaps;

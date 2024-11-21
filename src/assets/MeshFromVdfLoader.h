@@ -6,8 +6,15 @@
 #include "zenload/zCMesh.h"
 #include "zenload/zCProgMeshProto.h"
 
+#include "zenkit/World.hh"
+
 namespace assets
 {
+    void loadWorldMeshZkit(
+        render::VERT_CHUNKS_BY_MAT& target,
+        const zenkit::Mesh& worldMesh,
+        bool debugChecksEnabled = false);
+
     void loadWorldMesh(
         render::VERT_CHUNKS_BY_MAT& target,
         ZenLib::ZenLoad::zCMesh* worldMesh,
@@ -16,7 +23,6 @@ namespace assets
     void loadInstanceMesh(
         render::VERT_CHUNKS_BY_MAT& target,
         const ZenLib::ZenLoad::zCProgMeshProto& mesh,
-        const ZenLib::ZenLoad::PackedMesh packedMesh,
         const render::StaticInstance& instance,
         bool debugChecksEnabled = false);
 

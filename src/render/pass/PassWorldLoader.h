@@ -16,8 +16,6 @@ namespace render::pass::world
 		std::vector<Texture*> debugTextures;
 	};
 
-	extern World world;
-
 	void clearZenLevel();
 	LoadWorldResult loadZenLevel(D3d d3d, const std::string& level);
 }

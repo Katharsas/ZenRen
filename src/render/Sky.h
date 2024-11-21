@@ -1,7 +1,5 @@
 #pragma once
 
-#include "WinDx.h"
-
 #include <magic_enum.hpp>
 #include "Common.h"
 
@@ -28,7 +26,7 @@ namespace render
 	}
 
 	std::array<SkyTexState, 2> getSkyLayers(float timeOfDay);
-	boolean getSwapLayers(float timeOfDay);
+	bool getSwapLayers(float timeOfDay);
 	COLOR getSkyLightFromIntensity(float intensity, float currentTime = defaultTime);
 	COLOR getSkyColor(float currentTime = defaultTime);
 }

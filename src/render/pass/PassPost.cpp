@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "PassPost.h"
 
+#include "../WinDx.h"
 #include "../Renderer.h"
 #include "../Shader.h"
 #include "../RenderUtil.h"
