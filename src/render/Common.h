@@ -1,11 +1,11 @@
 #pragma once
 
 #include "Primitives.h"
-
-#include <dxgiformat.h>
 #include <string>
 #include <ostream>
 #include <vector>
+
+//enum DXGI_FORMAT : int;
 
 namespace render
 {
@@ -24,7 +24,8 @@ namespace render
 		bool hasAlpha = true;
 
 		// compression and color space
-		DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
+		// DXGI_FORMAT
+		uint32_t format = 0; // DXGI_FORMAT_UNKNOWN
 
 		auto operator<=>(const TexInfo&) const = default;
 	};

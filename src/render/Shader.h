@@ -12,6 +12,12 @@ namespace render
 		UINT InputSlot = 0;
 	};
 
+	struct ComputeShader {
+		ID3D11ComputeShader* computeShader = nullptr;
+	};
+
+	ComputeShader createComputeShader(D3d d3d, const std::string& sourceFile);
+
 	class Shader
 	{
 	public:

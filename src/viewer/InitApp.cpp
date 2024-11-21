@@ -4,7 +4,7 @@
 #include "InitApp.h"
 
 #include "conio.h"
-#include "../resource.h"
+#include "win_resources/resource.h"
 
 #include "../Util.h"
 #include "Args.h"

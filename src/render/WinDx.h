@@ -25,10 +25,12 @@
 
 #include <d3d11_1.h>
 #include <d3d11.h>
-#include <d3dx11.h>
+//#include <d3dx11.h>
 
-//#include <d3d10_1.h> TODO remove
-//#include <d3dx10.h>
+
+constexpr D3D11_USAGE BUFFER_IMMUTABLE = D3D11_USAGE_IMMUTABLE;
+constexpr D3D11_USAGE BUFFER_WRITE_CPU = D3D11_USAGE_DYNAMIC;
+constexpr D3D11_USAGE BUFFER_WRITE_GPU = D3D11_USAGE_DEFAULT;
 
 namespace render {
 	struct D3d {
@@ -40,4 +42,7 @@ namespace render {
 
 	void release(IUnknown* dx11object);
 	void release(const std::vector<IUnknown*>& dx11objects);
+
+	void release(ID3D11Buffer* dx11object);
+	void release(ID3D11ShaderResourceView* dx11object);
 }
