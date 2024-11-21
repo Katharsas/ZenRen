@@ -32,9 +32,9 @@ namespace render
 
 	COLOR fromSRGB(uint8_t r, uint8_t g, uint8_t b) {
 		return COLOR(
-			fromSRGB(r / 256.f),
-			fromSRGB(g / 256.f),
-			fromSRGB(b / 256.f),
+			fromSRGB(r / 255.f),
+			fromSRGB(g / 255.f),
+			fromSRGB(b / 255.f),
 			1.f);
 	}
 
@@ -212,7 +212,7 @@ namespace render
 		return currentLayers;
 	}
 
-	boolean getSwapLayers(float timeOfDay)
+	bool getSwapLayers(float timeOfDay)
 	{
 		// TODO maybe move this bool into SkyState
 		return timeOfDay >= timekey::day_start || timeOfDay <= timekey::day_end;

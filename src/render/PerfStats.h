@@ -60,5 +60,16 @@ namespace render::stats
 			start(now);
 			return result;
 		}
+
+		void logMillisAndRestart(const std::string& message)
+		{
+			LOG(INFO) << message << ": " << stop() / 1000 << "ms";
+			start();
+		}
+		void logMicrosAndRestart(const std::string& message)
+		{
+			LOG(INFO) << message << ": " << stop() << "us";
+			start();
+		}
 	};
 }

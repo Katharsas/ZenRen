@@ -1,9 +1,11 @@
 #include "stdafx.h"
 #include "PassPost.h"
 
+#include "../WinDx.h"
 #include "../Renderer.h"
 #include "../Shader.h"
-#include "../RenderUtil.h"
+#include "render/RenderUtil.h"
+#include "render/d3d/Buffer.h"
 
 namespace render::pass::post
 {
@@ -308,6 +310,6 @@ namespace render::pass::post
 	void initConstantBuffers(D3d d3d)
 	{
 		// TODO this should probably be dynamic, see https://www.gamedev.net/forums/topic/673486-difference-between-d3d11-usage-default-and-d3d11-usage-dynamic/
-		util::createConstantBuffer<CbPostSettings>(d3d, &settingsCb, D3D11_USAGE_DEFAULT);
+		d3d::createConstantBuf<CbPostSettings>(d3d, &settingsCb, BufferUsage::WRITE_GPU);
 	}
 }

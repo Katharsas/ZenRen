@@ -5,33 +5,51 @@
 #include "Common.h"
 #include "../Util.h"
 
-#include "utils/mathlib.h"
-
 namespace render
 {
-    template <typename T> bool isZero(const T& vec3, float threshold)
+    template <Vec3 Vec>
+    bool isZero(const Vec& vec, float threshold)
     {
-        return std::abs(vec3.x) <= threshold && std::abs(vec3.y) <= threshold && std::abs(vec3.z) <= threshold;
+        return std::abs(vec.x) <= threshold
+            && std::abs(vec.y) <= threshold
+            && std::abs(vec.z) <= threshold;
     }
 
-    template <typename T> DirectX::XMVECTOR toXM4Pos(const T& vec3)
+    template <Vec3 Vec>
+    DirectX::XMVECTOR toXM4Pos(const Vec& vec)
     {
-        return DirectX::XMVectorSet(vec3.x, vec3.y, vec3.z, 1);
+        return DirectX::XMVectorSet(vec.x, vec.y, vec.z, 1);
     }
-    template <typename T> DirectX::XMVECTOR toXM4Dir(const T& vec3)
+    template <Vec3 Vec>
+    DirectX::XMVECTOR toXM4Dir(const Vec& vec)
     {
-        return DirectX::XMVectorSet(vec3.x, vec3.y, vec3.z, 0);
+        return DirectX::XMVectorSet(vec.x, vec.y, vec.z, 0);
     }
-    DirectX::XMMATRIX toXMM(const ZenLib::ZMath::Matrix& matrix);
 
-    UV from(const ZenLib::ZMath::float2& source);
-    VEC3 from(const ZenLib::ZMath::float3& source);
-    VEC3 from(const ZenLib::ZMath::float3& source, float scale);
+    DirectX::XMMATRIX toXMMatrix(const float * matrix);
+
+    template <Vec2 Vec>
+    UV toUv(const Vec& vec)
+    {
+        return { vec.x, vec.y };
+    }
+    template <Vec3 Vec> 
+    VEC3 toVec3(const Vec& vec)
+    {
+        return { vec.x, vec.y, vec.z };
+    }
+    template <Vec3 Vec>
+    VEC3 toVec3(const Vec& vec, float scale)
+    {
+        return { vec.x * scale, vec.y * scale, vec.z * scale };
+    }
 
     VEC3 toVec3(const DirectX::XMFLOAT3& xmf3);
     VEC3 toVec3(const DirectX::XMVECTOR& xm4);
     VEC4 toVec4(const DirectX::XMVECTOR& xm4);
 
+    bool isZero(const DirectX::XMVECTOR& vec, float threshold);
+    DirectX::XMVECTOR bboxCenter(const std::array<DirectX::XMVECTOR, 2>& bbox);
     DirectX::XMVECTOR centroidPos(const std::array<DirectX::XMVECTOR, 3>& posXm);
     DirectX::XMVECTOR calcFlatFaceNormal(const std::array<DirectX::XMVECTOR, 3>& posXm);
     ChunkIndex toChunkIndex(DirectX::XMVECTOR posXm);
@@ -76,4 +94,6 @@ namespace render
     }
 
     void warnIfNotNormalized(const DirectX::XMVECTOR& source);
+
+    void printXMMatrix(const DirectX::XMMATRIX& matrix);
 }

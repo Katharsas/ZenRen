@@ -2,10 +2,11 @@
 
 #include "render/Loader.h"
 
-#include "vdfs/fileIndex.h"
+#include "AssetFinder.h"
+//#include "vdfs/fileIndex.h"
 
 namespace assets
 {
-    void loadZen(render::RenderData& out, std::string& zenFilename, ZenLib::VDFS::FileIndex* vdf);
+    void loadZen(render::RenderData& out, const FileHandle& file, const Vfs& vfs, LoadDebugFlags debug = {});
 }
 

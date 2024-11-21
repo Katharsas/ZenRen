@@ -38,5 +38,17 @@ namespace assets
 	};
 
 	LightLookupTree createLightLookup(const std::vector<render::Light>& lights);
+
+	struct FaceLookupContext
+	{
+		assets::VertLookupTree spatialTree;
+		const render::VERT_CHUNKS_BY_MAT& data;
+	};
+
+	struct LightLookupContext
+	{
+		assets::LightLookupTree spatialTree;
+		const std::vector<render::Light>& data;
+	};
 }
 

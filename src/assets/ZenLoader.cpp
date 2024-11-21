@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <filesystem>
 
+#include "../render/PerfStats.h"
 #include "../Util.h"
 #include "render/RenderUtil.h"
 #include "render/MeshUtil.h"
@@ -14,9 +15,10 @@
 #include "DebugMeshes.h"
 #include "TexFromVdfLoader.h"
 #include "LookupTrees.h"
-#include "FindGroundFace.h"
 #include "StaticLightFromVobLights.h"
+#include "VobLoader.h"
 
+#include "vdfs/fileIndex.h"
 #include "zenload/zCMesh.h"
 #include "zenload/zenParser.h"
 #include "zenload/ztex2dds.h"
@@ -41,87 +43,26 @@ namespace assets
 
     bool debugInstanceMeshBbox = false;
     bool debugInstanceMeshBboxCenter = false;
-    bool debugTintVobStaticLight = false;
-    bool debugStaticLights = false;
-    bool debugStaticLightRays = false;
 
-    namespace FormatsSource
-    {
-        const FileExt __3DS = FileExt::create(".3DS");
-        const FileExt ASC = FileExt::create(".ASC");
-        const FileExt MDS = FileExt::create(".MDS");
-        const FileExt PFX = FileExt::create(".PFX");
-        const FileExt MMS = FileExt::create(".MMS");
-        const FileExt TGA = FileExt::create(".TGA");
-    }
-
-    // see https://github.com/Try/OpenGothic/wiki/Gothic-file-formats
-    // MRM = single mesh (multiresolution)
-    // MDM = single mesh
-    // MDH = model hierarchy
-    // MDL = model hierarchy including all used single meshes
-    namespace FormatsCompiled
-    {
-        const FileExt MRM = FileExt::create(".MRM");
-        const FileExt MDM = FileExt::create(".MDM");
-        const FileExt MDH = FileExt::create(".MDH");
-        const FileExt MDL = FileExt::create(".MDL");
-    }
+    bool debugMeshLoading = false;
 
 
-    XMVECTOR bboxCenter(const array<VEC3, 2>& bbox)
-    {
-        return 0.5f * (toXM4Pos(bbox[0]) + toXM4Pos(bbox[1]));
-    }
-
-    std::optional<string> getVobVisual(VDFS::FileIndex& vdf, const string& visual)
-    {
-        using namespace FormatsSource;
-        using namespace FormatsCompiled;
-
-        auto visualNoExt = visual.substr(0, visual.find_last_of('.'));
-        string meshFile;
-
-        if (__3DS.isExtOf(visual)) {
-            meshFile = visualNoExt + MRM.str();
-            // TODO should probably fallback to MDH if missing
-        }
-        else if (ASC.isExtOf(visual)) {
-            // TODO do MRM files exist? do MDH files exist so we can re-use single meshes instead of reparsing them from MDL all the time?
-            // if a single mesh is shared between multiple hierarchies, does Gothic still put instances of them into MDL files?
-            meshFile = visualNoExt + MDL.str();
-        }
-        else if (MDS.isExtOf(visual)) {
-            // in this case, both MRM/MDM or MDL might exist
-            meshFile = visualNoExt + MDL.str();
-            if (!vdf.hasFile(meshFile)) {
-                meshFile = visualNoExt + MDM.str();
-            }
-        }
-        if (vdf.hasFile(meshFile)) {
-            return meshFile;
-        }
-        else {
-            return std::nullopt;
-        }
-    }
-
-    bool loadInstanceMesh(VERT_CHUNKS_BY_MAT& target, VDFS::FileIndex& vdf, const StaticInstance& instance)
+    bool loadInstanceMesh(VERT_CHUNKS_BY_MAT& target, const Vfs& vfs, const StaticInstance& instance)
     {
         using namespace FormatsCompiled;
 
-        const auto meshNameOpt = getVobVisual(vdf, instance.meshName);
+        const auto meshNameOpt = getVobVisual(instance.meshName);
         if (meshNameOpt.has_value()) {
             const auto& meshName = meshNameOpt.value();
             
             // load meshes
             if (endsWithEither(meshName, { MRM, MDM })) {
-                const auto& mesh = getOrParseMesh(vdf, meshName, true);
-                loadInstanceMesh(target, mesh.mesh, mesh.packed, instance);
+                const auto& mesh = getOrParseMesh(vfs, meshName);
+                loadInstanceMesh(target, mesh.mesh, instance, debugMeshLoading);
             }
             else if (endsWithEither(meshName, { MDL })) {
-                const auto& meshLib = getOrParseMeshLib(vdf, meshName, true);
-                loadInstanceMeshLib(target, meshLib, instance);
+                const auto& meshLib = getOrParseMeshLib(vfs, meshName);
+                loadInstanceMeshLib(target, meshLib.meshLib, instance, debugMeshLoading);
             }
             else {
                 LOG(DEBUG) << "Visual type not supported! Skipping VOB " << meshName;
@@ -134,7 +75,7 @@ namespace assets
             }
             if (debugInstanceMeshBboxCenter) {
                 auto center = toVec3(bboxCenter(instance.bbox));
-                auto scale = toVec3(0.7f * XMVectorAbs(toXM4Pos(instance.bbox[1]) - toXM4Pos(instance.bbox[0])));
+                auto scale = toVec3(0.7f * XMVectorAbs(instance.bbox[1] - instance.bbox[0]));
                 loadPointDebugVisual(target, center, scale, COLOR(0, 0, 1, 1));
             }
 
@@ -187,16 +128,11 @@ namespace assets
         return flattenVobTree(vobs, target, filter);
     }
 
-    inline std::ostream& operator <<(std::ostream& os, const COLOR& that)
-    {
-        return os << "[R:" << that.r << " G:" << that.g << " B:" << that.b << " A:" << that.a << "]";
-    }
-
-    array<VEC3, 2> bboxToVec3Scaled(const ZMath::float3 (& bbox)[2])
+    array<XMVECTOR, 2> bboxToXmScaled(const ZMath::float3 (& bbox)[2])
     {
         return {
-            from(bbox[0], G_ASSET_RESCALE),
-            from(bbox[1], G_ASSET_RESCALE)
+            toXM4Pos(bbox[0]) * G_ASSET_RESCALE,
+            toXM4Pos(bbox[1]) * G_ASSET_RESCALE
         };
     }
 
@@ -222,31 +158,12 @@ namespace assets
         return lights;
     }
 
-    COLOR interpolateColor(const VEC3& pos, const VERT_CHUNKS_BY_MAT& meshData, const VertKey& vertKey)
-    {
-        auto& vecVertData = vertKey.get(meshData);
-        auto& vecPos = vecVertData.vecPos;
-        auto& others = vecVertData.vecOther;
-        auto vertIndex = vertKey.vertIndex;
-        float v0Distance = std::sqrt(std::pow(vecPos[vertIndex + 0].x - pos.x, 2.f) + std::pow(vecPos[vertIndex + 0].z - pos.z, 2.f));
-        float v1Distance = std::sqrt(std::pow(vecPos[vertIndex + 1].x - pos.x, 2.f) + std::pow(vecPos[vertIndex + 1].z - pos.z, 2.f));
-        float v2Distance = std::sqrt(std::pow(vecPos[vertIndex + 2].x - pos.x, 2.f) + std::pow(vecPos[vertIndex + 2].z - pos.z, 2.f));
-        float totalDistance = v0Distance + v1Distance + v2Distance;
-        float v0Contrib = 1 - (v0Distance / totalDistance);
-        float v1Contrib = 1 - (v1Distance / totalDistance);
-        float v2Contrib = 1 - (v2Distance / totalDistance);
-        COLOR v0Color = others[vertIndex + 0].colLight;
-        COLOR v1Color = others[vertIndex + 1].colLight;
-        COLOR v2Color = others[vertIndex + 2].colLight;
-        COLOR colorAverage = mul(add(add(mul(v0Color, v0Contrib), mul(v1Color, v1Contrib)), mul(v2Color, v2Contrib)), 0.5f);
-        return colorAverage;
-    }
-
     vector<StaticInstance> loadVobs(
         vector<ZenLoad::zCVobData>& rootVobs,
         const VERT_CHUNKS_BY_MAT& worldMeshData,
         const vector<Light>& lightsStatic,
-        const bool isOutdoorLevel)
+        const bool isOutdoorLevel,
+        LoadDebugFlags debug)
     {
         vector<StaticInstance> statics;
         vector<const ZenLoad::zCVobData*> vobs;
@@ -257,8 +174,8 @@ namespace assets
         int32_t totalDurationMicros = 0;
         int32_t maxDurationMicros = 0;
 
-        const auto worldFaceLookup = createVertLookup(worldMeshData);
-        const auto lightStaticLookup = createLightLookup(lightsStatic);
+        const FaceLookupContext worldMeshContext = { createVertLookup(worldMeshData), worldMeshData };
+        const LightLookupContext lightsStaticContext = { createLightLookup(lightsStatic), lightsStatic };
 
         for (auto vobPtr : vobs) {
             ZenLoad::zCVobData vob = *vobPtr;
@@ -281,79 +198,17 @@ namespace assets
             //   - create a new AABB over the transformed BB, but it would be bigger than the original (not optimal) or
             //   - recompute a new optimal AABB from transformed mesh
             // Luckily it seems like the VOB instance BB is already transformed and axis-aligned.
-            instance.bbox = bboxToVec3Scaled(vob.bbox);
+            instance.bbox = bboxToXmScaled(vob.bbox);
             {
                 const auto now = std::chrono::high_resolution_clock::now();
 
-                instance.dirLightStatic = -1 * XMVectorSet(1, -0.5, -1.0, 0);
+                VobLighting lighting = calculateStaticVobLighting(instance.bbox, worldMeshContext, lightsStaticContext, isOutdoorLevel, debug);
 
-                COLOR colLight;
-                const XMVECTOR center = bboxCenter(instance.bbox);
-                const std::optional<VertKey> vertKey = getGroundFaceAtPos(center, worldMeshData, worldFaceLookup);
-
-                bool hasLightmap = false;
-                if (!isOutdoorLevel) {
-                    hasLightmap = true;
-                }
-                else if (vertKey.has_value()) {
-                    const auto& other = vertKey.value().getOther(worldMeshData);
-                    if (other[0].uvLightmap.i != -1) {
-                        hasLightmap = true;
-                    }
-                }
-                instance.receiveLightSun = !hasLightmap;
-
-                if (hasLightmap) {
-                    // TODO
-                    // The more lights get summed, the bigger the SRGB summing error is. 
-                    // More light additions -> brighter in SRGB than linar; less lights -> closer brightness
-                    // The final weight (0.71f) in Vanilla Gothic might be there to counteract this error, but should lead to objects
-                    // hit by less objects to be overly dark. Maybe adjust weight to lower value? Check low hit objects.
-                        
-                    auto optLight = getLightAtPos(bboxCenter(instance.bbox), lightsStatic, lightStaticLookup, worldMeshData, worldFaceLookup);
-                    if (optLight.has_value()) {
-                        colLight = optLight.value().color;
-                        colLight = multiplyColor(colLight, fromSRGB(0.85f));
-
-                        instance.dirLightStatic = optLight.value().dirInverted;
-                    }
-                    else {
-                        colLight = COLOR(0, 0, 0, 1);// no lights reached this vob, so its black
-                        if (debugStaticLightRays) {
-                            colLight = COLOR(0, 1, 0, 1);
-                        }
-                    }
-                    resolvedStaticLight++;
-                    colLight.a = 0;// indicates that this VOB receives no sky light
-                }
-                else {
-                    if (vertKey.has_value()) {
-                        colLight = interpolateColor(toVec3(center), worldMeshData, vertKey.value());
-                        resolvedStaticLight++;
-
-                        // outdoor vobs get additional fixed ambient
-                        if (isOutdoorLevel) {
-                            // TODO
-                            // Original game knows if a ground poly is in a portal room (without lightmap, like a cave) or actually outdoors
-                            // from per-ground-face flag. Find out how this is calculated or shoot some rays towards the sky.
-                            bool isVobIndoor = false;
-
-                            float minLight = isVobIndoor ? fromSRGB(0.2f) : fromSRGB(0.5f);
-                            colLight = add(mul(colLight, (1.f - minLight)), greyscale(minLight));
-                            // currently this results in light values between between 0.22 and 0.99 
-                        }
-                    }
-                    else {
-                        colLight = fromSRGB(COLOR(0.63f, 0.63f, 0.63f, 1));// fallback lightness of (160, 160, 160)
-                    }
-                    colLight.a = 1;// indicates that this VOB receives full sky light
+                if (debug.vobsTint) {
+                    lighting.color = COLOR((lighting.color.r / 3.f) * 2.f, lighting.color.g, lighting.color.b, lighting.color.a);
                 }
 
-                if (debugTintVobStaticLight) {
-                    colLight = COLOR((colLight.r / 3.f) * 2.f, colLight.g, colLight.b, colLight.a);
-                }
-
-                instance.colLightStatic = colLight;
+                instance.lighting = lighting;
 
                 const auto duration = std::chrono::high_resolution_clock::now() - now;
                 const auto durationMicros = static_cast<int32_t> (duration / std::chrono::microseconds(1));
@@ -372,11 +227,17 @@ namespace assets
         return statics;
     }
 
-    void loadZen(render::RenderData& out, string& zenFilename, VDFS::FileIndex* vdf)
+    void loadZen(render::RenderData& out, const FileHandle& file, const Vfs& vfs, LoadDebugFlags debug)
     {
-        const auto now = std::chrono::high_resolution_clock::now();
+        LOG(INFO) << "Loading World!";
 
-        auto parser = ZenLoad::ZenParser(zenFilename, *vdf);
+        auto samplerTotal = render::stats::TimeSampler();
+        samplerTotal.start();
+        auto sampler = render::stats::TimeSampler();
+        sampler.start();
+
+        auto fileData = assets::getData(file);
+        auto parser = ZenLoad::ZenParser((uint8_t*)fileData.data, fileData.size);
         if (parser.getFileSize() == 0)
         {
             LOG(FATAL) << "ZEN-File either not found or empty!";
@@ -387,20 +248,21 @@ namespace assets
         parser.readHeader();
 
         // Do something with the header, if you want.
-        LOG(INFO) << "Zen author: " << parser.getZenHeader().user;
-        LOG(INFO) << "Zen date: " << parser.getZenHeader().date;
-        LOG(INFO) << "Zen object count: " << parser.getZenHeader().objectCount;
+        LOG(INFO) << "    Zen author: " << parser.getZenHeader().user;
+        LOG(INFO) << "    Zen date: " << parser.getZenHeader().date;
+        LOG(INFO) << "    Zen object count: " << parser.getZenHeader().objectCount;
 
         ZenLoad::oCWorldData world;
         parser.readWorld(world);
-        
         ZenLoad::zCMesh* worldMesh = parser.getWorldMesh();
+        sampler.logMillisAndRestart("Loader: World data parsed");
+       
+
+        loadWorldMesh(out.worldMesh, parser.getWorldMesh(), debugMeshLoading);
+        sampler.logMillisAndRestart("Loader: World mesh loaded");
 
         vector<InMemoryTexFile> lightmaps = loadZenLightmaps(worldMesh);
-
-        loadWorldMesh(out.worldMesh, parser.getWorldMesh());
-
-        LOG(INFO) << "Zen parsed!";
+        sampler.logMillisAndRestart("Loader: World lightmaps loaded");
 
         vector<Light> lightsStatic = loadLights(world.rootVobs);
 
@@ -408,38 +270,35 @@ namespace assets
         bool isOutdoorLevel = world.bspTree.mode == ZenLoad::zCBspTreeData::TreeMode::Outdoor;
         vector<StaticInstance> vobs;
         if (loadStaticMeshes) {
-            vobs = loadVobs(world.rootVobs, out.worldMesh, lightsStatic, isOutdoorLevel);
-            LOG(INFO) << "VOBs loaded!";
+            vobs = loadVobs(world.rootVobs, out.worldMesh, lightsStatic, isOutdoorLevel, debug);
+            LOG(INFO) << "  VOBs loaded!";
         }
         else {
-            LOG(INFO) << "VOB loading disabled!";
+            LOG(INFO) << "  VOB loading disabled!";
         }
+        sampler.logMillisAndRestart("Loader: World VOB data loaded");
 
         VERT_CHUNKS_BY_MAT staticMeshData;
         for (auto& vob : vobs) {
             auto& visualname = vob.meshName;
-
-            bool loaded = loadInstanceMesh(out.staticMeshes, *vdf, vob);
+            bool loaded = loadInstanceMesh(out.staticMeshes, vfs, vob);
         }
+        sampler.logMillisAndRestart("Loader: World VOB meshes loaded");
 
-        if (debugStaticLights) {
+        if (debug.staticLights) {
             for (auto& light : lightsStatic) {
                 float scale = light.range / 10.f;
                 loadPointDebugVisual(out.staticMeshes, light.pos, { scale, scale, scale });
             }
         }
-        if (debugStaticLightRays) {
+        if (debug.staticLightRays) {
             for (auto& ray : debugLightToVobRays) {
                 loadLineDebugVisual(out.staticMeshes, ray.posStart, ray.posEnd, ray.color);
             }
         }
 
-        //VERTEX_DATA_BY_MAT dynamicMeshData;
-
-        LOG(INFO) << "Meshes loaded!";
-
-        const auto duration = std::chrono::high_resolution_clock::now() - now;
-        LOG(INFO) << "Loading finished in: " << duration / std::chrono::milliseconds(1) << " ms.";
+        sampler.logMillisAndRestart("Loader: World debug meshes loaded");
+        samplerTotal.logMillisAndRestart("World loaded in");
 
         out.isOutdoorLevel = isOutdoorLevel;
         out.worldMeshLightmaps = lightmaps;

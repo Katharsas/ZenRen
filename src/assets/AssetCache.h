@@ -1,8 +1,11 @@
 #pragma once
 
-#include "../render/Common.h"
+#include "render/Common.h"
+#include "assets/AssetFinder.h"
 
-#include "vdfs/fileIndex.h"
+#include "zenkit/MultiResolutionMesh.hh"
+#include "zenkit/Model.hh"
+
 #include "zenload/zTypes.h"
 #include "zenload/zCProgMeshProto.h"
 #include "zenload/zCModelMeshLib.h"
@@ -10,20 +13,20 @@
 namespace assets
 {
 	struct MeshData {
-		bool hasPacked;
 		ZenLib::ZenLoad::zCProgMeshProto mesh;
-		ZenLib::ZenLoad::PackedMesh packed;
 	};
 
 	struct MeshLibData {
-		bool hasPacked;
 		ZenLib::ZenLoad::zCModelMeshLib meshLib;
-		std::vector<ZenLib::ZenLoad::PackedMesh> meshesPacked;
-		std::vector<ZenLib::ZenLoad::PackedMesh> attachementsPacked;
 	};
 
-	const MeshData& getOrParseMesh(ZenLib::VDFS::FileIndex& vdf, const std::string& meshName, bool pack);
-	const MeshLibData& getOrParseMeshLib(ZenLib::VDFS::FileIndex& vdf, const std::string& meshName, bool pack);
+	std::optional<const zenkit::MultiResolutionMesh*> getOrParseMrm(const std::string& assetName);
+	std::optional<const zenkit::ModelHierarchy*> getOrParseMdh(const std::string& assetName);
+	std::optional<const zenkit::ModelMesh*> getOrParseMdm(const std::string& assetName);
+	std::optional<const zenkit::Model*> getOrParseMdl(const std::string& assetName);
+
+	const MeshData& getOrParseMesh(const Vfs& vfs, const std::string& meshName);
+	const MeshLibData& getOrParseMeshLib(const Vfs& vfs, const std::string& meshName);
 
 	render::TexId getTexId(const std::string& texName);
 	std::string_view getTexName(render::TexId texId);
