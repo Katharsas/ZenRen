@@ -1,308 +1,215 @@
 #include "stdafx.h"
 #include "ZenLoader.h"
 
-#include <filesystem>
-#include <queue>
-#include <stdexcept>
-#include <filesystem>
-
-#include "../render/PerfStats.h"
-#include "../Util.h"
-#include "render/RenderUtil.h"
+#include "Util.h"
+#include "render/PerfStats.h"
 #include "render/MeshUtil.h"
-#include "AssetCache.h"
-#include "MeshFromVdfLoader.h"
-#include "DebugMeshes.h"
-#include "TexLoader.h"
-#include "LookupTrees.h"
-#include "StaticLightFromVobLights.h"
-#include "VobLoader.h"
 
-#include "vdfs/fileIndex.h"
-#include "zenload/zCMesh.h"
-#include "zenload/zenParser.h"
-#include "zenload/ztex2dds.h"
-#include "zenload/zCProgMeshProto.h"
-#include "zenload/zCModelMeshLib.h"
+#include "assets/VobLoader.h"
+#include "assets/LookupTrees.h"
+#include "assets/AssetCache.h"
+#include "assets/MeshFromVdfLoader.h";
+#include "assets/TexLoader.h"
+
+#include "zenkit/World.hh"
+#include "zenkit/vobs/Light.hh"
+//#include "zenkit/Mesh.hh"
+
+#include <glm/gtc/type_ptr.hpp>
 
 namespace assets
 {
     using namespace render;
     using namespace DirectX;
-    using namespace ZenLib;
-    using ::std::string;
-    using ::std::array;
-    using ::std::vector;
-    using ::std::unordered_map;
-    using ::util::endsWithEither;
-    using ::util::getOrCreate;
-    using ::util::endsWith;
+    using std::string;
+    using std::vector;
+    using std::shared_ptr;
     using ::util::FileExt;
+    using ::util::endsWithEither;
 
-    bool loadStaticMeshes = true;
-
-    bool debugInstanceMeshBbox = false;
-    bool debugInstanceMeshBboxCenter = false;
-
-    bool debugMeshLoading = false;
-
-
-    bool loadInstanceMesh(VERT_CHUNKS_BY_MAT& target, const Vfs& vfs, const StaticInstance& instance)
+    void forEachVob(const vector<shared_ptr<zenkit::VirtualObject>>& vobs, std::function<void(zenkit::VirtualObject const *const)> processVob)
     {
-        using namespace FormatsCompiled;
-
-        const auto meshNameOpt = getVobVisual(instance.meshName);
-        if (meshNameOpt.has_value()) {
-            const auto& meshName = meshNameOpt.value();
-            
-            // load meshes
-            if (endsWithEither(meshName, { MRM, MDM })) {
-                const auto& mesh = getOrParseMesh(vfs, meshName);
-                loadInstanceMesh(target, mesh.mesh, instance, debugMeshLoading);
-            }
-            else if (endsWithEither(meshName, { MDL })) {
-                const auto& meshLib = getOrParseMeshLib(vfs, meshName);
-                loadInstanceMeshLib(target, meshLib.meshLib, instance, debugMeshLoading);
-            }
-            else {
-                LOG(DEBUG) << "Visual type not supported! Skipping VOB " << meshName;
-                return false;
-            }
-
-            // load debug visuals
-            if (debugInstanceMeshBbox) {
-                loadInstanceMeshBboxDebugVisual(target, instance);
-            }
-            if (debugInstanceMeshBboxCenter) {
-                auto center = toVec3(bboxCenter(instance.bbox));
-                auto scale = toVec3(0.7f * XMVectorAbs(instance.bbox[1] - instance.bbox[0]));
-                loadPointDebugVisual(target, center, scale, COLOR(0, 0, 1, 1));
-            }
-
-            return true;
-        }
-        else {
-            LOG(DEBUG) << "Visual not found: Skipping VOB " << instance.meshName;
-            return false;
+        for (auto vobPtr : vobs) {
+            processVob(vobPtr.get());
+            forEachVob(vobPtr->children, processVob);
         }
     }
 
-    void flattenVobTree(const vector<ZenLoad::zCVobData>& vobs, vector<const ZenLoad::zCVobData*>& target, std::function<bool(const ZenLoad::zCVobData& vob)> filter)
-    {
-        for (const ZenLoad::zCVobData& vob : vobs) {
-            if (filter(vob)) {
-                target.push_back(&vob);
-            }
-            flattenVobTree(vob.childVobs, target, filter);
-        }
-    }
-
-    void getVobsWithVisuals(const vector<ZenLoad::zCVobData>& vobs, vector<const ZenLoad::zCVobData*>& target)
-    {
-        using namespace FormatsSource;
-
-        const auto filter = [&](const ZenLoad::zCVobData& vob) {
-
-            if (vob.showVisual && !vob.visual.empty()) {
-                if (endsWithEither(vob.visual, { __3DS, ASC, MDS })) {
-                    return true;
-                }
-                if (endsWithEither(vob.visual, { PFX, MMS, TGA })) {
-                    // TODO effects, morphmeshes, decals
-                }
-                else {
-                    LOG(INFO) << "Visual not supported: " << vob.visual;
-                }
-            }
-            return false;
-        };
-
-        return flattenVobTree(vobs, target, filter);
-    }
-
-    void getVobStaticLights(const vector<ZenLoad::zCVobData>& vobs, vector<const ZenLoad::zCVobData*>& target)
-    {
-        const auto filter = [&](const ZenLoad::zCVobData& vob) {
-            return vob.vobType == ZenLoad::zCVobData::EVobType::VT_zCVobLight && vob.zCVobLight.lightStatic;
-        };
-        return flattenVobTree(vobs, target, filter);
-    }
-
-    array<XMVECTOR, 2> bboxToXmScaled(const ZMath::float3 (& bbox)[2])
-    {
-        return {
-            toXM4Pos(bbox[0]) * G_ASSET_RESCALE,
-            toXM4Pos(bbox[1]) * G_ASSET_RESCALE
-        };
-    }
-
-    vector<Light> loadLights(const vector<ZenLoad::zCVobData>& rootVobs)
+    vector<Light> loadLights(const vector<shared_ptr<zenkit::VirtualObject>>& rootVobs)
     {
         vector<Light> lights;
-        vector<const ZenLoad::zCVobData*> vobs;
-        getVobStaticLights(rootVobs, vobs);
-
-        for (auto vobPtr : vobs) {
-            ZenLoad::zCVobData vob = *vobPtr;
-            Light light = {
-                toVec3(toXM4Pos(vob.position) * G_ASSET_RESCALE),
-                vob.zCVobLight.lightStatic,
-                fromSRGB(COLOR(vob.zCVobLight.color)),
-                vob.zCVobLight.range * G_ASSET_RESCALE,
-            };
-
-            lights.push_back(light);
-        }
+        forEachVob(rootVobs, [&](zenkit::VirtualObject const* const vobPtr) -> void {
+            const zenkit::VirtualObject& vob = *vobPtr;
+            bool isLight = vob.type == zenkit::VirtualObjectType::zCVobLight;
+            if (isLight) {
+                const zenkit::VLight& vobLight = *dynamic_cast<zenkit::VLight const * const>(vobPtr);
+                bool isStatic = vobLight.is_static;
+                if (isStatic) {
+                    XMVECTOR pos = toXM4Pos(vob.position);
+                    Light light = {
+                        .pos = toVec3(pos * G_ASSET_RESCALE),
+                        .isStatic = true,
+                        .color = fromSRGB(from4xUint8(glm::value_ptr(vobLight.color))),
+                        .range = vobLight.range * G_ASSET_RESCALE
+                    };
+                    lights.push_back(light);
+                }
+            }
+        });
 
         LOG(INFO) << "VOBs: Loaded " << lights.size() << " static lights.";
         return lights;
     }
 
+    bool loadVob(zenkit::VirtualObject const* const vobPtr)
+    {
+        using namespace FormatsSource;
+
+        const zenkit::VirtualObject& vob = *vobPtr;
+        const auto& visualName = vob.visual->name;
+        if (vob.show_visual && !visualName.empty()) {
+            if (endsWithEither(visualName, { __3DS, ASC, MDS })) {
+                return true;
+            }
+            if (endsWithEither(visualName, { PFX, MMS, TGA })) {
+                // TODO effects, morphmeshes, decals
+            }
+            else {
+                LOG(INFO) << "Visual not supported: " << vob.visual;
+            }
+        }
+        return false;
+    }
+
     vector<StaticInstance> loadVobs(
-        vector<ZenLoad::zCVobData>& rootVobs,
+        vector<std::shared_ptr<zenkit::VirtualObject>>& rootVobs,
         const VERT_CHUNKS_BY_MAT& worldMeshData,
         const vector<Light>& lightsStatic,
         const bool isOutdoorLevel,
         LoadDebugFlags debug)
     {
         vector<StaticInstance> statics;
-        vector<const ZenLoad::zCVobData*> vobs;
-        getVobsWithVisuals(rootVobs, vobs);
-        
-        int32_t resolvedStaticLight = 0;
-
-        int32_t totalDurationMicros = 0;
-        int32_t maxDurationMicros = 0;
 
         const FaceLookupContext worldMeshContext = { createVertLookup(worldMeshData), worldMeshData };
         const LightLookupContext lightsStaticContext = { createLightLookup(lightsStatic), lightsStatic };
 
-        for (auto vobPtr : vobs) {
-            ZenLoad::zCVobData vob = *vobPtr;
+        forEachVob(rootVobs, [&](zenkit::VirtualObject const* const vobPtr) -> void {
+            if (!loadVob(vobPtr)) {
+                return;
+            }
+            const zenkit::VirtualObject& vob = *vobPtr;
             StaticInstance instance;
-            instance.meshName = vob.visual;
-
+            instance.meshName = vob.visual->name;
             {
-                XMVECTOR pos = XMVectorSet(vob.position.x, vob.position.y, vob.position.z, 1.f / G_ASSET_RESCALE);
-                pos = pos * G_ASSET_RESCALE;
-                XMMATRIX rotate = XMMATRIX(vob.rotationMatrix.mv);
+                glm::mat4x4 rotation(vob.rotation);
+                // TODO we have no idea if this is row or column first, so may need to transpose.
+                XMMATRIX rotate = XMMATRIX(glm::value_ptr(rotation));
+                
+                XMVECTOR pos = toXM4Pos(toVec3(vob.position, G_ASSET_RESCALE));
                 XMMATRIX translate = XMMatrixTranslationFromVector(pos);
-                instance.transform = rotate * translate;
+                instance.transform = XMMatrixMultiply(rotate, translate);
             }
-
-            // VOB instance bounding boxes:
-            // There are two types of bbs: Axis-Aligned (AABB) and non-axix-aligned.
-            // - storing AABBs requires only 2 vectors ((POS, SIZE) or (POS_MIN, POS_MAX)), non-AABBs more
-            // - most acceleration structures (spatial trees) require AABBs
-            // - transforming AABBs makes them potentially non-axis-aligned, so this is not trivial; instead we could
-            //   - create a new AABB over the transformed BB, but it would be bigger than the original (not optimal) or
-            //   - recompute a new optimal AABB from transformed mesh
-            // Luckily it seems like the VOB instance BB is already transformed and axis-aligned.
-            instance.bbox = bboxToXmScaled(vob.bbox);
+            instance.bbox = {
+                    toXM4Pos(toVec3(vob.bbox.min, G_ASSET_RESCALE)),
+                    toXM4Pos(toVec3(vob.bbox.max, G_ASSET_RESCALE))
+            };
             {
-                const auto now = std::chrono::high_resolution_clock::now();
-
-                VobLighting lighting = calculateStaticVobLighting(instance.bbox, worldMeshContext, lightsStaticContext, isOutdoorLevel, debug);
-
-                if (debug.vobsTint) {
-                    lighting.color = COLOR((lighting.color.r / 3.f) * 2.f, lighting.color.g, lighting.color.b, lighting.color.a);
-                }
-
-                instance.lighting = lighting;
-
-                const auto duration = std::chrono::high_resolution_clock::now() - now;
-                const auto durationMicros = static_cast<int32_t> (duration / std::chrono::microseconds(1));
-                totalDurationMicros += durationMicros;
-                maxDurationMicros = std::max(maxDurationMicros, durationMicros);
-                //LOG(INFO) << "Found VobInstance GroundPoly Color (" << std::to_string(durationMicros) << " micros): " << instance.colLightStatic;
+            VobLighting lighting = calculateStaticVobLighting(instance.bbox, worldMeshContext, lightsStaticContext, isOutdoorLevel, debug);
+            if (debug.vobsTint) {
+                lighting.color.r = (lighting.color.r / 3.f) * 2.f;
             }
-            statics.push_back(instance);
-        }
-
-        LOG(INFO) << "VOBs: Loaded " << statics.size() << " instances:";
-        LOG(INFO) << "    " << "Static light: Resolved for " << resolvedStaticLight << " instances.";
-        LOG(INFO) << "    " << "Static light: Duration: " << std::to_string(totalDurationMicros / 1000) << " ms total (" << std::to_string(maxDurationMicros) << " micros worst instance)";
-        LOG(INFO) << "    " << "Static light: Checked VobLight visibility " << vobLightWorldIntersectChecks << " times.";
+            instance.lighting = lighting;
+           }
+           statics.push_back(instance);
+        });
 
         return statics;
     }
 
-    void loadZen(render::RenderData& out, const FileHandle& file, const Vfs& vfs, LoadDebugFlags debug)
+    bool loadInstanceVisual(VERT_CHUNKS_BY_MAT& target, const StaticInstance& instance)
+    {
+        // TODO right now, getVobVisual essentially retrieves asset handle every time it is called,
+        // doing the work of resolving the entire asset even if it is already in AssetCache which
+        // does not make any sense.
+        // Maybe getVobVisual should return a variant of an already parsed visual.
+        
+        // TODO ok none of this makes sense anyway because MDS source files map to either MDL or (MDH + MDM) !!
+        // so just returning one compile visual for each source visual is already wrong.
+
+        const auto assetNameOpt = getVobVisual(instance.meshName);
+        if (!assetNameOpt.has_value()) {
+            LOG(DEBUG) << "Visual type not supported! Skipping VOB " << instance.meshName;
+            return false;
+        }
+
+        auto& assetName = assetNameOpt.value();
+
+        if (endsWithEither(assetName, { FormatsCompiled::MRM })) {
+            auto meshOpt = getOrParseMrm(assetName);
+            assert(meshOpt.has_value());
+            loadInstanceMesh(target, *meshOpt.value(), instance, true);
+        }
+        else if (endsWithEither(assetName, { FormatsCompiled::MDL })) {
+            auto meshOpt = getOrParseMdl(assetName);
+            assert(meshOpt.has_value());
+            loadInstanceModel(target, meshOpt.value()->hierarchy, meshOpt.value()->mesh, instance, true);
+        }
+        else if (endsWithEither(assetName, { FormatsCompiled::MDM })) {
+            //LOG(INFO) << "Loading: " << assetName;
+
+            auto meshOpt = getOrParseMdm(assetName);
+            assert(meshOpt.has_value());
+
+            auto mdhAssetName = util::replaceExtension(instance.meshName, ".MDH");
+            auto meshMdhOpt = getOrParseMdh(mdhAssetName);
+            assert(meshMdhOpt.has_value());
+
+            loadInstanceModel(target, *meshMdhOpt.value(), *meshOpt.value(), instance, true);
+        }
+        else {
+            LOG(DEBUG) << "Visual type not supported! Skipping VOB " << instance.meshName << " (" << assetName << ")";
+            return false;
+        }
+        return true;
+    }
+
+    void loadZen(render::RenderData& out, const FileHandle& levelFile, LoadDebugFlags debug)
     {
         LOG(INFO) << "Loading World!";
-
-        auto samplerTotal = render::stats::TimeSampler();
-        samplerTotal.start();
         auto sampler = render::stats::TimeSampler();
         sampler.start();
 
-        auto fileData = assets::getData(file);
-        auto parser = ZenLoad::ZenParser((uint8_t*)fileData.data, fileData.size);
-        if (parser.getFileSize() == 0)
+        auto fileData = assets::getData(levelFile);
+        zenkit::World world{};
         {
-            LOG(FATAL) << "ZEN-File either not found or empty!";
+            auto read = zenkit::Read::from(fileData.data, fileData.size);
+            world.load(read.get());
         }
-
-        // Since this is a usual level-zen, read the file header
-        // You will most likely allways need to do that
-        parser.readHeader();
-
-        // Do something with the header, if you want.
-        LOG(INFO) << "    Zen author: " << parser.getZenHeader().user;
-        LOG(INFO) << "    Zen date: " << parser.getZenHeader().date;
-        LOG(INFO) << "    Zen object count: " << parser.getZenHeader().objectCount;
-
-        ZenLoad::oCWorldData world;
-        parser.readWorld(world);
-        ZenLoad::zCMesh* worldMesh = parser.getWorldMesh();
+        bool isOutdoorLevel = world.world_bsp_tree.mode == zenkit::BspTreeType::OUTDOOR;
         sampler.logMillisAndRestart("Loader: World data parsed");
-       
 
-        loadWorldMesh(out.worldMesh, parser.getWorldMesh(), debugMeshLoading);
+        loadWorldMesh(out.worldMesh, world.world_mesh, true);
 
-        for (uint32_t i = 0; i < worldMesh->getLightmapTextures().size(); i++) {
-            auto& lightmap = worldMesh->getLightmapTextures().at(i);
+        for (uint32_t i = 0; i < world.world_mesh.lightmap_textures.size(); i++) {
+            auto& lightmap = world.world_mesh.lightmap_textures.at(i);
             auto name = std::format("lightmap_{:03}.tex", i);
-            out.worldMeshLightmaps.emplace_back(name, (std::byte*)lightmap.data(), lightmap.size());
+            out.worldMeshLightmaps.emplace_back(name, (std::byte*)lightmap->data(), lightmap->size(), lightmap);
         }
         sampler.logMillisAndRestart("Loader: World mesh loaded");
 
-        vector<Light> lightsStatic = loadLights(world.rootVobs);
+        vector<Light> lightsStatic = loadLights(world.world_vobs);
 
-        auto props = world.properties;
-        bool isOutdoorLevel = world.bspTree.mode == ZenLoad::zCBspTreeData::TreeMode::Outdoor;
+        // TODO debug lightmap VOB lighting
         vector<StaticInstance> vobs;
-        if (loadStaticMeshes) {
-            vobs = loadVobs(world.rootVobs, out.worldMesh, lightsStatic, isOutdoorLevel, debug);
-            LOG(INFO) << "  VOBs loaded!";
-        }
-        else {
-            LOG(INFO) << "  VOB loading disabled!";
-        }
+        vobs = loadVobs(world.world_vobs, out.worldMesh, lightsStatic, isOutdoorLevel, debug);
         sampler.logMillisAndRestart("Loader: World VOB data loaded");
 
-        VERT_CHUNKS_BY_MAT staticMeshData;
-        for (auto& vob : vobs) {
-            auto& visualname = vob.meshName;
-            bool loaded = loadInstanceMesh(out.staticMeshes, vfs, vob);
-        }
-        sampler.logMillisAndRestart("Loader: World VOB meshes loaded");
-
-        if (debug.staticLights) {
-            for (auto& light : lightsStatic) {
-                float scale = light.range / 10.f;
-                loadPointDebugVisual(out.staticMeshes, light.pos, { scale, scale, scale });
-            }
-        }
-        if (debug.staticLightRays) {
-            for (auto& ray : debugLightToVobRays) {
-                loadLineDebugVisual(out.staticMeshes, ray.posStart, ray.posEnd, ray.color);
-            }
+        for (auto& instance : vobs) {
+            loadInstanceVisual(out.staticMeshes, instance);
         }
 
-        sampler.logMillisAndRestart("Loader: World debug meshes loaded");
-        samplerTotal.logMillisAndRestart("World loaded in");
+        sampler.logMillisAndRestart("Loader: VOB visuals loaded");
 
         out.isOutdoorLevel = isOutdoorLevel;
-	}
+    }
 }

@@ -1,12 +1,11 @@
 #pragma once
 
-#include "render/Loader.h"
-
 #include "AssetFinder.h"
-//#include "vdfs/fileIndex.h"
+#include "render/Loader.h"
+#include <zenkit/Vfs.hh>
 
 namespace assets
 {
-    void loadZen(render::RenderData& out, const FileHandle& file, const Vfs& vfs, LoadDebugFlags debug = {});
+    // TODO of course, passing FileHandle here only really makes sense if this function is abstract over both ZenKit and ZenLib
+    void loadZen(render::RenderData& out, const FileHandle& levelFile, LoadDebugFlags debug = {});
 }
-

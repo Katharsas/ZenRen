@@ -13,7 +13,6 @@
 namespace assets
 {
 	namespace fs = std::filesystem;
-	using namespace ::ZenLib;
 	using render::FileData;
 	using std::byte;
 	using std::vector;
@@ -23,8 +22,14 @@ namespace assets
 	std::unordered_map<string, const fs::path> assetNamesToPaths;
 	std::unordered_set<string> zensFoundInVdfs;
 
-	bool useZenkit = true;
-	Vfs vfs;
+	struct Vfs {
+		zenkit::Vfs* zkit = nullptr;
+
+		bool initialized() const
+		{
+			return zkit != nullptr;
+		}
+	} vfs;
 
 	string filenameWithTga(const string& filename) {
 		return util::replaceExtension(filename, ".tga");
@@ -63,31 +68,16 @@ namespace assets
 	{
 		assert(vfs.initialized());
 		std::string assetNameStr = string(assetName);
-		if (vfs.zlib != nullptr) {
-			bool hasNode = vfs.zlib->hasFile(assetNameStr);
-			if (hasNode) {
-				return FileHandle{
-					.name = std::move(assetNameStr),
-					.path = nullptr,
-					.node = nullptr,
-				};
-			}
-			else {
-				return std::nullopt;
-			}
+		const zenkit::VfsNode* node = vfs.zkit->find(assetNameStr);
+		if (node != nullptr) {
+			return FileHandle{
+				.name = std::move(assetNameStr),
+				.path = nullptr,
+				.node = node,
+			};
 		}
 		else {
-			const zenkit::VfsNode* node = vfs.zkit->find(assetNameStr);
-			if (node != nullptr) {
-				return FileHandle{
-					.name = std::move(assetNameStr),
-					.path = nullptr,
-					.node = node,
-				};
-			}
-			else {
-				return std::nullopt;
-			}
+			return std::nullopt;
 		}
 	}
 
@@ -114,12 +104,6 @@ namespace assets
 		}
 		if (handle.node != nullptr) {
 			return handle.node->open_read();
-		}{
-			std::vector<uint8_t> rawData;
-			vfs.zlib->getFileData(handle.name, rawData);
-			std::byte* begin = (std::byte*)rawData.data();
-			std::vector<std::byte> rawData2(begin, begin + rawData.size());
-			return zenkit::Read::from(std::move(rawData2));
 		}
 	}
 
@@ -132,12 +116,6 @@ namespace assets
 		if (handle.node != nullptr) {
 			phoenix::buffer buffer_view = handle.node->open();
 			return FileData(handle.name, buffer_view.array(), buffer_view.limit());
-		}{
-			auto buffer = std::make_unique<vector<uint8_t>>();
-			auto& bufferRef = *(buffer.get());
-			vfs.zlib->getFileData(handle.name, bufferRef);
-			// move might (?) invalidate bufferRef before first two args are processed, don't use it
-			return FileData(handle.name, (byte*)buffer->data(), buffer->size(), std::move(buffer));
 		}
 	}
 
@@ -170,80 +148,45 @@ namespace assets
 	void initVdfAssetSourceDir(fs::path& rootDir)
 	{
 		LOG(INFO) << "Scanning dir for VDF files: " << util::toString(rootDir);
-		if (useZenkit) {
-			zenkit::Logger::use_logger([&](zenkit::LogLevel logLevel, std::string const& message) -> void {
-				switch (logLevel) {
-				case zenkit::LogLevel::TRACE: LOG(DEBUG) << "zenkit [TRACE]: " << message; break;
-				case zenkit::LogLevel::DEBUG: LOG(DEBUG) << "zenkit: " << message; break;
-				case zenkit::LogLevel::INFO: LOG(INFO) << "zenkit: " << message; break;
-				case zenkit::LogLevel::WARNING: LOG(WARNING) << "zenkit: " << message; break;
-				case zenkit::LogLevel::ERROR: LOG(FATAL) << "zenkit: " << message; break;
-				}
-			});
-
-			if (vfs.zkit != nullptr) {
-				delete vfs.zkit;
+		
+		zenkit::Logger::use_logger([&](zenkit::LogLevel logLevel, std::string const& message) -> void {
+			switch (logLevel) {
+			case zenkit::LogLevel::TRACE: LOG(DEBUG) << "zenkit [TRACE]: " << message; break;
+			case zenkit::LogLevel::DEBUG: LOG(DEBUG) << "zenkit: " << message; break;
+			case zenkit::LogLevel::INFO: LOG(INFO) << "zenkit: " << message; break;
+			case zenkit::LogLevel::WARNING: LOG(WARNING) << "zenkit: " << message; break;
+			case zenkit::LogLevel::ERROR: LOG(FATAL) << "zenkit: " << message; break;
 			}
-			vfs.zkit = new zenkit::Vfs();
-			
-			walkFilesRecursively(rootDir, [](const fs::path& path, const std::string& filename) -> void {
-				try {
-					if (util::endsWith(filename, ".vdf")) {
-						vfs.zkit->mount_disk(path);
-						LOG(DEBUG) << "Loaded VDF: " << filename;
-					}
-					if (util::endsWith(filename, ".mod")) {
-						vfs.zkit->mount_disk(path);
-						LOG(DEBUG) << "Loaded MOD: " << filename;
-					}
-				}
-				catch (...) {
-					LOG(WARNING) << "Skipped unsupported VDF: " << filename;
-				}
-			});
+		});
 
-			const auto& vdfFileList = vfs.zkit->root().children();
-			for (const auto& node : vdfFileList) {
-				LOG(INFO) << "VFS:  " << node.name();
-				const auto filenameLow = util::asciiToLower(node.name());
-				if (util::endsWith(filenameLow, ".zen")) {
-					zensFoundInVdfs.insert(filenameLow);
-				}
-			}
+		if (vfs.zkit != nullptr) {
+			delete vfs.zkit;
 		}
-		else {
-			VDFS::FileIndex::initVDFS("Foo");
-			if (vfs.zlib != nullptr) {
-				delete vfs.zlib;
-			}
-			vfs.zlib = new VDFS::FileIndex();
+		vfs.zkit = new zenkit::Vfs();
 			
-
-			walkFilesRecursively(rootDir, [](const fs::path& path, const std::string& filename) -> void {
+		walkFilesRecursively(rootDir, [](const fs::path& path, const std::string& filename) -> void {
+			try {
 				if (util::endsWith(filename, ".vdf")) {
-					LOG(DEBUG) << "Loading VDF: " << filename;
-					vfs.zlib->loadVDF(path.string());
+					vfs.zkit->mount_disk(path);
+					LOG(DEBUG) << "Loaded VDF: " << filename;
 				}
 				if (util::endsWith(filename, ".mod")) {
-					LOG(DEBUG) << "Loading MOD: " << filename;
-					vfs.zlib->loadVDF(path.string());
-				}
-			});
-
-			vfs.zlib->finalizeLoad();
-
-			std::vector<string> vdfFileList = vfs.zlib->getKnownFiles();
-			for (auto& filename : vdfFileList) {
-				util::asciiToLowerMut(filename);
-				if (util::endsWith(filename, ".zen")) {
-					zensFoundInVdfs.insert(filename);
+					vfs.zkit->mount_disk(path);
+					LOG(DEBUG) << "Loaded MOD: " << filename;
 				}
 			}
-		}
-	}
+			catch (...) {
+				LOG(WARNING) << "Skipped unsupported VDF: " << filename;
+			}
+		});
 
-	const Vfs& getVfsLegacy()
-	{
-		return vfs;
+		const auto& vdfFileList = vfs.zkit->root().children();
+		for (const auto& node : vdfFileList) {
+			LOG(INFO) << "VFS:  " << node.name();
+			const auto filenameLow = util::asciiToLower(node.name());
+			if (util::endsWith(filenameLow, ".zen")) {
+				zensFoundInVdfs.insert(filenameLow);
+			}
+		}
 	}
 }

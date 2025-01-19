@@ -10,8 +10,6 @@ namespace assets
 {
 	using namespace DirectX;
 	using namespace zenkit;
-	using namespace ZenLib;
-	using namespace ZenLib::ZenLoad;
 	using ::render::TexId;
 	using ::std::string;
 	using ::std::vector;
@@ -22,9 +20,6 @@ namespace assets
 	unordered_map<string, ModelHierarchy> cacheMdh;
 	unordered_map<string, ModelMesh> cacheModelMeshesZkit;
 	unordered_map<string, Model> cacheModelsZkit;
-
-	unordered_map<string, MeshData> cacheMeshes;
-	unordered_map<string, MeshLibData> cacheMeshLibs;
 
 	vector<string> cacheTexNames;
 	unordered_map<int32_t, TexId> cacheTexNameHashToIds;
@@ -90,20 +85,6 @@ namespace assets
 			}
 		}
 		return &result;
-	}
-
-	const MeshData& getOrParseMesh(const Vfs& vfs, const string& meshName)
-	{
-		return createOrGet<string, MeshData>(cacheMeshes, meshName, [&](MeshData& ref) {
-			ref.mesh = ZenLoad::zCProgMeshProto(meshName, *vfs.zlib);
-		});
-	}
-
-	const MeshLibData& getOrParseMeshLib(const Vfs& vfs, const string& meshName)
-	{
-		return createOrGet<string, MeshLibData>(cacheMeshLibs, meshName, [&](MeshLibData& ref) {
-			ref.meshLib = ZenLoad::zCModelMeshLib(meshName, *vfs.zlib, render::G_ASSET_RESCALE);
-		});
 	}
 
 	// TODO this should probably also lowercase everything, not callers

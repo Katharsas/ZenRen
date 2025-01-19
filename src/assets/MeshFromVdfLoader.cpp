@@ -15,7 +15,6 @@ namespace assets
 {
     using namespace render;
 	using namespace DirectX;
-	using namespace ZenLib;
     using ::std::string;
     using ::std::array;
     using ::std::vector;
@@ -28,10 +27,7 @@ namespace assets
     struct Unused {};
 
     static_assert(Vec3<glm::vec3>);
-    static_assert(Vec3<ZMath::float3>);
-
     static_assert(Vec2<glm::vec2>);
-    static_assert(Vec2<ZMath::float2>);
 
     // TODO Prepare for index buffer creation:
     // We should really at some point switch to processing/converting all vertex positions/features first
@@ -52,25 +48,12 @@ namespace assets
         return toXM4Pos(mesh.vertices.at(mesh.polygons.vertex_indices.at(vertIndex)));
     }
 
-    inline XMVECTOR getPosZlib(const ZenLoad::zCMesh& mesh, const Unused& _, uint32_t vertIndex)
-    {
-        return toXM4Pos(mesh.getVertices().at(mesh.getIndices().at(vertIndex)));
-    }
-
     inline XMVECTOR getPosModelZkit(const zenkit::MultiResolutionMesh& mesh, const zenkit::SubMesh& submesh, uint32_t vertIndex)
     {
         uint32_t faceIndex = vertIndex / 3;
         uint32_t faceVertIndex = vertIndex % 3;
         const auto wedgeIndex = submesh.triangles.at(faceIndex).wedges[faceVertIndex];
         return toXM4Pos(mesh.positions.at(submesh.wedges.at(wedgeIndex).index));
-    }
-
-    inline XMVECTOR getPosModelZlib(const ZenLoad::zCProgMeshProto& mesh, const ZenLoad::zCProgMeshProto::SubMesh& submesh, uint32_t vertIndex)
-    {
-        uint32_t faceIndex = vertIndex / 3;
-        uint32_t faceVertIndex = vertIndex % 3;
-        auto wedgeIndex = submesh.m_TriangleList.at(faceIndex).m_Wedges[faceVertIndex];
-        return toXM4Pos(mesh.getVertices().at(submesh.m_WedgeList.at(wedgeIndex).m_VertexIndex));
     }
 
     // POSITIONS - GET FACE POSITIONS
@@ -109,11 +92,6 @@ namespace assets
         return toXM4Pos(mesh.features.at(mesh.polygons.feature_indices.at(vertIndex)).normal);
     }
 
-    inline XMVECTOR getNormalZlib(const ZenLoad::zCMesh& mesh, const Unused& _, uint32_t vertIndex)
-    {
-        return toXM4Pos(mesh.getFeatures().at(mesh.getFeatureIndices().at(vertIndex)).vertNormal);
-    }
-
     // TODO pass face index as well for models or everywhere or return entire face
 
     inline XMVECTOR getNormalModelZkit(const Unused& _, const zenkit::SubMesh& submesh, uint32_t vertIndex)
@@ -122,14 +100,6 @@ namespace assets
         uint32_t faceVertIndex = vertIndex % 3;
         const auto wedgeIndex = submesh.triangles.at(faceIndex).wedges[faceVertIndex];
         return toXM4Pos(submesh.wedges.at(wedgeIndex).normal);
-    }
-
-    inline XMVECTOR getNormalModelZlib(const Unused& _, const ZenLoad::zCProgMeshProto::SubMesh& submesh, uint32_t vertIndex)
-    {
-        uint32_t faceIndex = vertIndex / 3;
-        uint32_t faceVertIndex = vertIndex % 3;
-        auto wedgeIndex = submesh.m_TriangleList.at(faceIndex).m_Wedges[faceVertIndex];
-        return toXM4Pos(submesh.m_WedgeList.at(wedgeIndex).m_Normal);
     }
 
     // NORMALS - UTIL FUNCTIONS
@@ -227,14 +197,6 @@ namespace assets
         return toUv(submesh.wedges.at(wedgeIndex).texture);
     }
 
-    inline UV getUvModelZlib(const Unused& _, const ZenLoad::zCProgMeshProto::SubMesh& submesh, uint32_t vertIndex)
-    {
-        uint32_t faceIndex = vertIndex / 3;
-        uint32_t faceVertIndex = vertIndex % 3;
-        auto wedgeIndex = submesh.m_TriangleList.at(faceIndex).m_Wedges[faceVertIndex];
-        return toUv(submesh.m_WedgeList.at(wedgeIndex).m_Texcoord);
-    }
-
     // ###########################################################################
     // LIGHTMAP UVs
     // ###########################################################################
@@ -266,29 +228,9 @@ namespace assets
         }
     }
 
-    ARRAY_UV getLightmapUvsZlib(const ZenLoad::zCMesh& mesh, uint32_t faceIndex, XMVECTOR posXm)
-    {
-        int16_t lightmapIndex = mesh.getTriangleLightmapIndices().at(faceIndex);
-        if (lightmapIndex != -1) {
-            ZenLoad::Lightmap lightmap = mesh.getLightmapReferences().at(lightmapIndex);
-            auto [u, v] = calculateLightmapUvs(lightmap.origin, lightmap.normalUp, lightmap.normalRight, posXm).vec;
-            float i = (float)lightmap.lightmapTextureIndex;
-            return { u, v, i };
-        }
-        else {
-            return { 0, 0, -1 };
-        }
-    }
-
     // ###########################################################################
     // UTIL FUNCTIONS
     // ###########################################################################
-
-    Material toMaterial(const ZenLoad::zCMaterialData& material)
-    {
-        const auto& texture = material.texture;
-        return { getTexId(::util::asciiToLower(texture)) };
-    }
 
     void insertFace(VEC_VERTEX_DATA& target, const array<VERTEX_POS, 3>& facePos, const array<VERTEX_OTHER, 3>& faceOther) {
         target.vecPos.push_back(facePos[0]);
@@ -325,28 +267,6 @@ namespace assets
         return false;
     }
 
-    bool isMeshEmptyAndValidate(const ZenLoad::zCMesh& mesh, bool expectLigtmaps)
-    {
-        if (mesh.getIndices().empty()) {
-            return true;
-        }
-        if (expectLigtmaps && mesh.getTriangleLightmapIndices().empty()) {
-            ::util::throwError("Expected world mesh to have lightmap information!");
-        }
-        if (!expectLigtmaps && !mesh.getTriangleLightmapIndices().empty()) {
-            ::util::throwError("Expected VOB mesh to NOT have lightmap information!");
-        }
-        return false;
-    }
-
-    bool isSubmeshEmptyAndValidate(const ZenLoad::zCProgMeshProto::SubMesh& submesh)
-    {
-        if (submesh.m_TriangleList.empty()) {
-            return true;
-        }
-        return false;
-    }
-
     static_assert(std::is_enum_v<zenkit::AlphaFunction>);
 
     template<typename T>
@@ -378,7 +298,7 @@ namespace assets
     // LOAD WORLD
     // ###########################################################################
 
-    void loadWorldMeshZkit(
+    void loadWorldMeshActual(
         VERT_CHUNKS_BY_MAT& target,
         const zenkit::Mesh& worldMesh,
         bool debugChecksEnabled)
@@ -456,86 +376,9 @@ namespace assets
         }
     }
 
-    void loadWorldMeshActual(
-        VERT_CHUNKS_BY_MAT& target,
-        const ZenLoad::zCMesh* worldMesh,
-        bool debugChecksEnabled)
-    {
-        if (isMeshEmptyAndValidate(*worldMesh, true)) {
-            ::util::throwError("World mesh is empty!");
-        }
-        NormalsStats normalStats;
-        
-        uint32_t vertCount = worldMesh->getIndices().size();
-        uint32_t faceCount = vertCount / 3;
-
-        for (uint32_t faceIndex = 0, vertIndex = 0; faceIndex < faceCount;) {
-
-            uint32_t meshMatIndex = worldMesh->getTriangleMaterialIndices().at(faceIndex);
-            ZenLoad::zCMaterialData meshMat = worldMesh->getMaterials().at(meshMatIndex);
-
-            const Material material = { getTexId(::util::asciiToLower(meshMat.texture)) };
-            unordered_map<ChunkIndex, VEC_VERTEX_DATA>& materialData = ::util::getOrCreateDefault(target, material);
-
-            uint32_t nextMeshMatIndex;
-            do {
-                // positions
-                auto facePosXm = facePosToXm<ZenLoad::zCMesh, Unused, getPosZlib, true, false>(*worldMesh, {}, vertIndex);
-
-                // normals
-                array<XMVECTOR, 3> faceNormalsXm;
-                NormalsStats faceNormalStats;
-                if (debugChecksEnabled) {
-                    std::tie(faceNormalStats, faceNormalsXm) = faceNormalsToXm<ZenLoad::zCMesh, Unused, getNormalZlib, false, true>(
-                        *worldMesh, {}, vertIndex, facePosXm);
-                }
-                else {
-                    std::tie(faceNormalStats, faceNormalsXm) = faceNormalsToXm<ZenLoad::zCMesh, Unused, getNormalZlib, false, false>(
-                        *worldMesh, {}, vertIndex, facePosXm);
-                }
-                normalStats += faceNormalStats;
-
-                // other
-                array<VERTEX_POS, 3> facePos;
-                array<VERTEX_OTHER, 3> faceOther;
-
-                for (uint32_t i = 0; i < 3; i++) {
-                    const auto& feature = worldMesh->getFeatures().at(worldMesh->getFeatureIndices().at(vertIndex));
-
-                    VERTEX_POS pos = toVec3(facePosXm[i]);
-                    VERTEX_OTHER other;
-                    other.normal = toVec3(faceNormalsXm[i]);
-                    other.uvDiffuse = { feature.uv[0], feature.uv[1] };
-                    other.colLight = fromSRGB(COLOR(feature.lightStat));
-                    other.dirLight = { -100.f, -100.f, -100.f };// value that is easy to check as not normalized in shader
-                    other.lightSun = 1.0f;
-                    other.uvLightmap = getLightmapUvsZlib(*worldMesh, faceIndex, facePosXm[i]);
-
-                    facePos.at(2 - i) = pos;
-                    faceOther.at(2 - i) = other;
-                    vertIndex++;
-                }
-
-                const ChunkIndex chunkIndex = toChunkIndex(centroidPos(facePosXm));
-                VEC_VERTEX_DATA& chunkData = ::util::getOrCreateDefault(materialData, chunkIndex);
-                insertFace(chunkData, facePos, faceOther);
-
-                faceIndex++;
-                if (faceIndex >= faceCount) {
-                    break;
-                }
-                nextMeshMatIndex = worldMesh->getTriangleMaterialIndices().at(faceIndex);
-            } while (nextMeshMatIndex == meshMatIndex);
-        }
-
-        if (debugChecksEnabled) {
-            logNormalStats(normalStats, "LEVEL_MESH");
-        }
-    }
-
     void loadWorldMesh(
         VERT_CHUNKS_BY_MAT& target,
-        ZenLoad::zCMesh* worldMesh,
+        const zenkit::Mesh& worldMesh,
         bool debugChecksEnabled)
     {
         uint32_t instances = 1;
@@ -555,7 +398,7 @@ namespace assets
 
     unordered_set<string> processedVisuals;
 
-    void loadInstanceMeshZkit(
+    void loadInstanceMesh(
         VERT_CHUNKS_BY_MAT& target,
         const zenkit::MultiResolutionMesh& mesh,
         const StaticInstance& instance,
@@ -640,93 +483,6 @@ namespace assets
         }
     }
 
-    void loadInstanceMesh(
-        VERT_CHUNKS_BY_MAT& target,
-        const ZenLoad::zCProgMeshProto& mesh,
-        const StaticInstance& instance,
-        bool debugChecksEnabled)
-    {
-        NormalsStats normalStats;
-        if (mesh.getNumSubmeshes() == 0) {
-            LOG(WARNING) << "Model contained no geometry! " << instance.meshName;
-            return;
-        }
-        using Submesh = ZenLoad::zCProgMeshProto::SubMesh;
-
-        for (uint32_t i = 0; i < mesh.getNumSubmeshes(); i++) {
-            auto& submesh = mesh.getSubmesh(i);
-            if (isSubmeshEmptyAndValidate(submesh)) {
-                LOG(WARNING) << "Skipped VOB submesh because of empty geometry! " << instance.meshName;
-                continue;
-            }
-
-            ZenLoad::zCMaterialData meshMat = submesh.m_Material;
-            if (meshMat.texture.empty()) {
-                LOG(WARNING) << "Skipped VOB submesh because of empty texture! " << instance.meshName;
-                continue;
-            }
-
-            const Material material = { getTexId(::util::asciiToLower(meshMat.texture)) };
-            unordered_map<ChunkIndex, VEC_VERTEX_DATA>& materialData = ::util::getOrCreateDefault(target, material);
-
-            uint32_t faceCount = submesh.m_TriangleList.size();
-
-            for (uint32_t faceIndex = 0, vertIndex = 0; faceIndex < faceCount; faceIndex++) {
-
-                // positions
-                array<XMVECTOR, 3> facePosXm = facePosToXm<ZenLoad::zCProgMeshProto, Submesh, getPosModelZlib, true, true>(
-                                mesh, submesh, vertIndex, instance.transform);
-
-                // normals
-                array<XMVECTOR, 3> faceNormalsXm;
-                NormalsStats faceNormalStats;
-                if (debugChecksEnabled) {
-                    std::tie(faceNormalStats, faceNormalsXm) = faceNormalsToXm<Unused, Submesh, getNormalModelZlib, true, true>(
-                        {}, submesh, vertIndex, facePosXm, instance.transform);
-                }
-                else {
-                    std::tie(faceNormalStats, faceNormalsXm) = faceNormalsToXm<Unused, Submesh, getNormalModelZlib, true, false>(
-                        {}, submesh, vertIndex, facePosXm, instance.transform);
-                }
-                normalStats += faceNormalStats;
-
-                // other
-                array<VERTEX_POS, 3> facePos;
-                array<VERTEX_OTHER, 3> faceOther;
-
-                for (uint32_t i = 0; i < 3; i++) {
-                    //auto wedgeIndex = submesh.m_TriangleList.at(faceIndex).m_Wedges[i];
-                    //const auto& vertFeature = submesh.m_WedgeList.at(wedgeIndex);
-
-                    VERTEX_POS pos = toVec3(facePosXm[i]);
-                    VERTEX_OTHER other;
-                    other.normal = toVec3(faceNormalsXm[i]);
-                    other.uvDiffuse = getUvModelZlib({}, submesh, vertIndex);
-                    other.uvLightmap = { 0, 0, -1 };
-                    other.colLight = instance.lighting.color;
-                    other.dirLight = toVec3(XMVector3Normalize(instance.lighting.direction));
-                    other.lightSun = instance.lighting.receiveLightSun ? 1.f : 0.f;
-
-                    // flip faces (seems like zEngine uses counter-clockwise winding, while we use clockwise winding)
-                    // TODO use D3D11_RASTERIZER_DESC FrontCounterClockwise instead?
-                    facePos.at(2 - i) = pos;
-                    faceOther.at(2 - i) = other;
-                    vertIndex++;
-                }
-
-                const ChunkIndex chunkIndex = toChunkIndex(centroidPos(facePosXm));
-                VEC_VERTEX_DATA& chunkData = ::util::getOrCreateDefault(materialData, chunkIndex);
-                insertFace(chunkData, facePos, faceOther);
-            }
-        }
-
-        if (debugChecksEnabled) {
-            const auto& visualname = instance.meshName;
-            logNormalStats(normalStats, visualname);
-            processedVisuals.insert(visualname);
-        }
-    }
-
     XMMATRIX rescale(const XMMATRIX& transform)
     {
         // "rescaling" means scaling the translation part of the matrix, not actually applying a scale transform
@@ -736,7 +492,7 @@ namespace assets
         return XMMatrixAffineTransformation(scaleXm, g_XMZero, rotQuatXm, transXm * G_ASSET_RESCALE);
     }
 
-    void loadInstanceModelZkit(
+    void loadInstanceModel(
         VERT_CHUNKS_BY_MAT& target,
         const zenkit::ModelHierarchy& hierarchy,
         const zenkit::ModelMesh& model,
@@ -750,7 +506,7 @@ namespace assets
             // TODO softskin animation
             StaticInstance newInstance = instance;
             newInstance.transform = XMMatrixMultiply(transformRoot, instance.transform);
-            loadInstanceMeshZkit(target, mesh.mesh, newInstance, debugChecksEnabled);
+            loadInstanceMesh(target, mesh.mesh, newInstance, debugChecksEnabled);
         }
 
         unordered_map<string, uint32_t> attachmentToNode;
@@ -769,43 +525,6 @@ namespace assets
                 XMMATRIX transformParent = rescale(toXMMatrix(glm::value_ptr(parent.transform)));
                 transform = XMMatrixMultiply(transform, transformParent);
                 node = &parent;
-            }
-            // rootNode translation is not applied to attachments (example: see kettledrum placement on oldcamp music stage)
-
-            StaticInstance newInstance = instance;
-            newInstance.transform = XMMatrixMultiply(transform, instance.transform);
-            loadInstanceMeshZkit(target, mesh, newInstance, debugChecksEnabled);
-        }
-    }
-
-    void loadInstanceMeshLib(
-        VERT_CHUNKS_BY_MAT& target,
-        const ZenLoad::zCModelMeshLib& lib,
-        const StaticInstance& instance,
-        bool debugChecksEnabled)
-    {
-        for (auto mesh : lib.getMeshes()) {
-            auto trans = lib.getRootNodeTranslation();
-            // It's unclear why negation is needed and if only z component or other components needs to be negated as well.
-            // If z is not negated, shisha's in Gomez' throneroom (G1) are not placed correctly.
-            XMMATRIX transformRoot = XMMatrixTranslationFromVector(XMVectorSet(-trans.x, -trans.y, -trans.z, 0));
-
-            StaticInstance newInstance = instance;
-            newInstance.transform = XMMatrixMultiply(transformRoot, instance.transform);
-            loadInstanceMesh(target, mesh.getMesh(), newInstance, debugChecksEnabled);
-        }
-
-        for (const auto& [name, mesh] : lib.getAttachments()) {
-            auto index = lib.findNodeIndex(name);
-
-            auto node = lib.getNodes()[index];
-            XMMATRIX transform = toXMMatrix(node.transformLocal.mv);
-
-            while (node.parentValid()) {
-                const auto& parent = lib.getNodes()[node.parentIndex];
-                XMMATRIX transformParent = toXMMatrix(parent.transformLocal.mv);
-                transform = XMMatrixMultiply(transform, transformParent);
-                node = parent;
             }
             // rootNode translation is not applied to attachments (example: see kettledrum placement on oldcamp music stage)
 

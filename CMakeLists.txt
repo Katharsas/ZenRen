@@ -78,11 +78,6 @@ option(ZK_ENABLE_ASAN "" OFF)
 #option(ZK_ENABLE_INSTALL "" OFF)
 add_subdirectory(lib/ZenKit)
 
-#set(libsquish_POPULATED ON CACHE BOOL "") # fix error due to ZenKit already having fetched libsquish
-set(ZENLIB_BUILD_EXAMPLES OFF CACHE BOOL "")
-set(ZENLIB_BUILD_TESTS OFF CACHE BOOL "")
-add_subdirectory(lib/ZenLib)
-
 ####### ZenRen Executable
 message(STATUS "############## EXECUTABLE ##############")
 
@@ -140,7 +135,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE "lib/g3log/src")
 target_include_directories(${PROJECT_NAME} PRIVATE "lib/DirectXMath/Inc")
 target_include_directories(${PROJECT_NAME} PRIVATE "lib/DirectXTex/DirectXTex")
 target_include_directories(${PROJECT_NAME} PRIVATE "lib/ZenKit/include")
-target_include_directories(${PROJECT_NAME} PRIVATE "lib/ZenLib")
 target_include_directories(${PROJECT_NAME} PRIVATE "lib/magic_enum")
 target_include_directories(${PROJECT_NAME} PRIVATE "lib/octree_attcs")
 target_include_directories(${PROJECT_NAME} PRIVATE "lib/tinyobj")
@@ -152,7 +146,6 @@ target_include_directories(${PROJECT_NAME} PUBLIC "lib/ZenKit/vendor/glm")
 target_link_libraries(${PROJECT_NAME} PRIVATE g3log)
 target_link_libraries(${PROJECT_NAME} PRIVATE imgui)
 target_link_libraries(${PROJECT_NAME} PRIVATE DirectXTex)
-target_link_libraries(${PROJECT_NAME} PRIVATE utils vdfs zenload daedalus)
 target_link_libraries(${PROJECT_NAME} PRIVATE zenkit)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE

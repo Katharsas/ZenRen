@@ -9,7 +9,6 @@
 #include "assets/AssetCache.h"
 #include "assets/AssetFinder.h"
 #include "assets/ZenLoader.h"
-#include "assets/ZenKitLoader.h"
 #include "assets/ObjLoader.h"
 #include "assets/TexLoader.h"
 
@@ -21,7 +20,6 @@ namespace render::pass::world
 {
 	using namespace render;
 	using namespace DirectX;
-	using namespace ZenLib;
 	using ::std::string;
 	using ::std::vector;
 	using ::std::unordered_map;
@@ -412,12 +410,7 @@ namespace render::pass::world
 		if (levelFileOpt.has_value()) {
 			if (::util::endsWith(level, ".zen")) {
 				auto levelFile = levelFileOpt.value();
-				if (levelFile.node != nullptr) {
-					assets::loadZen2(data, levelFile);
-				}
-				else {
-					assets::loadZen(data, levelFile, assets::getVfsLegacy());
-				}
+				assets::loadZen(data, levelFile);
 				levelDataFound = true;
 			}
 			else {
