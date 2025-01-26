@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "PassWorldLoader.h"
 
+#include "render/d3d/TextureBuffer.h"
 #include "render/PerfStats.h"
 #include "render/Loader.h"
 #include "PassWorldChunkGrid.h"
@@ -10,7 +11,7 @@
 #include "assets/ZenLoader.h"
 #include "assets/ZenKitLoader.h"
 #include "assets/ObjLoader.h"
-#include "assets/TexFromVdfLoader.h"
+#include "assets/TexLoader.h"
 
 #include "Util.h"
 #include "Win.h"
@@ -62,18 +63,15 @@ namespace render::pass::world
 		auto sourceAssetOpt = assets::getIfExists(texName);
 		if (sourceAssetOpt.has_value()) {
 			auto fileData = assets::getData(sourceAssetOpt.value());
-			return new Texture(d3d, std::move(fileData));
+			return assets::createTextureFromImageFormat(d3d, fileData);
 		}
 		texName = ::util::replaceExtension(texName, "-c.tex");// compiled textures have -C suffix
 		auto compiledAssetOpt = assets::getIfExists(texName);
 		if (compiledAssetOpt.has_value()) {
-			auto optionalTex = assets::loadTex(compiledAssetOpt.value());
-			if (optionalTex.has_value()) {
-				return new Texture(d3d, optionalTex.value().ddsRaw, true, texName);
-			}
-
+			FileData file = assets::getData(compiledAssetOpt.value());
+			return assets::createTextureFromGothicTex(d3d, file);
 		}
-		return new Texture(d3d, ::util::toString(assets::DEFAULT_TEXTURE));
+		return assets::createDefaultTexture(d3d);
 	}
 
 	struct TextureCreator {
@@ -112,51 +110,23 @@ namespace render::pass::world
 		return { 1, vertCount };
 	}
 
-	void initDxTextureArray(D3d d3d, ID3D11ShaderResourceView** targetSrv, const TexInfo& info, uint32_t arraySize)
-	{
-		D3D11_TEXTURE2D_DESC texDesc = CD3D11_TEXTURE2D_DESC((DXGI_FORMAT) info.format, info.width, info.height);
-		texDesc.MipLevels = info.mipLevels;
-		texDesc.ArraySize = arraySize;
-
-		ID3D11Texture2D* targetTex;
-		auto hr = d3d.device->CreateTexture2D(&texDesc, nullptr, &targetTex);
-		::util::throwOnError(hr, "Failed to initialize texture array resource!");
-
-		D3D11_SHADER_RESOURCE_VIEW_DESC descSrv = CD3D11_SHADER_RESOURCE_VIEW_DESC(
-			D3D11_SRV_DIMENSION_TEXTURE2DARRAY,
-			(DXGI_FORMAT) info.format,
-			0, info.mipLevels,
-			0, arraySize
-		);
-
-		hr = d3d.device->CreateShaderResourceView((ID3D11Resource*)targetTex, &descSrv, targetSrv);
-		::util::throwOnError(hr, "Failed to initialize texture array SRV!");
-
-		targetTex->Release();
-	}
-
 	void createTexArray(D3d d3d, ID3D11ShaderResourceView** targetSrv, const TexInfo& info, const vector<TexId>& texIds)
 	{
-		initDxTextureArray(d3d, targetSrv, info, texIds.size());
-		ID3D11Resource* targetTex;
-		(*targetSrv)->GetResource(&targetTex);
-
-		// https://learn.microsoft.com/en-us/windows/win32/direct3d11/overviews-direct3d-11-resources-subresources
-		uint32_t currentTex = 0;
-
+		vector<ID3D11Texture2D*> sourceBuffers;
 		for (const auto texId : texIds) {
-			ID3D11Resource* source;
+			sourceBuffers.push_back(nullptr);
 			const Texture* tex = getOrCreateTexture(d3d, texId);
-			tex->GetResourceView()->GetResource(&source);
-
-			for (uint32_t mipLevel = 0; mipLevel < info.mipLevels; mipLevel++) {
-				d3d.deviceContext->CopySubresourceRegion(targetTex, (currentTex * info.mipLevels) + mipLevel, 0, 0, 0, source, mipLevel, NULL);
-			}
-
-			release(source);
-			currentTex++;
+			tex->GetResourceView()->GetResource((ID3D11Resource**)&sourceBuffers.back());
 		}
-		release(targetTex);
+
+		ID3D11Texture2D* texArrayBuf = nullptr;
+		d3d::createTexture2dArrayBufByCopy(d3d, &texArrayBuf, sourceBuffers, BufferUsage::WRITE_GPU);
+		d3d::createTexture2dArraySrv(d3d, targetSrv, texArrayBuf);
+
+		release(texArrayBuf);
+		for (auto& sourceBuffer : sourceBuffers) {
+			release(sourceBuffer);
+		}
 	}
 
 	void loadRenderBatch(D3d d3d, vector<MeshBatch>& target, TexInfo batchInfo, const VEC_VERTEX_DATA_BATCH& batchData)
@@ -467,15 +437,24 @@ namespace render::pass::world
 		clearZenLevel();
 		world.isOutdoorLevel = data.isOutdoorLevel;
 		{
-			vector<vector<uint8_t>> ddsRaws;
-			for (auto& lightmap : data.worldMeshLightmaps) {
-				ddsRaws.push_back(lightmap.ddsRaw);
-
-				Texture* texture = new Texture(d3d, lightmap.ddsRaw, false, "lightmap_xxx");
-				world.debugTextures.push_back(texture);
+			vector<Texture*> lightmaps = assets::createTexturesFromLightmaps(d3d, std::move(data.worldMeshLightmaps));
+			for (auto& lightmap : lightmaps) {
+				world.debugTextures.push_back(lightmap);
 			}
-			if (!ddsRaws.empty()) {
-				world.lightmapTexArray = createShaderTexArray(d3d, ddsRaws, 256, 256, true);
+			if (!lightmaps.empty()) {
+				vector<ID3D11Texture2D*> buffers;
+				for (auto * texture : lightmaps) {
+					ID3D11Resource* resoucePtr;
+					texture->GetResourceView()->GetResource(&resoucePtr);
+					buffers.push_back((ID3D11Texture2D*)resoucePtr);
+				}
+				ID3D11Texture2D* texArray = nullptr;
+				d3d::createTexture2dArrayBufByCopy(d3d, &texArray, buffers, BufferUsage::WRITE_GPU);
+				for (auto * buffer : buffers) {
+					release(buffer);
+				}
+				d3d::createTexture2dArraySrv(d3d, &world.lightmapTexArray, texArray);
+				release(texArray);
 			}
 		}
 		sampler.logMillisAndRestart("Level: Uploaded lightmap textures");

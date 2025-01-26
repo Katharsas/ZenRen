@@ -42,7 +42,7 @@ namespace render
 
 	struct MeshBatch {
 		// we could wrap this in a normal Texture object to make it more similar to unbatched meshes
-		ID3D11ShaderResourceView* texColorArray;
+		ID3D11ShaderResourceView* texColorArray = nullptr;
 
 		std::vector<ChunkVertCluster> vertClusters;
 

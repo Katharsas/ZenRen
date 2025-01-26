@@ -13,7 +13,7 @@
 #include "AssetCache.h"
 #include "MeshFromVdfLoader.h"
 #include "DebugMeshes.h"
-#include "TexFromVdfLoader.h"
+#include "TexLoader.h"
 #include "LookupTrees.h"
 #include "StaticLightFromVobLights.h"
 #include "VobLoader.h"
@@ -259,10 +259,13 @@ namespace assets
        
 
         loadWorldMesh(out.worldMesh, parser.getWorldMesh(), debugMeshLoading);
-        sampler.logMillisAndRestart("Loader: World mesh loaded");
 
-        vector<InMemoryTexFile> lightmaps = loadZenLightmaps(worldMesh);
-        sampler.logMillisAndRestart("Loader: World lightmaps loaded");
+        for (uint32_t i = 0; i < worldMesh->getLightmapTextures().size(); i++) {
+            auto& lightmap = worldMesh->getLightmapTextures().at(i);
+            auto name = std::format("lightmap_{:03}.tex", i);
+            out.worldMeshLightmaps.emplace_back(name, (std::byte*)lightmap.data(), lightmap.size());
+        }
+        sampler.logMillisAndRestart("Loader: World mesh loaded");
 
         vector<Light> lightsStatic = loadLights(world.rootVobs);
 
@@ -301,6 +304,5 @@ namespace assets
         samplerTotal.logMillisAndRestart("World loaded in");
 
         out.isOutdoorLevel = isOutdoorLevel;
-        out.worldMeshLightmaps = lightmaps;
 	}
 }
