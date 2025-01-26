@@ -1,14 +1,14 @@
 #include "stdafx.h"
 #include "ZenKitLoader.h"
 
+#include "Util.h"
+#include "render/PerfStats.h"
 #include "render/MeshUtil.h"
 #include "assets/VobLoader.h"
 #include "assets/LookupTrees.h"
-#include "../render/PerfStats.h"
-#include "Util.h"
-#include "AssetCache.h"
-#include "MeshFromVdfLoader.h";
-#include "TexFromVdfLoader.h"
+#include "assets/AssetCache.h"
+#include "assets/MeshFromVdfLoader.h";
+#include "assets/TexLoader.h"
 
 #include "zenkit/World.hh"
 #include "zenkit/vobs/Light.hh"
@@ -188,10 +188,13 @@ namespace assets
         sampler.logMillisAndRestart("Loader: World data parsed");
 
         loadWorldMeshZkit(out.worldMesh, world.world_mesh, true);
+        
+        for (uint32_t i = 0; i < world.world_mesh.lightmap_textures.size(); i++) {
+            auto& lightmap = world.world_mesh.lightmap_textures.at(i);
+            auto name = std::format("lightmap_{:03}.tex", i);
+            out.worldMeshLightmaps.emplace_back(name, (std::byte*)lightmap->data(), lightmap->size(), lightmap);
+        }
         sampler.logMillisAndRestart("Loader: World mesh loaded");
-
-        vector<InMemoryTexFile> lightmaps = loadLightmapsZkit(world.world_mesh);
-        sampler.logMillisAndRestart("Loader: World lightmaps loaded");
 
         vector<Light> lightsStatic = loadLights(world.world_vobs);
 
@@ -207,6 +210,5 @@ namespace assets
         sampler.logMillisAndRestart("Loader: VOB visuals loaded");
 
         out.isOutdoorLevel = isOutdoorLevel;
-        out.worldMeshLightmaps = lightmaps;
     }
 }

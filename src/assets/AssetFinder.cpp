@@ -14,6 +14,7 @@ namespace assets
 {
 	namespace fs = std::filesystem;
 	using namespace ::ZenLib;
+	using render::FileData;
 	using std::byte;
 	using std::vector;
 	using std::string;
@@ -126,17 +127,17 @@ namespace assets
 	{
 		if (handle.path != nullptr) {
 			auto mmap = zenkit::Mmap(*handle.path);
-			return FileData(mmap.data(), (uint64_t) mmap.size(), std::move(mmap));
+			return FileData(handle.name, mmap.data(), mmap.size(), std::move(mmap));
 		}
 		if (handle.node != nullptr) {
 			phoenix::buffer buffer_view = handle.node->open();
-			return FileData(buffer_view.array(), buffer_view.limit());
+			return FileData(handle.name, buffer_view.array(), buffer_view.limit());
 		}{
 			auto buffer = std::make_unique<vector<uint8_t>>();
 			auto& bufferRef = *(buffer.get());
 			vfs.zlib->getFileData(handle.name, bufferRef);
 			// move might (?) invalidate bufferRef before first two args are processed, don't use it
-			return FileData((byte*)buffer->data(), buffer->size(), std::move(buffer));
+			return FileData(handle.name, (byte*)buffer->data(), buffer->size(), std::move(buffer));
 		}
 	}
 

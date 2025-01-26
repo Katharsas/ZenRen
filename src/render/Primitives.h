@@ -150,6 +150,10 @@ namespace render {
 		{
 			return { (uint16_t)((width * scalar) + 0.5f), (uint16_t)((height * scalar) + 0.5f) };
 		}
+		bool operator!=(const BufferSize& other) const
+		{
+			return width != other.width || height != other.height;
+		}
 		operator std::tuple<uint16_t&, uint16_t&>()
 		{
 			return std::tuple<uint16_t&, uint16_t&>{width, height};
