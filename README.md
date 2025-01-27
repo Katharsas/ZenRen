@@ -1,7 +1,7 @@
 # ZenRen
 
 
-Simple, high performance DirectX11.1 renderer for Gothic assets (VDF or single files).
+High performance DirectX11 viewer/renderer for Gothic assets (VDF or single files).
 <br>Attempts to closely recreate original G1/G2-AddOn look and lighting.
 
 ### Download (Windows)
@@ -9,12 +9,16 @@ Simple, high performance DirectX11.1 renderer for Gothic assets (VDF or single f
 
 ### Currently supports
 - Worldmesh (ZEN)
-- Static Objects (VOBs)
-- Static Light
-  - Lightmaps
-  - Per-Vertex Colors
-  - Per-Vob Static Light Accumulation (Color & Direction)
-- Time-Of-Day Skylight
+  - Static Light
+    - Indoor: Lightmaps
+    - Outdoor: Per-Vertex Baked Brightness 
+- Static Objects (VOBs, MOBs)
+  - Static Light
+    - Indoor: Static Voblight Accumulation (Color & Direction, Visibility Ray Testing)
+    - Outdoor: Per-Vob Color from Ground Face
+- Sky
+  - Time-Of-Day Skylight
+  - Sky Layer Animation
 - Asset File Formats
   - Level: VDF
   - Objects: VDF
@@ -22,27 +26,34 @@ Simple, high performance DirectX11.1 renderer for Gothic assets (VDF or single f
 
 ### Features
 - Frame Limiter
-- Simple Forward Renderer
+- Forward Renderer
   - Linear Colors
-  - MSAA, up to 4x SMAA
+  - MSAA
   - Transparency Multisampling (Alpha-To-Coverage with Sharpening)
-  - Resolution Scaling
-  - Depth Prepass
+  - Resolution Scaling (up to 4x SSAA equivalent)
 - Postprocessing
   - Tonemapping
   - Gamma, Brightness, Contrast
-- UI (ImGUI)
+- UI
   - High DPI Aware
 
 ### TODO
-- Sky
-- Water / Morph-Meshes
+- Effects
 - Dynamic Lights
-- Dynamic Objects (MOBs)
+- Dynamic Objects
+  - Light Updates
+- Transparent Surfaces (Water)
+- Distance Fog
+- Sky Celestials (Sun, Moon)
 - Asset File Formats
   - Level: ZEN (outside VDF), OBJ
   - Objects: 3DS, OBJ
 - Loading single objects without level
+
+### Non-Goals
+- Animations
+  - Morph-Meshes
+  - Skeletal Animations
 
 ### Options
 <pre>
@@ -74,6 +85,6 @@ This project's first-party code is "source available" for now.
 - lib/g3log - Public Domain / Unlicense
 - lib/imgui - MIT
 - lib/magic_enum - MIT
+- lib/octree_attcs - MIT
 - lib/tinyobj - MIT
 - lib/ZenKit - MIT
-- lib/ZenLib - MIT

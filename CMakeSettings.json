@@ -45,6 +45,17 @@
       "ctestCommandArgs": ""
     },
     {
+      "name": "Ninja-x64-Debug",
+      "generator": "Ninja",
+      "configurationType": "Debug",
+      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "buildRoot": "${projectDir}\\out\\build\\${name}",
+      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "",
+      "ctestCommandArgs": ""
+    },
+    {
       "name": "Ninja-x64-Release",
       "generator": "Ninja",
       "configurationType": "Release",
