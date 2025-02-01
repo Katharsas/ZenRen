@@ -27,5 +27,12 @@ namespace assets
         const zenkit::ModelMesh& model,
         const render::StaticInstance& instance,
         bool debugChecksEnabled);
-}
 
+    void loadInstanceDecal(
+        render::VERT_CHUNKS_BY_MAT& target,
+        const render::StaticInstance& instance,
+        bool debugChecksEnabled
+    );
+
+    void printAndResetLoadStats(bool debugChecksEnabled);
+}

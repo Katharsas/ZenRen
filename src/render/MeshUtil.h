@@ -33,6 +33,11 @@ namespace render
     {
         return { vec.x, vec.y };
     }
+    template <Vec2 Vec>
+    VEC2 toVec2(const Vec& vec)
+    {
+        return { vec.x, vec.y };
+    }
     template <Vec3 Vec> 
     VEC3 toVec3(const Vec& vec)
     {

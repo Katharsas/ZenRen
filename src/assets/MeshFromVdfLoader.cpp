@@ -26,6 +26,27 @@ namespace assets
     const XMMATRIX identity = XMMatrixIdentity();
     struct Unused {};
 
+    struct NormalsStats {
+        uint32_t total = 0;
+        uint32_t zero = 0;
+        uint32_t extreme = 0;
+
+        auto operator+=(const NormalsStats& rhs)
+        {
+            total += rhs.total;
+            zero += rhs.zero;
+            extreme += rhs.extreme;
+        };
+    };
+
+    struct LoadStats {
+        NormalsStats normalsWorldMesh;
+        std::unordered_map<std::string, NormalsStats> normalsInstances;
+        std::unordered_map<std::string, bool> skippedNoTexSubmeshInstances;
+        std::unordered_map<zenkit::AlphaFunction, uint32_t> materialAlphas;
+        std::unordered_map<zenkit::MaterialGroup, uint32_t> materialGroups;
+    } loadStats;
+
     static_assert(Vec3<glm::vec3>);
     static_assert(Vec2<glm::vec2>);
 
@@ -69,7 +90,7 @@ namespace assets
         for (uint32_t i = 0; i < 3; i++) {
             result[i] = getPos(mesh, submesh, indexStart + i);
             if (rescale) {
-                result[i] = XMVectorMultiply(result[i], XMVectorSet(0.01f, 0.01f, 0.01f, 1.f));
+                result[i] = XMVectorMultiply(result[i], XMVectorSet(G_ASSET_RESCALE, G_ASSET_RESCALE, G_ASSET_RESCALE, 1.f));
             }
             if (transform) {
                 result[i] = XMVector4Transform(result[i], posTransform);
@@ -104,28 +125,15 @@ namespace assets
 
     // NORMALS - UTIL FUNCTIONS
 
-    struct NormalsStats {
-        uint32_t total = 0;
-        uint32_t zero = 0;
-        uint32_t extreme = 0;
-
-        auto operator+=(const NormalsStats& rhs)
-        {
-            total += rhs.total;
-            zero += rhs.zero;
-            extreme += rhs.extreme;
-        };
-    };
-
     void logNormalStats(const NormalsStats& normalStats, const std::string& meshName)
     {
         if (normalStats.zero > 0) {
-            LOG(WARNING) << "Normals: " << util::leftPad("'" + std::to_string(normalStats.zero) + "/" + std::to_string(normalStats.total), 9)
-                << "' are ZERO:  " << meshName;
+            LOG(WARNING) << "    Normals: " << util::leftPad("'" + std::to_string(normalStats.zero) + "/" + std::to_string(normalStats.total), 9)
+                << "' are zero:  " << meshName;
         }
         if (normalStats.extreme > 0) {
-            LOG(WARNING) << "Normals: " << util::leftPad("'" + std::to_string(normalStats.extreme) + "/" + std::to_string(normalStats.total), 9)
-                << "' are WRONG: " << meshName << " (over 90 degrees off recalculated flat normal)";
+            LOG(WARNING) << "    Normals: " << util::leftPad("'" + std::to_string(normalStats.extreme) + "/" + std::to_string(normalStats.total), 9)
+                << "' are wrong: " << meshName << " (over 90 degrees off recalculated flat normal)";
         }
     }
 
@@ -288,7 +296,7 @@ namespace assets
     {
         string name = material.texture;
         bool unusual = false;
-        unusual |= logIfPropertyUnusual(name, "alpha_func", zenkit::AlphaFunction::DEFAULT, material.alpha_func);
+        //unusual |= logIfPropertyUnusual(name, "alpha_func", zenkit::AlphaFunction::DEFAULT, material.alpha_func);
         unusual |= logIfPropertyUnusual(name, "force_occluder", false, material.force_occluder);// TODO find occluders if they exist
         // disable_collision is for waterfalls
         return unusual;
@@ -314,6 +322,11 @@ namespace assets
             uint32_t meshMatIndex = worldMesh.polygons.material_indices.at(faceIndex);
             zenkit::Material meshMat = worldMesh.materials.at(meshMatIndex);
             bool unusual = checkForUnusualMatProperties(meshMat);
+
+            if (debugChecksEnabled) {
+                ::util::getOrCreateDefault(loadStats.materialGroups, meshMat.group)++;
+                ::util::getOrCreateDefault(loadStats.materialAlphas, meshMat.alpha_func)++;
+            }
 
             const Material material = { getTexId(::util::asciiToLower(meshMat.texture)) };
             unordered_map<ChunkIndex, VEC_VERTEX_DATA>& materialData = ::util::getOrCreateDefault(target, material);
@@ -372,7 +385,7 @@ namespace assets
         }
 
         if (debugChecksEnabled) {
-            logNormalStats(normalStats, "LEVEL_MESH");
+            loadStats.normalsWorldMesh = normalStats;
         }
     }
 
@@ -396,8 +409,6 @@ namespace assets
         return XMMatrixInverse(nullptr, transposed);
     }
 
-    unordered_set<string> processedVisuals;
-
     void loadInstanceMesh(
         VERT_CHUNKS_BY_MAT& target,
         const zenkit::MultiResolutionMesh& mesh,
@@ -408,9 +419,10 @@ namespace assets
         using Submesh = zenkit::SubMesh;
 
         NormalsStats normalStats;
+        bool createNormalStats = debugChecksEnabled && !util::hasKey(loadStats.normalsInstances, instance.visual_name);
         
         if (mesh.sub_meshes.size() == 0) {
-            LOG(WARNING) << "Model contained no geometry! " << instance.meshName;
+            LOG(WARNING) << "Model contained no geometry! " << instance.visual_name;
             return;
         }
 
@@ -421,8 +433,13 @@ namespace assets
             zenkit::Material meshMat = submesh.mat;
             bool unusual = checkForUnusualMatProperties(meshMat);
 
-            if (meshMat.texture.empty()) {
-                LOG(WARNING) << "Skipped VOB submesh because of empty texture! " << instance.meshName;
+            if (debugChecksEnabled) {
+                ::util::getOrCreateDefault(loadStats.materialGroups, meshMat.group)++;
+                ::util::getOrCreateDefault(loadStats.materialAlphas, meshMat.alpha_func)++;
+            }
+
+            if (meshMat.texture.empty() && !util::hasKey(loadStats.skippedNoTexSubmeshInstances, instance.visual_name)) {
+                loadStats.skippedNoTexSubmeshInstances[instance.visual_name] = true;
                 continue;
             }
 
@@ -439,7 +456,7 @@ namespace assets
                 // normals
                 array<XMVECTOR, 3> faceNormalsXm;
                 NormalsStats faceNormalStats;
-                if (debugChecksEnabled) {
+                if (createNormalStats) {
                     std::tie(faceNormalStats, faceNormalsXm) = faceNormalsToXm<Unused, Submesh, getNormalModelZkit, true, true>(
                         {}, submesh, vertIndex, facePosXm, instance.transform);
                 }
@@ -477,9 +494,9 @@ namespace assets
         }
 
         if (debugChecksEnabled) {
-            const auto& visualname = instance.meshName;
-            logNormalStats(normalStats, visualname);
-            processedVisuals.insert(visualname);
+            if (createNormalStats) {
+                loadStats.normalsInstances[instance.visual_name] = normalStats;
+            }
         }
     }
 
@@ -532,5 +549,111 @@ namespace assets
             newInstance.transform = XMMatrixMultiply(transform, instance.transform);
             loadInstanceMesh(target, mesh, newInstance, debugChecksEnabled);
         }
+    }
+
+    /**
+     * Create quad.
+     */
+    vector<std::array<std::pair<XMVECTOR, UV>, 3>> createQuadPositions(const Decal& decal)
+    {
+        auto& size = decal.quad_size;
+        auto& offset = decal.uv_offset;
+        float base = 0.5f;
+        std::pair quadA = { toXM4Pos(VEC3{ -base * size.x,  base * size.y, 0 }), UV{ 0 + offset.u, 0 + offset.v } };
+        std::pair quadB = { toXM4Pos(VEC3{  base * size.x,  base * size.y, 0 }), UV{ 1 + offset.u, 0 + offset.v } };
+        std::pair quadC = { toXM4Pos(VEC3{  base * size.x, -base * size.y, 0 }), UV{ 1 + offset.u, 1 + offset.v } };
+        std::pair quadD = { toXM4Pos(VEC3{ -base * size.x, -base * size.y, 0 }), UV{ 0 + offset.u, 1 + offset.v } };
+
+        vector<std::array<std::pair<XMVECTOR, UV>, 3>> result;
+        result.reserve(decal.two_sided ? 4 : 2);
+
+        // vertex order reversed per tri to be consistent with other Gothic asset (counter-clockwise winding)
+        result.push_back({ quadA, quadB, quadC });
+        result.push_back({ quadA, quadC, quadD });
+        if (decal.two_sided) {
+            result.push_back({ quadA, quadD, quadC });
+            result.push_back({ quadA, quadC, quadB });
+        }
+        return result;
+    }
+
+    void loadInstanceDecal(
+        VERT_CHUNKS_BY_MAT& target,
+        const StaticInstance& instance,
+        bool debugChecksEnabled
+    )
+    {
+        assert(instance.decal.has_value());
+        auto decal = instance.decal.value();
+
+        if (debugChecksEnabled) {
+            ::util::getOrCreateDefault(loadStats.materialAlphas, decal.alpha)++;
+        }
+
+        const Material material = { getTexId(::util::asciiToLower(instance.visual_name)) };
+        unordered_map<ChunkIndex, VEC_VERTEX_DATA>& materialData = ::util::getOrCreateDefault(target, material);
+
+        auto quadFacesXm = createQuadPositions(decal);
+
+        for (auto& quadFaceXm : quadFacesXm) {
+            // positions
+            array<XMVECTOR, 3> facePosXm;
+            for (uint32_t i = 0; i < 3; i++) {
+                facePosXm[i] = quadFaceXm.at(i).first;
+                facePosXm[i] = XMVectorMultiply(facePosXm[i], XMVectorSet(G_ASSET_RESCALE, G_ASSET_RESCALE, G_ASSET_RESCALE, 1.f));
+                facePosXm[i] = XMVector4Transform(facePosXm[i], instance.transform);
+            }
+
+            //normals
+            const auto faceNormal = toVec3(calcFlatFaceNormal(facePosXm));
+
+            //other
+            array<VERTEX_POS, 3> facePos;
+            array<VERTEX_OTHER, 3> faceOther;
+
+            for (int32_t i = 2; i >= 0; i--) {
+                facePos[i] = toVec3(facePosXm.at(i));
+
+                VERTEX_OTHER other;
+                other.normal = faceNormal;
+                other.uvDiffuse = quadFaceXm.at(i).second;
+                other.uvLightmap = { 0, 0, -1 };
+                other.colLight = instance.lighting.color;
+                other.dirLight = toVec3(XMVector3Normalize(instance.lighting.direction));
+                other.lightSun = instance.lighting.receiveLightSun ? 1.f : 0.f;
+                faceOther[i] = other;
+            }
+
+            const ChunkIndex chunkIndex = toChunkIndex(centroidPos(facePosXm));
+            VEC_VERTEX_DATA& chunkData = ::util::getOrCreateDefault(materialData, chunkIndex);
+            insertFace(chunkData, facePos, faceOther);
+        }
+    }
+
+    void printAndResetLoadStats(bool debugChecksEnabled)
+    {
+        LOG(INFO) << "Skipped mesh data:";
+        for (auto& [name, __] : loadStats.skippedNoTexSubmeshInstances) {
+            LOG(WARNING) << "    Skipped VOB submesh because of empty texture! " << name;
+        }
+        if (debugChecksEnabled) {
+            LOG(INFO) << "Norrmal Stats:";
+            logNormalStats(loadStats.normalsWorldMesh, "LEVEL_MESH");
+            for (auto& [name, normals] : loadStats.normalsInstances) {
+                logNormalStats(normals, name);
+            }
+            LOG(INFO) << "Material count by group:";
+            for (auto& [group, count] : loadStats.materialGroups) {
+                LOG(INFO) << "     '" << magic_enum::enum_name(group) << "' -> " << std::to_string(count);
+            }
+            LOG(INFO) << "Material count by alpha (incl. decals):";
+            for (auto& [alpha, count] : loadStats.materialAlphas) {
+                LOG(INFO) << "     '" << magic_enum::enum_name(alpha) << "' -> " << std::to_string(count);
+            }
+        }
+
+        loadStats.normalsInstances.clear();
+        loadStats.materialGroups.clear();
+        loadStats.materialAlphas.clear();
     }
 }

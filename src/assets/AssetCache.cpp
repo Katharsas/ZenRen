@@ -24,11 +24,14 @@ namespace assets
 	vector<string> cacheTexNames;
 	unordered_map<int32_t, TexId> cacheTexNameHashToIds;
 
-	// TODO T must have load method
-	template<typename T>
+	template <typename L> concept HasLoad =
+		requires(L loadable) {
+			{ loadable.load((Read*)nullptr) } -> std::same_as<void>;
+	};
+
+	template<HasLoad T>
 	bool loadVisualZkit(T& parseTarget, const string& assetName)
 	{
-		//LOG(DEBUG) << "Loading: " << assetName;
 		const auto& assetFileOpt = assets::getIfExists(assetName);
 		if (assetFileOpt.has_value()) {
 			auto visualData = assets::getData(assetFileOpt.value());

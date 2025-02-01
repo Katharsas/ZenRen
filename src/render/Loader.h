@@ -3,10 +3,13 @@
 #include "Common.h"
 
 #include "zenkit/Mmap.hh" 
+#include "zenkit/Material.hh"
 
 namespace assets
 {
 	struct LoadDebugFlags {
+		bool validateMeshData = true;
+
 		bool vobsTint = false;
 		bool staticLights = false;
 		bool staticLightRays = false;
@@ -19,6 +22,17 @@ namespace assets
 //}
 namespace render
 {
+	enum class VisualType : std::uint8_t {
+		DECAL = 0,
+		MESH = 1,
+		MULTI_RESOLUTION_MESH = 2,
+		PARTICLE_EFFECT = 3,
+		AI_CAMERA = 4,
+		MODEL = 5,
+		MORPH_MESH = 6,
+		UNKNOWN = 7,
+	};
+
 	struct VobLighting
 	{
 		DirectX::XMVECTOR direction;// pre-inverted
@@ -26,11 +40,23 @@ namespace render
 		bool receiveLightSun;
 	};
 
+	struct Decal {
+		VEC2 quad_size;
+		UV uv_offset;
+		bool two_sided;
+
+		zenkit::AlphaFunction alpha;
+		// TODO shouldn't this be part of TexInfo? Does it work identical to model materials?
+		// Seems very likely that a texture is always used with the same alphafunc, so just pass it to shader when setting texture?
+	};
+
 	struct StaticInstance {
-		std::string meshName;// TODO rename to modelName or visualAsset or visualFile
+		VisualType type;
+		std::string visual_name;
 		DirectX::XMMATRIX transform;
 		std::array<DirectX::XMVECTOR, 2> bbox;// pos_min, pos_max
 		VobLighting lighting;
+		std::optional<Decal> decal = std::nullopt;
 	};
 
 	struct Light {

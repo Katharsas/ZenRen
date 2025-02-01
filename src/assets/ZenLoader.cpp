@@ -13,7 +13,6 @@
 
 #include "zenkit/World.hh"
 #include "zenkit/vobs/Light.hh"
-//#include "zenkit/Mesh.hh"
 
 #include <glm/gtc/type_ptr.hpp>
 
@@ -63,6 +62,7 @@ namespace assets
 
     bool loadVob(zenkit::VirtualObject const* const vobPtr)
     {
+        // TODO we should probably use visual type here, not extensions
         using namespace FormatsSource;
 
         const zenkit::VirtualObject& vob = *vobPtr;
@@ -75,7 +75,7 @@ namespace assets
                 // TODO effects, morphmeshes, decals
             }
             else {
-                LOG(INFO) << "Visual not supported: " << vob.visual;
+                LOG(INFO) << "Visual not supported: " << visualName;
             }
         }
         return false;
@@ -99,7 +99,8 @@ namespace assets
             }
             const zenkit::VirtualObject& vob = *vobPtr;
             StaticInstance instance;
-            instance.meshName = vob.visual->name;
+            instance.type = (VisualType) vob.visual->type;
+            instance.visual_name = vob.visual->name;
             {
                 glm::mat4x4 rotation(vob.rotation);
                 // TODO we have no idea if this is row or column first, so may need to transpose.
@@ -113,64 +114,88 @@ namespace assets
                     toXM4Pos(toVec3(vob.bbox.min, G_ASSET_RESCALE)),
                     toXM4Pos(toVec3(vob.bbox.max, G_ASSET_RESCALE))
             };
-            {
-            VobLighting lighting = calculateStaticVobLighting(instance.bbox, worldMeshContext, lightsStaticContext, isOutdoorLevel, debug);
-            if (debug.vobsTint) {
-                lighting.color.r = (lighting.color.r / 3.f) * 2.f;
+            if (vob.visual->type == zenkit::VisualType::DECAL) {
+                //assert(::util::endsWith(instance.meshName, ".TGA"));
+                const zenkit::VisualDecal* decalVisual = dynamic_cast<zenkit::VisualDecal*>(vobPtr->visual.get());
+                instance.decal = Decal{
+                    .quad_size = toVec2(decalVisual->dimension),
+                    .uv_offset = toUv(decalVisual->offset),
+                    .two_sided = decalVisual->two_sided,
+                    .alpha = decalVisual->alpha_func,
+                };
             }
-            instance.lighting = lighting;
-           }
-           statics.push_back(instance);
+            {
+                VobLighting lighting = calculateStaticVobLighting(instance.bbox, worldMeshContext, lightsStaticContext, isOutdoorLevel, debug);
+                if (debug.vobsTint) {
+                    lighting.color.r = (lighting.color.r / 3.f) * 2.f;
+                }
+                instance.lighting = lighting;
+            }
+            statics.push_back(instance);
         });
 
         return statics;
     }
 
-    bool loadInstanceVisual(VERT_CHUNKS_BY_MAT& target, const StaticInstance& instance)
+    bool loadInstanceVisual(VERT_CHUNKS_BY_MAT& target, const StaticInstance& instance, bool debugChecksEnabled)
     {
-        // TODO right now, getVobVisual essentially retrieves asset handle every time it is called,
-        // doing the work of resolving the entire asset even if it is already in AssetCache which
-        // does not make any sense.
-        // Maybe getVobVisual should return a variant of an already parsed visual.
-        
-        // TODO ok none of this makes sense anyway because MDS source files map to either MDL or (MDH + MDM) !!
-        // so just returning one compile visual for each source visual is already wrong.
+        using namespace FormatsSource;
+        using namespace FormatsCompiled;
+        const auto& name = instance.visual_name;
 
-        const auto assetNameOpt = getVobVisual(instance.meshName);
-        if (!assetNameOpt.has_value()) {
-            LOG(DEBUG) << "Visual type not supported! Skipping VOB " << instance.meshName;
+        switch (instance.type) {
+        case VisualType::MULTI_RESOLUTION_MESH: {
+            assert(__3DS.isExtOf(name));
+            auto compiledName = ::util::replaceExtension(name, MRM.str());
+            auto meshOpt = getOrParseMrm(compiledName);
+            if (!meshOpt.has_value()) {
+                LOG(INFO) << "Failed to find MRM data for visual: " << name;
+                return false;
+            }
+            loadInstanceMesh(target, *meshOpt.value(), instance, debugChecksEnabled);
+            return true;
+        }
+        case VisualType::MODEL: {
+            bool isAsc = ASC.isExtOf(name);// ASCs are always compiled to MDL apparently (?)
+            bool isMds = !isAsc && MDS.isExtOf(name);// MDS might be either MDL or MDH+MDM pair
+            assert(isAsc || isMds);
+            {
+                // MDL
+                auto compiledName = ::util::replaceExtension(name, MDL.str());
+                auto meshOpt = getOrParseMdl(compiledName);
+                if (!meshOpt.has_value()) {
+                    if (isAsc) {
+                        LOG(INFO) << "Failed to find MDL data for visual: " << name;
+                        return false;
+                    }
+                }
+                else {
+                    loadInstanceModel(target, meshOpt.value()->hierarchy, meshOpt.value()->mesh, instance, debugChecksEnabled);
+                    return true;
+                }
+            } {
+                // MDH+MDM
+                auto compiledName = ::util::replaceExtension(name, MDH.str());
+                auto mdhOpt = getOrParseMdh(compiledName);
+                compiledName = ::util::replaceExtension(name, MDM.str());
+                auto mdmOpt = getOrParseMdm(compiledName);
+                if (!mdhOpt.has_value() || !mdmOpt.has_value()) {
+                    LOG(INFO) << "Failed to find MDH + MDM data for visual: " << name;
+                    return false;
+                }
+                loadInstanceModel(target, *mdhOpt.value(), *mdmOpt.value(), instance, debugChecksEnabled);
+                return true;
+            }
+        }
+        case VisualType::DECAL: {
+            assert(TGA.isExtOf(name));
+            loadInstanceDecal(target, instance, debugChecksEnabled);
             return false;
         }
-
-        auto& assetName = assetNameOpt.value();
-
-        if (endsWithEither(assetName, { FormatsCompiled::MRM })) {
-            auto meshOpt = getOrParseMrm(assetName);
-            assert(meshOpt.has_value());
-            loadInstanceMesh(target, *meshOpt.value(), instance, true);
-        }
-        else if (endsWithEither(assetName, { FormatsCompiled::MDL })) {
-            auto meshOpt = getOrParseMdl(assetName);
-            assert(meshOpt.has_value());
-            loadInstanceModel(target, meshOpt.value()->hierarchy, meshOpt.value()->mesh, instance, true);
-        }
-        else if (endsWithEither(assetName, { FormatsCompiled::MDM })) {
-            //LOG(INFO) << "Loading: " << assetName;
-
-            auto meshOpt = getOrParseMdm(assetName);
-            assert(meshOpt.has_value());
-
-            auto mdhAssetName = util::replaceExtension(instance.meshName, ".MDH");
-            auto meshMdhOpt = getOrParseMdh(mdhAssetName);
-            assert(meshMdhOpt.has_value());
-
-            loadInstanceModel(target, *meshMdhOpt.value(), *meshOpt.value(), instance, true);
-        }
-        else {
-            LOG(DEBUG) << "Visual type not supported! Skipping VOB " << instance.meshName << " (" << assetName << ")";
+        default: {
             return false;
         }
-        return true;
+        }
     }
 
     void loadZen(render::RenderData& out, const FileHandle& levelFile, LoadDebugFlags debug)
@@ -205,11 +230,12 @@ namespace assets
         sampler.logMillisAndRestart("Loader: World VOB data loaded");
 
         for (auto& instance : vobs) {
-            loadInstanceVisual(out.staticMeshes, instance);
+            loadInstanceVisual(out.staticMeshes, instance, debug.validateMeshData);
         }
 
         sampler.logMillisAndRestart("Loader: VOB visuals loaded");
 
+        printAndResetLoadStats(debug.validateMeshData);
         out.isOutdoorLevel = isOutdoorLevel;
     }
 }

@@ -208,7 +208,7 @@ namespace assets
 				format = { .dxgi = DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, .hasAlpha = false };
 			}
 			else {
-				LOG(WARNING) << "Failed to load TEX because of unsupported format!";
+				LOG(WARNING) << "Texture Load: Failed to load TEX because of unsupported format!";
 				return assets::createDefaultTexture(d3d);
 			}
 		}
@@ -221,9 +221,12 @@ namespace assets
 		// when resizing we always re-generate all mips since that is easier and probably cleaner.
 		if (rebuild) {
 			if (resize) {
-				LOG(DEBUG) << "Rebuilding texture for resize: " << name;
+				LOG(INFO) << "Texture Load: Rebuilding texture for resize: " << name;
 			} else {
-				LOG(DEBUG) << "Rebuilding texture due to missing mipmaps: " << name;
+				static const std::string lightmapPrefix = "lightmap";// lightmaps never have mipmaps, so logging it is noise
+				if (!util::startsWith(name, lightmapPrefix)) {
+					LOG(INFO) << "Texture Load: Rebuilding texture due to missing mipmaps: " << name;
+				}
 			}
 			
 			format.dxgi = DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
@@ -288,6 +291,9 @@ namespace assets
 		}
 
 		const BufferSize& targetSize = getMaxSize(textures);
+
+		LOG(INFO) << "Texture Load: Rebuilding all lightmaps due to missing mipmaps!";
+		LOG(INFO) << "Texture Load: Resizing smaller lightmaps to target size " << targetSize << "!";
 
 		vector<Texture*> result;
 		result.reserve(textures.size());

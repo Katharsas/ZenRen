@@ -45,6 +45,12 @@ namespace util
 	}
 
 	template<typename Key, typename Value>
+	bool hasKey(std::unordered_map<Key, Value>& map, const Key& key)
+	{
+		return map.find(key) != map.end();
+	}
+
+	template<typename Key, typename Value>
 	Value& getOrCreateDefault(std::unordered_map<Key, Value>& map, const Key& key)
 	{
 		auto [it, wasInserted] = map.try_emplace(key);// first lookup, default constructor only called if not found

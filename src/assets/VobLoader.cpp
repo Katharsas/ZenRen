@@ -9,7 +9,7 @@
 
 namespace assets
 {
-    // TODO rename to VobLoader or similar?
+    // TODO rename to VobLighting or similar?
 
     using namespace render;
     using namespace DirectX;
@@ -17,38 +17,6 @@ namespace assets
     using std::optional;
     using std::vector;
     using ::util::FileExt;
-
-    optional<string> getVobVisual(const string& visual)
-    {
-        using namespace FormatsSource;
-        using namespace FormatsCompiled;
-
-        auto visualNoExt = visual.substr(0, visual.find_last_of('.'));
-        string meshFile;
-
-        if (__3DS.isExtOf(visual)) {
-            meshFile = visualNoExt + MRM.str();
-            // TODO should probably fallback to MDH if missing
-        }
-        else if (ASC.isExtOf(visual)) {
-            // TODO do MRM files exist? do MDH files exist so we can re-use single meshes instead of reparsing them from MDL all the time?
-            // if a single mesh is shared between multiple hierarchies, does Gothic still put instances of them into MDL files?
-            meshFile = visualNoExt + MDL.str();
-        }
-        else if (MDS.isExtOf(visual)) {
-            // in this case, both MRM/MDM or MDL might exist
-            meshFile = visualNoExt + MDL.str();
-            if (!assets::exists(meshFile)) {
-                meshFile = visualNoExt + MDM.str();
-            }
-        }
-        if (assets::exists(meshFile)) {
-            return meshFile;
-        }
-        else {
-            return std::nullopt;
-        }
-    }
 
     COLOR interpolateColorFromFaceXZ(const VEC3& pos, const VERT_CHUNKS_BY_MAT& meshData, const VertKey& vertKey)
     {

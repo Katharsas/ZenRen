@@ -430,6 +430,7 @@ namespace render::pass::world
 		clearZenLevel();
 		world.isOutdoorLevel = data.isOutdoorLevel;
 		{
+			LOG(INFO) << "Level: Lightmap count: " << data.worldMeshLightmaps.size();
 			vector<Texture*> lightmaps = assets::createTexturesFromLightmaps(d3d, std::move(data.worldMeshLightmaps));
 			for (auto& lightmap : lightmaps) {
 				world.debugTextures.push_back(lightmap);

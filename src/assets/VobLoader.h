@@ -24,6 +24,7 @@ namespace assets
     // MDL = model hierarchy including all used single meshes
     namespace FormatsCompiled
     {
+        const ::util::FileExt TEX = ::util::FileExt::create(".TEX");
         const ::util::FileExt MRM = ::util::FileExt::create(".MRM");
         const ::util::FileExt MDM = ::util::FileExt::create(".MDM");
         const ::util::FileExt MDH = ::util::FileExt::create(".MDH");
@@ -31,7 +32,6 @@ namespace assets
         const ::util::FileExt MAN = ::util::FileExt::create(".MAN");
     }
 
-    std::optional<std::string> getVobVisual(const std::string& visual);
     COLOR interpolateColorFromFaceXZ(const VEC3& pos, const render::VERT_CHUNKS_BY_MAT& meshData, const render::VertKey& vertKey);
     render::VobLighting calculateStaticVobLighting(
         std::array<DirectX::XMVECTOR, 2> bbox, const FaceLookupContext& worldMesh, const LightLookupContext& lightsStatic, bool isOutdoorLevel,
