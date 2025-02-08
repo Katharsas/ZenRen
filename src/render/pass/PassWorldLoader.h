@@ -8,8 +8,9 @@ namespace render::pass::world
 	struct World {
 		bool isOutdoorLevel = true;
 		std::vector<PrepassMeshes> prepassMeshes;
-		std::vector<MeshBatch> meshBatchesWorld;
-		std::vector<MeshBatch> meshBatchesObjects;
+		std::vector<MeshBatch<VertexBasic>> meshBatchesWorld;
+		std::vector<MeshBatch<VertexBlend>> meshBatchesWorldBlend;
+		std::vector<MeshBatch<VertexBasic>> meshBatchesObjects;
 
 		ID3D11ShaderResourceView* lightmapTexArray = nullptr;
 

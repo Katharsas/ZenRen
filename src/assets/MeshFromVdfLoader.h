@@ -11,25 +11,26 @@
 namespace assets
 {
     void loadWorldMesh(
-        render::VERT_CHUNKS_BY_MAT& target,
+        render::MatToChunksToVertsBasic& target,
+        render::MatToChunksToVertsBlend& targetBlend,
         const zenkit::Mesh& worldMesh,
         bool debugChecksEnabled = false);
     
     void loadInstanceMesh(
-        render::VERT_CHUNKS_BY_MAT& target,
+        render::MatToChunksToVertsBasic& target,
         const zenkit::MultiResolutionMesh& mesh,
         const render::StaticInstance& instance,
         bool debugChecksEnabled);
 
     void loadInstanceModel(
-        render::VERT_CHUNKS_BY_MAT& target,
+        render::MatToChunksToVertsBasic& target,
         const zenkit::ModelHierarchy& hierarchy,
         const zenkit::ModelMesh& model,
         const render::StaticInstance& instance,
         bool debugChecksEnabled);
 
     void loadInstanceDecal(
-        render::VERT_CHUNKS_BY_MAT& target,
+        render::MatToChunksToVertsBasic& target,
         const render::StaticInstance& instance,
         bool debugChecksEnabled
     );

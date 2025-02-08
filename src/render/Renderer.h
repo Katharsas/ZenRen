@@ -2,6 +2,7 @@
 
 #include "Dx.h"
 #include "Common.h"
+#include "render/d3d/Buffer.h"
 #include "Texture.h"
 
 namespace render
@@ -17,16 +18,11 @@ namespace render
 		}
 	};
 
-	struct VertexBuffer {
-		uint32_t stride = -1;
-		ID3D11Buffer* buffer = nullptr;
-	};
-
 	struct Mesh
 	{
 		uint32_t vertexCount = 0;
-		VertexBuffer vbPos = { sizeof(VERTEX_POS) };
-		VertexBuffer vbOther = { sizeof(VERTEX_OTHER) };
+		VertexBuffer vbPos = { sizeof(VertexPos) };
+		VertexBuffer vbOther = { sizeof(VertexBasic) };
 
 		// Ideally, we could not create one mesh per texture, but instead have a single mesh for whole world.
 		// This would require us to map every texture used for the mesh to an offset into the vertex buffer.
@@ -40,6 +36,7 @@ namespace render
 		}
 	};
 
+	template <VERTEX_FEATURE F>
 	struct MeshBatch {
 		// we could wrap this in a normal Texture object to make it more similar to unbatched meshes
 		ID3D11ShaderResourceView* texColorArray = nullptr;
@@ -47,8 +44,8 @@ namespace render
 		std::vector<ChunkVertCluster> vertClusters;
 
 		uint32_t vertexCount = 0;
-		VertexBuffer vbPos = { sizeof(VERTEX_POS) };
-		VertexBuffer vbOther = { sizeof(VERTEX_OTHER) };
+		VertexBuffer vbPos = { sizeof(VertexPos) };
+		VertexBuffer vbOther = { sizeof(F) };
 		VertexBuffer vbTexIndices = { sizeof(TEX_INDEX) };// indices into texture array (base color textures)
 
 		void release()
@@ -65,7 +62,7 @@ namespace render
 		std::vector<ChunkVertCluster> vertClusters;
 
 		uint32_t vertexCount = 0;
-		VertexBuffer vbPos = { sizeof(VERTEX_POS) };
+		VertexBuffer vbPos = { sizeof(VertexPos) };
 
 		void release()
 		{
@@ -77,6 +74,11 @@ namespace render
 	{
 		ID3D11Buffer* settingsCb = nullptr;
 		ID3D11Buffer* cameraCb = nullptr;
+	};
+
+	enum class RenderPass {
+		BASIC,
+		BLEND
 	};
 
 	struct LoadWorldResult {

@@ -15,9 +15,9 @@ namespace assets
 
     struct FacePosData {
         VertKey vertKey;
-        vector<VERTEX_POS> vecPos;
+        vector<VertexPos> vecPos;
     };
-    const FacePosData GetFacePos(const Material& material, const ChunkIndex& chunkIndex, const uint32_t vertIndex, const VEC_VERTEX_DATA& vertData)
+    const FacePosData GetFacePos(const Material& material, const ChunkIndex& chunkIndex, const uint32_t vertIndex, const VertsBasic& vertData)
     {
         return { { material, chunkIndex, vertIndex }, vertData.vecPos };
     }
@@ -30,7 +30,7 @@ namespace assets
         return { result.x, result.y, result.z };
     }
 
-    OrthoBoundingBox3D createBB3D(const vector<VERTEX_POS>& verts, uint32_t vertIndex)
+    OrthoBoundingBox3D createBB3D(const vector<VertexPos>& verts, uint32_t vertIndex)
     {
         float minX =  FLT_MAX, minY =  FLT_MAX, minZ =  FLT_MAX;
         float maxX = -FLT_MAX, maxY = -FLT_MAX, maxZ = -FLT_MAX;
@@ -46,7 +46,7 @@ namespace assets
         return OrthoTree::BoundingBoxND<3, float>{ {minX, minY, minZ}, {maxX, maxY, maxZ} };
     }
 
-    VertLookupTree createVertLookup(const VERT_CHUNKS_BY_MAT& meshData)
+    VertLookupTree createVertLookup(const MatToChunksToVertsBasic& meshData)
     {
         vector<OrthoBoundingBox3D> bboxes;
 
@@ -86,7 +86,7 @@ namespace assets
     // Naive implementation does quadratic looping over all world faces each time, no spatial structure used. For debugging purposes.
     // ##############################################################################################################################
 
-    inline bool rayDownIntersectsFaceBB(const VEC3& pos, const vector<VERTEX_POS>& verts, const size_t vertIndex, const float searchSizeY)
+    inline bool rayDownIntersectsFaceBB(const VEC3& pos, const vector<VertexPos>& verts, const size_t vertIndex, const float searchSizeY)
     {
         float minX =  FLT_MAX, minY =  FLT_MAX, minZ =  FLT_MAX;
         float maxX = -FLT_MAX, maxY = -FLT_MAX, maxZ = -FLT_MAX;
@@ -113,7 +113,7 @@ namespace assets
         return !(pos.y >= (maxY + rayIntersectTolerance + searchSizeY) || pos.y >= (minY - rayIntersectTolerance));
     }
 
-    std::vector<VertKey> rayDownIntersectedNaive(const VERT_CHUNKS_BY_MAT& meshData, const VEC3& pos, float searchSizeY)
+    std::vector<VertKey> rayDownIntersectedNaive(const MatToChunksToVertsBasic& meshData, const VEC3& pos, float searchSizeY)
     {
         vector<VertKey> result;
         for_each_face<FacePosData, GetFacePos>(meshData, [&](const FacePosData& data) -> void {

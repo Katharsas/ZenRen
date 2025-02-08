@@ -1,7 +1,8 @@
 #pragma once
 
-#include "render/Primitives.h"
 #include "render/Dx.h"
+#include "render/d3d/Buffer.h"
+#include "render/Primitives.h"
 
 #include <dxgiformat.h>
 

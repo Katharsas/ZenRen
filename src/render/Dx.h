@@ -16,22 +16,16 @@ struct ID3D11UnorderedAccessView;
 
 struct ID3D11SamplerState;
 
-enum class BufferUsage // castable to D3D11_USAGE
-{
-	IMMUTABLE = 1,// D3D11_USAGE_IMMUTABLE -> in GPU VRAM, TODO rename to GPU_IMMUTABLE
-	WRITE_CPU = 2,// D3D11_USAGE_DYNAMIC -> in GPU VRAM, implicit synchronization mechanism to copy from CPU to GPU in driver, TODO rename to GPU_READ_CPU_MAP
-	WRITE_GPU = 0,// D3D11_USAGE_DEFAULT -> in GPU VRAM, TODO rename to GPU_READ_WRITE
-	READBACK = 3  // D3D11_USAGE_STAGING -> in CPU VRAM, for explicit synchronization (copied to/from other usage types with copy functions), TODO rename to CPU_READ_WRITE
-};
-
 namespace render
 {
-	struct D3d;
+	struct D3d {
+		ID3D11Device* device;
+		ID3D11DeviceContext* deviceContext;
+		ID3DUserDefinedAnnotation* annotation;
+		std::optional<ID3D11Debug*> debug = {};
+	};
 
-	//void release(ID3D11Buffer *const dx11object);
-	//void release(ID3D11ShaderResourceView *const dx11object);
-
-	// since forward declared D3D do not have a type hierarchy, release(IUnknown* ...) is not a valid overload for parameter of other types,
+	// since forward declared D3D types do not have a type hierarchy, release(IUnknown* ...) is not a valid overload for parameter of other types,
 	// we just implement it with template for all types and assert correct type in implementation.
 
 	template<typename T>

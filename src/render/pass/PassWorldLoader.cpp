@@ -2,6 +2,7 @@
 #include "PassWorldLoader.h"
 
 #include "render/d3d/TextureBuffer.h"
+#include "render/d3d/GeometryBuffer.h"
 #include "render/PerfStats.h"
 #include "render/Loader.h"
 #include "PassWorldChunkGrid.h"
@@ -9,7 +10,7 @@
 #include "assets/AssetCache.h"
 #include "assets/AssetFinder.h"
 #include "assets/ZenLoader.h"
-#include "assets/ObjLoader.h"
+//#include "assets/ObjLoader.h"
 #include "assets/TexLoader.h"
 
 #include "Util.h"
@@ -39,7 +40,7 @@ namespace render::pass::world
 	};
 
 	const TEX_INDEX texturesPerBatch = 512;
-	const uint32_t vertCountPerBatch = (20 * 1024 * 1024) / sizeof(VERTEX_OTHER);// 20 MB divided by biggest buffer element size
+	const uint32_t vertCountPerBatch = (20 * 1024 * 1024) / sizeof(VertexBasic);// 20 MB divided by biggest buffer element size
 
 	World world;
 
@@ -85,10 +86,10 @@ namespace render::pass::world
 		return ::util::createOrGet<TexId, Texture*>(textureCache, texId, [&](Texture*& ref) { ref = createTexture(d3d, texId); });
 	}
 
-	LoadResult loadPrepassData(D3d d3d, vector<PrepassMeshes>& target, const VERTEX_DATA_BY_MAT& meshData)
+	LoadResult loadPrepassData(D3d d3d, vector<PrepassMeshes>& target, const MatToVertsBasic& meshData)
 	{
 		uint32_t vertCount = 0;
-		vector<VERTEX_POS> allVerts;
+		vector<VertexPos> allVerts;
 
 		for (const auto& pair : meshData) {
 			auto& vecPos = pair.second.vecPos;
@@ -127,9 +128,10 @@ namespace render::pass::world
 		}
 	}
 
-	void loadRenderBatch(D3d d3d, vector<MeshBatch>& target, TexInfo batchInfo, const VEC_VERTEX_DATA_BATCH& batchData)
+	template <VERTEX_FEATURE F>
+	void loadRenderBatch(D3d d3d, vector<MeshBatch<F>>& target, TexInfo batchInfo, const VertsBatch<F>& batchData)
 	{
-		MeshBatch batch;
+		MeshBatch<F> batch;
 		batch.vertClusters = batchData.vertClusters;
 		batch.vertexCount = batchData.vecPos.size();
 		d3d::createVertexBuf(d3d, batch.vbPos, batchData.vecPos);
@@ -139,7 +141,8 @@ namespace render::pass::world
 		target.push_back(batch);
 	}
 
-	vector<pair<TexInfo, vector<pair<Material, const VERT_CHUNKS *>>>> groupByTexId(D3d d3d, const VERT_CHUNKS_BY_MAT& meshData, TEX_INDEX maxTexturesPerBatch)
+	template <VERTEX_FEATURE F>
+	vector<pair<TexInfo, vector<pair<Material, const ChunkToVerts<F> *>>>> groupByTexId(D3d d3d, const MatToChunksToVerts<F>& meshData, TEX_INDEX maxTexturesPerBatch)
 	{
 		// load and bucket all materials so textures that are texture-array-compatible are grouped in a single bucket
 		unordered_map<TexInfo, vector<Material>> texBuckets;
@@ -149,16 +152,16 @@ namespace render::pass::world
 			vec.push_back(mat);
 		}
 
-		vector<pair<TexInfo, vector<pair<Material, const VERT_CHUNKS*>>>> result;
+		vector<pair<TexInfo, vector<pair<Material, const ChunkToVerts<F> *>>>> result;
 
 		// create batches
 		for (const auto& [texInfo, textures] : texBuckets) {
 
-			pair<TexInfo, vector<pair<Material, const VERT_CHUNKS*>>> batch = { texInfo, {} };
+			pair<TexInfo, vector<pair<Material, const ChunkToVerts<F> *>>> batch = { texInfo, {} };
 			TEX_INDEX currentIndex = 0;
 
 			for (const auto mat : textures) {
-				const VERT_CHUNKS& currentMatData = meshData.find(mat)->second;
+				const ChunkToVerts<F>& currentMatData = meshData.find(mat)->second;
 				batch.second.push_back(pair{ mat, &currentMatData });
 
 				// create and start new batch because we reached max texture size per batch
@@ -183,7 +186,8 @@ namespace render::pass::world
 		return result;
 	}
 
-	bool compareByChunkIndex(pair<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>> const& lhs, pair<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>> const& rhs) {
+	template <VERTEX_FEATURE F>
+	bool compareByChunkIndex(pair<ChunkIndex, vector<pair<Material, Verts<F>>>> const& lhs, pair<ChunkIndex, vector<pair<Material, Verts<F>>>> const& rhs) {
 		const ChunkIndex& lhsIndex = lhs.first;
 		const ChunkIndex& rhsIndex = rhs.first;
 		if (lhsIndex.y == rhsIndex.y) {
@@ -192,10 +196,11 @@ namespace render::pass::world
 		return lhsIndex.y < rhsIndex.y;
 	}
 
-	vector<pair<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>>> groupAndSortByChunkIndex(const vector<pair<Material, const VERT_CHUNKS*>>& batchData)
+	template <VERTEX_FEATURE F>
+	vector<pair<ChunkIndex, vector<pair<Material, Verts<F>>>>> groupAndSortByChunkIndex(const vector<pair<Material, const ChunkToVerts<F> *>>& batchData)
 	{
 		// use unordered_map to group
-		unordered_map<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>> chunkBuckets;
+		unordered_map<ChunkIndex, vector<pair<Material, Verts<F>>>> chunkBuckets;
 
 		for (const auto& [mat, chunkData] : batchData) {
 			for (const auto& [chunkIndex, chunkVerts] : *chunkData) {
@@ -206,7 +211,7 @@ namespace render::pass::world
 		}
 
 		// convert unordered_map to vector for sorting
-		vector<pair<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>>> result;
+		vector<pair<ChunkIndex, vector<pair<Material, Verts<F>>>>> result;
 		result.reserve(chunkBuckets.size());
 
 		for (const auto& [chunkIndex, chunkData] : chunkBuckets) {
@@ -215,17 +220,18 @@ namespace render::pass::world
 
 		// ideally we would maybe sort by morton code or something like that (implement "uint32_t getMortonIndex(ChunkIndex)" in ChunkGrid or similar)
 		// for now we just sort by y then x which already reduces number of draw calls significantly (due to vert range merging of continuous active grid cells)
-		std::sort(result.begin(), result.end(), &compareByChunkIndex);
+		std::sort(result.begin(), result.end(), &compareByChunkIndex<F>);
 
 		return result;
 	}
 
-	vector<pair<uint32_t, vector<pair<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>>>>> splitByVertCount(
-		const vector<pair<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>>>& batchData, uint32_t maxVertCount)
+	template <VERTEX_FEATURE F>
+	vector<pair<uint32_t, vector<pair<ChunkIndex, vector<pair<Material, Verts<F>>>>>>> splitByVertCount(
+		const vector<pair<ChunkIndex, vector<pair<Material, Verts<F>>>>>& batchData, uint32_t maxVertCount)
 	{
-		vector<pair<uint32_t, vector<pair<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>>>>> result;
+		vector<pair<uint32_t, vector<pair<ChunkIndex, vector<pair<Material, Verts<F>>>>>>> result;
 
-		vector<pair<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>>> currentBatch;
+		vector<pair<ChunkIndex, vector<pair<Material, Verts<F>>>>> currentBatch;
 		uint32_t currentBatchVertCount = 0;
 
 		for (const auto& [chunkIndex, vertDataByMat] : batchData) {
@@ -252,11 +258,12 @@ namespace render::pass::world
 		return result;
 	}
 
-	pair<VEC_VERTEX_DATA_BATCH, LoadResult> flattenIntoBatch(const vector<pair<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>>>& batchData)
+	template <VERTEX_FEATURE F>
+	pair<VertsBatch<F>, LoadResult> flattenIntoBatch(const vector<pair<ChunkIndex, vector<pair<Material, Verts<F>>>>>& batchData)
 	{
 		LoadResult result;
 		result.states = 1;
-		VEC_VERTEX_DATA_BATCH target;
+		VertsBatch<F> target;
 
 		uint32_t clusterCount = batchData.size();
 		result.draws = clusterCount;
@@ -301,17 +308,18 @@ namespace render::pass::world
 		return { target, result };
 	}
 
-	LoadResult loadVertexDataBatched(D3d d3d, vector<MeshBatch>& target, const VERT_CHUNKS_BY_MAT& meshData, TEX_INDEX maxTexturesPerBatch)
+	template <VERTEX_FEATURE F>
+	LoadResult loadVertexDataBatched(D3d d3d, vector<MeshBatch<F>>& target, const MatToChunksToVerts<F>& meshData, TEX_INDEX maxTexturesPerBatch)
 	{
-		vector<pair<TexInfo, vector<pair<Material, const VERT_CHUNKS*>>>> batchedMeshData = groupByTexId(d3d, meshData, maxTexturesPerBatch);
+		vector<pair<TexInfo, vector<pair<Material, const ChunkToVerts<F> *>>>> batchedMeshData = groupByTexId(d3d, meshData, maxTexturesPerBatch);
 
 		LoadResult result;
 		for (const auto& [texInfo, batchData] : batchedMeshData) {
 
-			vector<pair<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>>> batchDataByChunk = groupAndSortByChunkIndex(batchData);
+			vector<pair<ChunkIndex, vector<pair<Material, Verts<F>>>>> batchDataByChunk = groupAndSortByChunkIndex(batchData);
 			
 			// split current batch into multiple smaller batches along chunk boundaries if it contains too many verts to prevent OOM crashes
-			vector<pair<uint32_t, vector<pair<ChunkIndex, vector<pair<Material, VEC_VERTEX_DATA>>>>>> batchDataSplit =
+			vector<pair<uint32_t, vector<pair<ChunkIndex, vector<pair<Material, Verts<F>>>>>>> batchDataSplit =
 				splitByVertCount(batchDataByChunk, vertCountPerBatch);
 
 			batchDataByChunk.clear();// lots of memory that are no longer needed
@@ -328,20 +336,22 @@ namespace render::pass::world
 		return result;
 	}
 
-	bool compareByVertCount(MeshBatch const& lhs, MeshBatch const& rhs) {
+	template <VERTEX_FEATURE F>
+	bool compareByVertCount(MeshBatch<F> const& lhs, MeshBatch<F> const& rhs) {
 		return lhs.vertexCount > rhs.vertexCount;
 	}
 
-	void sortByVertCount(vector<MeshBatch>& target)
+	template <VERTEX_FEATURE F>
+	void sortByVertCount(vector<MeshBatch<F>>& target)
 	{
-		std::sort(target.begin(), target.end(), &compareByVertCount);
+		std::sort(target.begin(), target.end(), &compareByVertCount<F>);
 	}
 
 
 	// TODO
 	// This is pretty useless until we actually have dynamic objects that cannot be pre-loaded into grid cells,
 	// and having those would require a mesh type that does not have/support ChunkIndices at all (and logic in draw to account for that)
-	LoadResult loadVertexData(D3d d3d, vector<MeshBatch>& target, const VERTEX_DATA_BY_MAT& meshData)
+	LoadResult loadVertexData(D3d d3d, vector<MeshBatch<VertexBasic>>& target, const MatToVerts<VertexBasic>& meshData)
 	{
 		LoadResult result;
 
@@ -350,7 +360,7 @@ namespace render::pass::world
 			auto& matData = pair.second;
 
 			if (!matData.vecPos.empty()) {
-				VEC_VERTEX_DATA_BATCH batchData;
+				VertsBatch<VertexBasic> batchData;
 
 				uint32_t vertCount = matData.vecPos.size();
 				batchData.vertClusters.push_back({ {0, 0}, 0 });
@@ -456,25 +466,32 @@ namespace render::pass::world
 		// chunk grid
 		chunkgrid::updateSize(data.worldMesh);
 		chunkgrid::updateSize(data.staticMeshes);
+		chunkgrid::updateSize(data.staticMeshesBlend);
 		uint32_t cellCount = chunkgrid::finalizeSize();
 		chunkgrid::updateMesh(data.worldMesh);
 		chunkgrid::updateMesh(data.staticMeshes);
+		chunkgrid::updateMesh(data.staticMeshesBlend);
 		LOG(INFO) << "Level: Computed Chunk Grid       - Cells: " << cellCount;
 		sampler.logMillisAndRestart("Level: Computed chunk grid");
 
 		LoadResult loadResult;
 		// TODO fix prepass
 		//loadResult = loadPrepassData(d3d, world.prepassMeshes, data.worldMesh);
-		LOG(INFO) << "Level: Uploaded depth prepass    - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
+		LOG(INFO) << "Level: Uploaded depth prepass        - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
 		sampler.logMillisAndRestart("Level: Uploaded depth prepass");
 
 		loadResult = loadVertexDataBatched(d3d, world.meshBatchesWorld, data.worldMesh, texturesPerBatch);
 		sortByVertCount(world.meshBatchesWorld);// improves performance
-		LOG(INFO) << "Level: Uploaded world mesh       - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
+		LOG(INFO) << "Level: Uploaded world mesh           - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
 		sampler.logMillisAndRestart("Level: Uploaded world mesh");
 
+		loadResult = loadVertexDataBatched(d3d, world.meshBatchesWorldBlend, data.staticMeshesBlend, texturesPerBatch);
+		//sortByVertCount(world.meshBatchesWorldBlend);
+		LOG(INFO) << "Level: Uploaded world mesh (blended) - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
+		sampler.logMillisAndRestart("Level: Uploaded world mesh (blended)");
+
 		loadResult = loadVertexDataBatched(d3d, world.meshBatchesObjects, data.staticMeshes, texturesPerBatch);
-		LOG(INFO) << "Level: Uploaded static instances - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
+		LOG(INFO) << "Level: Uploaded static instances     - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
 		sampler.logMillisAndRestart("Level: Uploaded static instances");
 
 		// since single textures have been copied to texture arrays, we can release them

@@ -32,7 +32,7 @@ namespace assets
         const ::util::FileExt MAN = ::util::FileExt::create(".MAN");
     }
 
-    COLOR interpolateColorFromFaceXZ(const VEC3& pos, const render::VERT_CHUNKS_BY_MAT& meshData, const render::VertKey& vertKey);
+    COLOR interpolateColorFromFaceXZ(const VEC3& pos, const render::MatToChunksToVertsBasic& meshData, const render::VertKey& vertKey);
     render::VobLighting calculateStaticVobLighting(
         std::array<DirectX::XMVECTOR, 2> bbox, const FaceLookupContext& worldMesh, const LightLookupContext& lightsStatic, bool isOutdoorLevel,
         LoadDebugFlags debug);

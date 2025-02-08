@@ -6,9 +6,11 @@
 
 namespace render::pass::world::chunkgrid
 {
-	void updateSize(const VERT_CHUNKS_BY_MAT& meshData);
+	template <VERTEX_FEATURE F>
+	void updateSize(const MatToChunksToVerts<F>& meshData);
 	uint32_t finalizeSize();
-	void updateMesh(const VERT_CHUNKS_BY_MAT& meshData);
+	template <VERTEX_FEATURE F>
+	void updateMesh(const MatToChunksToVerts<F>& meshDataVariants);
 	void updateCamera(const DirectX::BoundingFrustum& cameraFrustum);
 	bool intersectsCamera(const ChunkIndex& index);
 }

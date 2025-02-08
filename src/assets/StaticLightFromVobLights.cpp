@@ -18,7 +18,7 @@ namespace assets
     float debugStaticLightRaysMaxDist = 50;
     vector<DebugLine> debugLightToVobRays;
 
-    bool rayIntersectsWorldFaces(XMVECTOR rayStart, XMVECTOR rayEnd, float maxDistance, const VERT_CHUNKS_BY_MAT& meshData, const VertLookupTree& vertLookup)
+    bool rayIntersectsWorldFaces(XMVECTOR rayStart, XMVECTOR rayEnd, float maxDistance, const MatToChunksToVertsBasic& meshData, const VertLookupTree& vertLookup)
     {
         XMVECTOR direction = DirectX::XMVector3Normalize(rayEnd - rayStart);
         vector<VertKey> vertKeys = rayIntersected(vertLookup, rayStart, rayEnd);
@@ -40,7 +40,7 @@ namespace assets
             XMVECTOR posXm,
             const vector<Light>& lights,
             const LightLookupTree& lightLookup,
-            const VERT_CHUNKS_BY_MAT& worldMeshData,
+            const MatToChunksToVertsBasic& worldMeshData,
             const VertLookupTree& worldFaceLookup)
     {
         auto pos = toVec3(posXm);

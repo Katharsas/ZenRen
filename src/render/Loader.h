@@ -107,9 +107,10 @@ namespace render
 
 	struct RenderData {
 		bool isOutdoorLevel = false;
-		VERT_CHUNKS_BY_MAT worldMesh;
-		VERT_CHUNKS_BY_MAT staticMeshes;
-		VERTEX_DATA_BY_MAT dynamicMeshes;
+		MatToChunksToVertsBasic worldMesh;
+		MatToChunksToVertsBasic staticMeshes;
+		//VERTEX_DATA_BY_MAT dynamicMeshes;
+		MatToChunksToVertsBlend staticMeshesBlend;
 		std::vector<FileData> worldMeshLightmaps;
 	};
 }

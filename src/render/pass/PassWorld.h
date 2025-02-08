@@ -34,8 +34,8 @@ namespace render::pass::world
 	COLOR getBackgroundColor();
 	void drawSky(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs);
 	void drawPrepass(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs);
-	void drawWorld(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs);
-	void drawWireframe(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs);
+	void drawWorld(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs, RenderPass pass);
+	void drawWireframe(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs, RenderPass pass);
 	void clean();
 }
 

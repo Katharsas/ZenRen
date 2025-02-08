@@ -14,8 +14,7 @@ namespace render
 
 	typedef uint16_t TexId;
 
-	typedef VEC3 VERTEX_POS;
-	typedef NORMAL_CL_UV_LUV_STATIC_LIGHT VERTEX_OTHER;
+	typedef VEC3 VertexPos;
 
 	struct TexInfo {
 		// TODO make width/height of type BufferSize?
@@ -51,10 +50,25 @@ namespace render
 		uint32_t vertStartIndex;
 	};
 
-	struct VEC_VERTEX_DATA {
-		std::vector<VERTEX_POS> vecPos;
-		std::vector<VERTEX_OTHER> vecOther;
+
+	template<typename F>
+	concept IS_VERTEX_BASIC = std::is_same_v<F, VertexBasic>;
+
+	template<typename F>
+	concept IS_VERTEX_BLEND = std::is_same_v<F, VertexBlend>;
+
+	template <typename F>
+	concept VERTEX_FEATURE = IS_VERTEX_BASIC<F> || IS_VERTEX_BLEND<F>;
+
+
+	template <VERTEX_FEATURE F>
+	struct Verts {
+		std::vector<VertexPos> vecPos;
+		std::vector<F> vecOther;
 	};
+
+	typedef Verts<VertexBasic> VertsBasic;
+	typedef Verts<VertexBlend> VertsBlend;
 
 	struct Material {
 		TexId texBaseColor;
@@ -62,26 +76,35 @@ namespace render
 		auto operator<=>(const Material&) const = default;
 	};
 
-	typedef std::unordered_map<Material, VEC_VERTEX_DATA> VERTEX_DATA_BY_MAT;
+	template <VERTEX_FEATURE F>
+	using ChunkToVerts = std::unordered_map<ChunkIndex, Verts<F>>;
+	
+	template <VERTEX_FEATURE F>
+	using MatToChunksToVerts = std::unordered_map<Material, ChunkToVerts<F>>;
+	using MatToChunksToVertsBasic = MatToChunksToVerts<VertexBasic>;
+	using MatToChunksToVertsBlend = MatToChunksToVerts<VertexBlend>;
 
-	typedef std::unordered_map<ChunkIndex, VEC_VERTEX_DATA> VERT_CHUNKS;
-	typedef std::unordered_map<Material, VERT_CHUNKS> VERT_CHUNKS_BY_MAT;
+	template <VERTEX_FEATURE F>
+	using MatToVerts = std::unordered_map<Material, Verts<F>>;
+	using MatToVertsBasic = MatToVerts<VertexBasic>;
 
-	struct VEC_VERTEX_DATA_BATCH {
+
+	template <VERTEX_FEATURE F>
+	struct VertsBatch {
 		std::vector<ChunkVertCluster> vertClusters;
-		std::vector<VERTEX_POS> vecPos;
-		std::vector<VERTEX_OTHER> vecOther;
+		std::vector<VertexPos> vecPos;
+		std::vector<F> vecOther;
 		std::vector<TEX_INDEX> texIndices;
 		std::vector<TexId> texIndexedIds;
 	};
 
     // TODO call with [[msvc::forceinline]] if necessary for performance
 	template <typename FaceData>
-	using GetFace = const FaceData(*) (const Material&, const ChunkIndex&, uint32_t, const VEC_VERTEX_DATA&);
+	using GetFace = const FaceData(*) (const Material&, const ChunkIndex&, uint32_t, const VertsBasic&);
 
 	template <typename FaceData, GetFace<FaceData> GetFace>
 	void for_each_face(
-		const VERT_CHUNKS_BY_MAT& data,
+		const MatToChunksToVertsBasic& data,
 		const std::function<void(const FaceData& face)>& func)
 	{
 		for (const auto& [material, chunkData] : data) {
@@ -156,16 +179,16 @@ namespace render
 		const uint32_t vertIndex;
 
 
-		const VEC_VERTEX_DATA& get(const VERT_CHUNKS_BY_MAT& meshData) const
+		const VertsBasic& get(const MatToChunksToVertsBasic& meshData) const
 		{
 			return meshData.find(this->mat)->second.find(this->chunkIndex)->second;
 		}
-		const std::array<VERTEX_POS, 3> getPos(const VERT_CHUNKS_BY_MAT& meshData) const
+		const std::array<VertexPos, 3> getPos(const MatToChunksToVertsBasic& meshData) const
 		{
 			auto& vertData = get(meshData).vecPos;
 			return { vertData[this->vertIndex], vertData[this->vertIndex + 1], vertData[this->vertIndex + 2] };
 		}
-		const std::array<VERTEX_OTHER, 3> getOther(const VERT_CHUNKS_BY_MAT& meshData) const
+		const std::array<VertexBasic, 3> getOther(const MatToChunksToVertsBasic& meshData) const
 		{
 			auto& vertData = get(meshData).vecOther;
 			return { vertData[this->vertIndex], vertData[this->vertIndex + 1], vertData[this->vertIndex + 2] };

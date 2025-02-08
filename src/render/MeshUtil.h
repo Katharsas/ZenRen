@@ -67,7 +67,7 @@ namespace render
     }
 
     template <typename C1, typename C2>
-    void insert(VERTEX_DATA_BY_MAT& target, const Material& material, const C1& positions, const C2& normalsAndUvs)
+    void insert(MatToVertsBasic& target, const Material& material, const C1& positions, const C2& normalsAndUvs)
     {
         auto& meshData = ::util::getOrCreateDefault(target, material);
 
@@ -76,9 +76,9 @@ namespace render
     }
 
     template <typename C1, typename C2>
-    void insert(VERT_CHUNKS_BY_MAT& target, const Material& material, const C1& positions, const C2& normalsAndUvs)
+    void insert(MatToChunksToVertsBasic& target, const Material& material, const C1& positions, const C2& normalsAndUvs)
     {
-        std::unordered_map<ChunkIndex, VEC_VERTEX_DATA>& meshData = ::util::getOrCreateDefault(target, material);
+        std::unordered_map<ChunkIndex, VertsBasic>& meshData = ::util::getOrCreateDefault(target, material);
         
         for (uint32_t i = 0; i < positions.size(); i += 3) {
             const ChunkIndex chunkIndex = toChunkIndex(centroidPos({
@@ -86,7 +86,7 @@ namespace render
                 toXM4Pos(positions[i + 1]),
                 toXM4Pos(positions[i + 2])
             }));
-            VEC_VERTEX_DATA& chunkData = ::util::getOrCreateDefault(meshData, chunkIndex);
+            VertsBasic& chunkData = ::util::getOrCreateDefault(meshData, chunkIndex);
 
             // TODO copied from MeshFromVdfLoader for now, clean up
             chunkData.vecPos.push_back(positions[i]);

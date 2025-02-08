@@ -5,7 +5,7 @@
 #include "../Renderer.h"
 #include "../Shader.h"
 #include "render/RenderUtil.h"
-#include "render/d3d/Buffer.h"
+#include "render/d3d/ConstantBuffer.h"
 
 namespace render::pass::post
 {
@@ -67,7 +67,7 @@ namespace render::pass::post
 		postSettings.brightness = settings.brightness;
 		postSettings.contrast = settings.contrast;
 		postSettings.gamma = settings.gamma;
-		d3d.deviceContext->UpdateSubresource(settingsCb, 0, nullptr, &postSettings, 0, 0);
+		d3d::updateConstantBuf(d3d, settingsCb, postSettings);
 	}
 
 	void renderToTexure(D3d d3d, Shader* shader, ID3D11ShaderResourceView* srv, ID3D11RenderTargetView* rtv, ID3D11DepthStencilView* depth) {

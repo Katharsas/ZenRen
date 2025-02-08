@@ -1,11 +1,14 @@
 #include "stdafx.h"
 #include "PassForward.h"
 
-#include "../Camera.h"
-#include "../Sky.h"
-#include "PassSky.h"
-#include "PassWorld.h"
-#include "../RenderUtil.h"
+#include "render/d3d/ConstantBuffer.h"
+#include "render/RenderUtil.h"
+
+#include "render/Camera.h"
+#include "render/Sky.h"
+#include "render/pass/PassSky.h"
+#include "render/pass/PassWorld.h"
+
 
 namespace render::pass::forward
 {
@@ -77,7 +80,7 @@ namespace render::pass::forward
 		cbGlobalSettings.skyLight = getSkyLightFromIntensity(1, cbGlobalSettings.timeOfDay);
 		cbGlobalSettings.skyTexBlurEnabled = settings.skyTexBlur;
 
-		d3d.deviceContext->UpdateSubresource(shaderCbs.settingsCb, 0, nullptr, &cbGlobalSettings, 0, 0);
+		d3d::updateConstantBuf(d3d, shaderCbs.settingsCb, cbGlobalSettings);
 	}
 
 	void updateCamera(D3d d3d, bool fixedPosAtOrigin = false)
@@ -98,7 +101,7 @@ namespace render::pass::forward
 			camera::getProjectionMatrix(),
 		};
 
-		d3d.deviceContext->UpdateSubresource(shaderCbs.cameraCb, 0, nullptr, &camera, 0, 0);
+		d3d::updateConstantBuf(d3d, shaderCbs.cameraCb, camera);
 	}
 
 	void draw(D3d d3d, ShaderManager* shaders, const RenderSettings& settings) {
@@ -129,10 +132,11 @@ namespace render::pass::forward
 		if (settings.depthPrepass) {
 			world::drawPrepass(d3d, shaders, shaderCbs);
 		}
-		world::drawWorld(d3d, shaders, shaderCbs);
+		world::drawWorld(d3d, shaders, shaderCbs, RenderPass::BASIC);
 		if (settings.wireframe) {
 			d3d.deviceContext->RSSetState(rasterizerWf);
-			world::drawWireframe(d3d, shaders, shaderCbs);
+			world::drawWireframe(d3d, shaders, shaderCbs, RenderPass::BASIC);
+			world::drawWireframe(d3d, shaders, shaderCbs, RenderPass::BLEND);
 			d3d.deviceContext->RSSetState(rasterizer);
 		}
 
@@ -310,30 +314,8 @@ namespace render::pass::forward
 
 	void initConstantBuffers(D3d d3d)
 	{
-		{
-			// render settings
-			D3D11_BUFFER_DESC bufferDesc;
-			ZeroMemory(&bufferDesc, sizeof(D3D11_BUFFER_DESC));
-
-			bufferDesc.Usage = D3D11_USAGE_DEFAULT;// TODO this should probably be dynamic, see https://www.gamedev.net/forums/topic/673486-difference-between-d3d11-usage-default-and-d3d11-usage-dynamic/
-			bufferDesc.ByteWidth = sizeof(CbGlobalSettings);
-			bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-			bufferDesc.CPUAccessFlags = 0;
-			bufferDesc.MiscFlags = 0;
-
-			d3d.device->CreateBuffer(&bufferDesc, nullptr, &shaderCbs.settingsCb);
-		} {
-			// camera matrices
-			D3D11_BUFFER_DESC bufferDesc;
-			ZeroMemory(&bufferDesc, sizeof(D3D11_BUFFER_DESC));
-
-			bufferDesc.Usage = D3D11_USAGE_DEFAULT;// TODO this should probably be dynamic, see https://www.gamedev.net/forums/topic/673486-difference-between-d3d11-usage-default-and-d3d11-usage-dynamic/
-			bufferDesc.ByteWidth = sizeof(CbCamera);
-			bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-			bufferDesc.CPUAccessFlags = 0;
-			bufferDesc.MiscFlags = 0;
-
-			d3d.device->CreateBuffer(&bufferDesc, nullptr, &shaderCbs.cameraCb);
-		}
+		// TODO these should probably be dynamic, see https://www.gamedev.net/forums/topic/673486-difference-between-d3d11-usage-default-and-d3d11-usage-dynamic/
+		d3d::createConstantBuf<CbGlobalSettings>(d3d, &shaderCbs.settingsCb, BufferUsage::WRITE_GPU);
+		d3d::createConstantBuf<CbCamera>(d3d, &shaderCbs.cameraCb, BufferUsage::WRITE_GPU);
 	}
 }

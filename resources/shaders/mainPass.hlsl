@@ -38,6 +38,7 @@ struct VS_IN
     float3 dirLight : NORMAL1;
     float sunLight : TEXCOORD2;
     uint1 iTexColor : TEXCOORD3;
+    //uint1 blendType : ENUM;
 };
 
 struct VS_OUT
