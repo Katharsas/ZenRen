@@ -1,11 +1,13 @@
 #include "stdafx.h"
 #include "PassSky.h"
 
-#include "../WinDx.h"
-#include "../Renderer.h"
-#include "render/d3d/Buffer.h"
-#include "../MeshUtil.h"
-#include "../Camera.h"
+#include "render/WinDx.h"
+#include "render/d3d/ConstantBuffer.h"
+#include "render/d3d/GeometryBuffer.h"
+#include "render/Renderer.h"
+#include "render/MeshUtil.h"
+#include "render/Camera.h"
+
 #include "assets/AssetFinder.h"
 #include "assets/TexLoader.h"
 
@@ -26,9 +28,9 @@ namespace render::pass::sky
         UV uvOverlay;
     };
 
-    typedef VEC3 VERTEX_POS;
+    typedef VEC3 VertexPos;
     struct VEC_VERTEX_DATA {
-        std::vector<VERTEX_POS> vecPos;
+        std::vector<VertexPos> vecPos;
         std::vector<LAYER_UVS> vecOther;
     };
 
@@ -55,7 +57,7 @@ namespace render::pass::sky
     struct SkyMesh
     {
         int32_t vertexCount = 0;
-        VertexBuffer vbPos = { sizeof(VERTEX_POS) };
+        VertexBuffer vbPos = { sizeof(VertexPos) };
         VertexBuffer vbUvs = { sizeof(LAYER_UVS) };
 
         void release()
@@ -120,7 +122,7 @@ namespace render::pass::sky
     void loadSky(D3d d3d)
     {
         {
-            vector<VERTEX_POS> facesPos;
+            vector<VertexPos> facesPos;
             const auto& quadFacesXm = createSkyVerts();
             for (auto& posXm : quadFacesXm) {
                 for (int32_t i = 0; i < 3; i++) {
@@ -208,7 +210,7 @@ namespace render::pass::sky
             layerSettings.texLayers[i].blurDisabled = state.tex.blurDisabled;
         }
 
-        d3d.deviceContext->UpdateSubresource(skyLayerSettingsCb, 0, nullptr, &layerSettings, 0, 0);
+        d3d::updateConstantBuf(d3d, skyLayerSettingsCb, layerSettings);
     }
 
     void drawSky(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs, ID3D11SamplerState* layerSampler)

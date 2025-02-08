@@ -18,7 +18,7 @@ namespace assets
     using std::vector;
     using ::util::FileExt;
 
-    COLOR interpolateColorFromFaceXZ(const VEC3& pos, const VERT_CHUNKS_BY_MAT& meshData, const VertKey& vertKey)
+    COLOR interpolateColorFromFaceXZ(const VEC3& pos, const MatToChunksToVertsBasic& meshData, const VertKey& vertKey)
     {
         auto& vecVertData = vertKey.get(meshData);
         auto& vecPos = vecVertData.vecPos;

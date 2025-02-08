@@ -17,6 +17,7 @@
 // $(LibraryPath); $(DXSDK_DIR)Lib\x64
 
 #include "Win.h"
+#include "Dx.h"
 
 #include <dxgi1_4.h>// This is only needed to test for hardware/software capability, otherwise it is not used
 #include <dxgi1_2.h>
@@ -28,12 +29,6 @@
 //#include <d3dx11.h>
 
 namespace render {
-	struct D3d {
-		ID3D11Device* device;
-		ID3D11DeviceContext* deviceContext;
-		ID3DUserDefinedAnnotation* annotation;
-		std::optional<ID3D11Debug*> debug = {};
-	};
 
 	void release(IUnknown *const dx11object);
 	void release(const std::vector<IUnknown*>& dx11objects);

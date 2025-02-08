@@ -45,7 +45,7 @@ namespace assets
         return true;
     }
 
-    void logPosAndGroundPolyCandidatesJson(const VEC3& pos, const vector<VERTEX_POS>& verts) {
+    void logPosAndGroundPolyCandidatesJson(const VEC3& pos, const vector<VertexPos>& verts) {
         // https://jsfiddle.net/fzdb6j17/53/
         LOG(INFO) << "";
         LOG(INFO) << "POINT    { x: " + std::to_string(pos.x) + ", y: " + std::to_string(pos.z) + " }";
@@ -65,7 +65,7 @@ namespace assets
         LOG(INFO) << "";
     }
 
-    __inline int closestGroundFace(const VEC3& pos, const vector<VERTEX_POS>& verts) {
+    __inline int closestGroundFace(const VEC3& pos, const vector<VertexPos>& verts) {
         //logPosAndGroundPolyCandidatesJson(pos, verts);
 
         // TODO there must still be a bug here because VOBs that have multiple faces below & above them are not lit correctly
@@ -122,7 +122,7 @@ namespace assets
         return currentBestIndex;
     }
 
-    std::optional<VertKey> getGroundFaceAtPos(const XMVECTOR pos, const VERT_CHUNKS_BY_MAT& meshData, const VertLookupTree& vertLookup)
+    std::optional<VertKey> getGroundFaceAtPos(const XMVECTOR pos, const MatToChunksToVertsBasic& meshData, const VertLookupTree& vertLookup)
     {
         VEC3 pos3 = toVec3(pos);
         vector<VertKey> vertKeys;
@@ -132,7 +132,7 @@ namespace assets
         else {
             vertKeys = rayDownIntersected(vertLookup, pos3, 100);
         }
-        vector<VERTEX_POS> belowVerts;
+        vector<VertexPos> belowVerts;
         for (auto& vertKey : vertKeys) {
             auto& vecPos = vertKey.get(meshData).vecPos;
             belowVerts.push_back(vecPos[vertKey.vertIndex]);

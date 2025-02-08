@@ -22,19 +22,20 @@ namespace render::pass::world::chunkgrid
 		return (y * (uint32_t)lengthX) + x;
 	}
 
-	DirectX::BoundingBox createBbox(const std::vector<VERTEX_POS> vecPos)
+	DirectX::BoundingBox createBbox(const std::vector<VertexPos> vecPos)
 	{
 		BoundingBox result;
-		BoundingBox::CreateFromPoints(result, vecPos.size(), (const XMFLOAT3*)vecPos.data(), sizeof(VERTEX_POS));
+		BoundingBox::CreateFromPoints(result, vecPos.size(), (const XMFLOAT3*)vecPos.data(), sizeof(VertexPos));
 		return result;
 	}
 
-	void updateSize(const VERT_CHUNKS_BY_MAT& meshData)
+	template <VERTEX_FEATURE F>
+	void updateSize(const MatToChunksToVerts<F>& meshData)
 	{
 		assert(!sizeFinalized);
 
-		for (const auto& [material, chunkData] : meshData) {
-			for (const auto& [chunkIndex, vertData] : chunkData) {
+		for (const auto& [material, chunkToVerts] : meshData) {
+			for (const auto& [chunkIndex, verts] : chunkToVerts) {
 				minX = std::min(minX, chunkIndex.x);
 				minY = std::min(minY, chunkIndex.y);
 				maxX = std::max(maxX, chunkIndex.x);
@@ -44,6 +45,8 @@ namespace render::pass::world::chunkgrid
 		lengthX = (maxX - minX) + 1;
 		lengthY = (maxY - minY) + 1;
 	}
+	template void updateSize(const MatToChunksToVerts<VertexBasic>&);
+	template void updateSize(const MatToChunksToVerts<VertexBlend>&);
 
 	uint32_t finalizeSize()
 	{
@@ -56,13 +59,14 @@ namespace render::pass::world::chunkgrid
 		return size;
 	}
 
-	void updateMesh(const VERT_CHUNKS_BY_MAT& meshData)
+	template <VERTEX_FEATURE F>
+	void updateMesh(const MatToChunksToVerts<F>& meshData)
 	{
 		assert(sizeFinalized);
 
-		for (const auto& [material, chunkData] : meshData) {
-			for (const auto& [chunkIndex, vertData] : chunkData) {
-				const BoundingBox vertBbox = createBbox(vertData.vecPos);
+		for (const auto& [material, chunkToVerts] : meshData) {
+			for (const auto& [chunkIndex, verts] : chunkToVerts) {
+				const BoundingBox vertBbox = createBbox(verts.vecPos);
 				uint32_t flatIndex = getFlatIndex(chunkIndex);
 				auto& [exists, existingBbox] = chunks[flatIndex];
 				if (exists) {
@@ -75,6 +79,8 @@ namespace render::pass::world::chunkgrid
 			}
 		}
 	}
+	template void updateMesh(const MatToChunksToVerts<VertexBasic>&);
+	template void updateMesh(const MatToChunksToVerts<VertexBlend>&);
 
 	void strplace(std::string& str, uint32_t index, const std::string& str2)
 	{

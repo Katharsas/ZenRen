@@ -83,7 +83,7 @@ namespace assets
 
     vector<StaticInstance> loadVobs(
         vector<std::shared_ptr<zenkit::VirtualObject>>& rootVobs,
-        const VERT_CHUNKS_BY_MAT& worldMeshData,
+        const MatToChunksToVertsBasic& worldMeshData,
         const vector<Light>& lightsStatic,
         const bool isOutdoorLevel,
         LoadDebugFlags debug)
@@ -137,7 +137,7 @@ namespace assets
         return statics;
     }
 
-    bool loadInstanceVisual(VERT_CHUNKS_BY_MAT& target, const StaticInstance& instance, bool debugChecksEnabled)
+    bool loadInstanceVisual(MatToChunksToVertsBasic& target, const StaticInstance& instance, bool debugChecksEnabled)
     {
         using namespace FormatsSource;
         using namespace FormatsCompiled;
@@ -215,7 +215,7 @@ namespace assets
         bool isOutdoorLevel = world.world_bsp_tree.mode == zenkit::BspTreeType::OUTDOOR;
         sampler.logMillisAndRestart("Loader: World data parsed");
 
-        loadWorldMesh(out.worldMesh, world.world_mesh, true);
+        loadWorldMesh(out.worldMesh, out.staticMeshesBlend, world.world_mesh, true);
 
         for (uint32_t i = 0; i < world.world_mesh.lightmap_textures.size(); i++) {
             auto& lightmap = world.world_mesh.lightmap_textures.at(i);

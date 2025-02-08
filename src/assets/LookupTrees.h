@@ -28,9 +28,9 @@ namespace assets
 		}
 	};
 
-	VertLookupTree createVertLookup(const render::VERT_CHUNKS_BY_MAT& meshData);
+	VertLookupTree createVertLookup(const render::MatToChunksToVertsBasic& meshData);
 	std::vector<render::VertKey> rayDownIntersected(const VertLookupTree& lookup, const VEC3& pos, float searchSizeY);
-	std::vector<render::VertKey> rayDownIntersectedNaive(const render::VERT_CHUNKS_BY_MAT& meshData, const VEC3& pos, float searchSizeY);
+	std::vector<render::VertKey> rayDownIntersectedNaive(const render::MatToChunksToVertsBasic& meshData, const VEC3& pos, float searchSizeY);
 	std::vector<render::VertKey> rayIntersected(const VertLookupTree& lookup, const DirectX::XMVECTOR& rayPosStart, const DirectX::XMVECTOR& rayPosEnd);
 
 	struct LightLookupTree {
@@ -42,7 +42,7 @@ namespace assets
 	struct FaceLookupContext
 	{
 		assets::VertLookupTree spatialTree;
-		const render::VERT_CHUNKS_BY_MAT& data;
+		const render::MatToChunksToVertsBasic& data;
 	};
 
 	struct LightLookupContext

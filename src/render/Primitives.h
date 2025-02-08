@@ -125,7 +125,7 @@ inline std::ostream& operator <<(std::ostream& os, const NORMAL_UV_LUV& that)
 // TODO create union of uvLightmap + colLight with single bit flag ti differentiate
 // TODO move uvDiffuse into TEX_INDEX
 // TODO define input layout in structs
-struct NORMAL_CL_UV_LUV_STATIC_LIGHT {
+struct VertexBasic {
 	VEC3 normal;
 	UV uvDiffuse;
 	ARRAY_UV uvLightmap;
@@ -133,7 +133,27 @@ struct NORMAL_CL_UV_LUV_STATIC_LIGHT {
 	VEC3 dirLight;
 	float lightSun;
 };
-inline std::ostream& operator <<(std::ostream& os, const NORMAL_CL_UV_LUV_STATIC_LIGHT& that)
+inline std::ostream& operator <<(std::ostream& os, const VertexBasic& that)
+{
+	return os << "[NOR:" << that.normal << " COL_LIGHT:" << that.colLight << " DIR_LIGHT:" << that.dirLight << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
+}
+
+enum class BlendType : uint8_t {
+	BLEND = 1,
+	ADD = 2,
+	MULTIPLY = 3,
+};
+
+struct VertexBlend {
+	VEC3 normal;
+	UV uvDiffuse;
+	ARRAY_UV uvLightmap;
+	COLOR colLight;
+	VEC3 dirLight;
+	float lightSun;
+	BlendType blendType;
+};
+inline std::ostream& operator <<(std::ostream& os, const VertexBlend& that)
 {
 	return os << "[NOR:" << that.normal << " COL_LIGHT:" << that.colLight << " DIR_LIGHT:" << that.dirLight << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
 }

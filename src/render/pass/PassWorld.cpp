@@ -11,7 +11,7 @@
 #include "render/Camera.h"
 #include "render/Sky.h"
 #include "render/PerfStats.h"
-#include "render/d3d/Buffer.h"
+#include "render/d3d/GeometryBuffer.h"
 
 #include "Util.h"
 
@@ -212,12 +212,12 @@ namespace render::pass::world
 	template <typename Mesh, int VbCount>
 	using GetVertexBuffers = array<VertexBuffer, VbCount> (*) (const Mesh&);
 
-	ID3D11ShaderResourceView* batchGetTex(const MeshBatch& mesh) { return mesh.texColorArray; }
+	template <VERTEX_FEATURE F> ID3D11ShaderResourceView* batchGetTex(const MeshBatch<F>& mesh) { return mesh.texColorArray; }
 
 	array<VertexBuffer, 1> prepassGetVbPos(const PrepassMeshes& mesh) { return { mesh.vbPos }; }
-	array<VertexBuffer, 1> batchGetVbPos   (const MeshBatch& mesh) { return { mesh.vbPos }; }
-	array<VertexBuffer, 2> batchGetVbPosTex(const MeshBatch& mesh) { return { mesh.vbPos, mesh.vbTexIndices }; }
-	array<VertexBuffer, 3> batchGetVbAll   (const MeshBatch& mesh) { return { mesh.vbPos, mesh.vbOther, mesh.vbTexIndices }; }
+	template <VERTEX_FEATURE F> array<VertexBuffer, 1> batchGetVbPos   (const MeshBatch<F>& mesh) { return { mesh.vbPos }; }
+	template <VERTEX_FEATURE F> array<VertexBuffer, 2> batchGetVbPosTex(const MeshBatch<F>& mesh) { return { mesh.vbPos, mesh.vbTexIndices }; }
+	template <VERTEX_FEATURE F> array<VertexBuffer, 3> batchGetVbAll   (const MeshBatch<F>& mesh) { return { mesh.vbPos, mesh.vbOther, mesh.vbTexIndices }; }
 
 	DrawStats draw(D3d d3d, uint32_t count, uint32_t startIndex)
 	{
@@ -317,29 +317,41 @@ namespace render::pass::world
 		return stats;
 	};
 
-	template<int VbCount, GetVertexBuffers<MeshBatch, VbCount> GetVbs>
+	template<int VbCount, VERTEX_FEATURE F, GetVertexBuffers<MeshBatch<F>, VbCount> GetVbs>
 	DrawStats drawVertexBuffersWorld(D3d d3d, bool bindTex)
 	{
 		DrawStats stats;
 		if (worldSettings.drawWorld) {
 			d3d.annotation->BeginEvent(L"World");
-			if (bindTex) {
-				stats += drawVertexBuffers<MeshBatch, VbCount, GetVbs, batchGetTex, true>(d3d, world.meshBatchesWorld);
+			vector<MeshBatch<F>>* batchesPtr = nullptr;
+			if constexpr (IS_VERTEX_BASIC<F>) {
+				batchesPtr = &world.meshBatchesWorld;
+			}
+			else if constexpr (IS_VERTEX_BLEND<F>) {
+				batchesPtr = &world.meshBatchesWorldBlend;
 			}
 			else {
-				stats += drawVertexBuffers<MeshBatch, VbCount, GetVbs, nullptr, true>(d3d, world.meshBatchesWorld);
+				static_assert(false);
+			}
+			if (bindTex) {
+				stats += drawVertexBuffers<MeshBatch<F>, VbCount, GetVbs, batchGetTex, true>(d3d, *batchesPtr);
+			}
+			else {
+				stats += drawVertexBuffers<MeshBatch<F>, VbCount, GetVbs, nullptr, true>(d3d, *batchesPtr);
 			}
 			d3d.annotation->EndEvent();
 		}
-		if (worldSettings.drawStaticObjects) {
-			d3d.annotation->BeginEvent(L"Objects");
-			if (bindTex) {
-				stats += drawVertexBuffers<MeshBatch, VbCount, GetVbs, batchGetTex, true>(d3d, world.meshBatchesObjects);
+		if constexpr (IS_VERTEX_BASIC<F>) {
+			if (worldSettings.drawStaticObjects) {
+				d3d.annotation->BeginEvent(L"Objects");
+				if (bindTex) {
+					stats += drawVertexBuffers<MeshBatch<F>, VbCount, GetVbs, batchGetTex, true>(d3d, world.meshBatchesObjects);
+				}
+				else {
+					stats += drawVertexBuffers<MeshBatch<F>, VbCount, GetVbs, nullptr, true>(d3d, world.meshBatchesObjects);
+				}
+				d3d.annotation->EndEvent();
 			}
-			else {
-				stats += drawVertexBuffers<MeshBatch, VbCount, GetVbs, nullptr, true>(d3d, world.meshBatchesObjects);
-			}
-			d3d.annotation->EndEvent();
 		}
 		return stats;
 	};
@@ -357,20 +369,27 @@ namespace render::pass::world
 		d3d.annotation->EndEvent();
 	}
 
-	void drawWireframe(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs)
+	void drawWireframe(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs, RenderPass pass)
 	{
 		Shader* shader = shaders->getShader("wireframe");
 		d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
 		d3d.deviceContext->VSSetShader(shader->getVertexShader(), 0, 0);
 		d3d.deviceContext->PSSetShader(shader->getPixelShader(), 0, 0);
 		d3d.deviceContext->VSSetConstantBuffers(1, 1, &cbs.cameraCb);
-		
-		drawVertexBuffersWorld<1, batchGetVbPos>(d3d, false);
+
+		if (pass == RenderPass::BASIC) {
+			drawVertexBuffersWorld<1, VertexBasic, batchGetVbPos>(d3d, false);
+		}
+		if (pass == RenderPass::BLEND) {
+			drawVertexBuffersWorld<1, VertexBlend, batchGetVbPos>(d3d, false);
+		}
 	}
 
-	void drawWorld(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs)
+	void drawWorld(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs, RenderPass pass)
 	{
 		d3d.annotation->BeginEvent(L"Main");
+
+		// TODO set blend shader based on pass
 
 		// set the shader objects avtive
 		Shader* shader;
@@ -400,11 +419,12 @@ namespace render::pass::world
 		currentDrawCall = 0;
 
 		DrawStats stats;
-		if (worldSettings.debugWorldShaderEnabled) {
-			stats = drawVertexBuffersWorld<3, batchGetVbAll>(d3d, true);
+		if (pass == RenderPass::BASIC) {
+			stats = drawVertexBuffersWorld<3, VertexBasic, batchGetVbAll>(d3d, true);
 		}
 		else {
-			stats = drawVertexBuffersWorld<3, batchGetVbAll>(d3d, true);
+			// TODO set RTV as SRV
+			stats = drawVertexBuffersWorld<3, VertexBlend, batchGetVbAll>(d3d, true);
 		}
 		stats::takeSample(samplers.stateChanges, stats.stateChanges);
 		stats::takeSample(samplers.draws, stats.draws);

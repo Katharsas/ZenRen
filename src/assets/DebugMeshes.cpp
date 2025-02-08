@@ -53,10 +53,10 @@ namespace assets
         return result;
     }
 
-    void loadInstanceMeshBboxDebugVisual(VERT_CHUNKS_BY_MAT& target, const StaticInstance& instance)
+    void loadInstanceMeshBboxDebugVisual(MatToChunksToVertsBasic& target, const StaticInstance& instance)
     {
-        vector<VERTEX_POS> facesPos;
-        vector<VERTEX_OTHER> facesOther;
+        vector<VertexPos> facesPos;
+        vector<VertexBasic> facesOther;
         const auto& bboxFacesXm = createBboxVerts(toVec3(instance.bbox[0]), toVec3(instance.bbox[1]), instance.transform);
         for (auto& posXm : bboxFacesXm) {
             const auto faceNormal = toVec3(calcFlatFaceNormal(posXm));
@@ -96,10 +96,10 @@ namespace assets
         return result;
     }
 
-    void loadPointDebugVisual(VERT_CHUNKS_BY_MAT& target, const VEC3& pos, const VEC3& scale, const COLOR& color)
+    void loadPointDebugVisual(MatToChunksToVertsBasic& target, const VEC3& pos, const VEC3& scale, const COLOR& color)
     {
-        vector<VERTEX_POS> facesPos;
-        vector<VERTEX_OTHER> facesOther;
+        vector<VertexPos> facesPos;
+        vector<VertexBasic> facesOther;
         const auto& bboxFacesXm = createDebugPointVerts(pos, scale);
         for (auto& posXm : bboxFacesXm) {
             const auto faceNormal = toVec3(calcFlatFaceNormal(posXm));
@@ -134,10 +134,10 @@ namespace assets
         return result;
     }
 
-    void loadLineDebugVisual(VERT_CHUNKS_BY_MAT& target, const VEC3& posStart, VEC3& posEnd, const COLOR& color)
+    void loadLineDebugVisual(MatToChunksToVertsBasic& target, const VEC3& posStart, VEC3& posEnd, const COLOR& color)
     {
-        vector<VERTEX_POS> facesPos;
-        vector<VERTEX_OTHER> facesOther;
+        vector<VertexPos> facesPos;
+        vector<VertexBasic> facesOther;
         const auto& bboxFacesXm = createDebugLineVerts(posStart, posEnd, 0.02f);
         for (auto& posXm : bboxFacesXm) {
             const auto faceNormal = toVec3(calcFlatFaceNormal(posXm));

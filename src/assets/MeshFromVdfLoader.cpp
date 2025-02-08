@@ -3,6 +3,7 @@
 
 #include <type_traits>
 #include <filesystem>
+#include <variant>
 
 #include "AssetCache.h"
 #include "render/MeshUtil.h"
@@ -24,7 +25,6 @@ namespace assets
 
     const float zeroThreshold = 0.000001f;
     const XMMATRIX identity = XMMatrixIdentity();
-    struct Unused {};
 
     struct NormalsStats {
         uint32_t total = 0;
@@ -47,52 +47,63 @@ namespace assets
         std::unordered_map<zenkit::MaterialGroup, uint32_t> materialGroups;
     } loadStats;
 
+    typedef std::monostate Unused;
+
+    // Either of type T if conditional is true, or of type std::monostate (which is essentially usable void type)
+    template<bool TEST, typename T>
+    using OPT_PARAM = std::conditional<TEST, T, Unused>::type;
+
     static_assert(Vec3<glm::vec3>);
     static_assert(Vec2<glm::vec2>);
+
+    template<typename MESH, typename SUBMESH>
+    concept IS_WORLD_MESH = std::is_same_v<MESH, zenkit::Mesh>;
+
+    template<typename MESH, typename SUBMESH>
+    concept IS_MODEL_MESH = std::is_same_v<MESH, zenkit::MultiResolutionMesh> && std::is_same_v<SUBMESH, zenkit::SubMesh>;
 
     // TODO Prepare for index buffer creation:
     // We should really at some point switch to processing/converting all vertex positions/features first
     // and THEN validating correct values for each face. Current approach is not really compatible with index buffers.
 
-
     // ###########################################################################
     // POSITIONS
     // ###########################################################################
 
-    // POSITIONS - VECTOR ACCESSORS
-
-    template <typename Mesh, typename Submesh>
-    using GetPos = XMVECTOR(*) (const Mesh& mesh, const Submesh& submesh, uint32_t vertIndex);
-
-    inline XMVECTOR getPosZkit(const zenkit::Mesh& mesh, const Unused& _, uint32_t vertIndex)
+    inline XMVECTOR getPosWorldZkit(const zenkit::Mesh& mesh, uint32_t vertIndex)
     {
         return toXM4Pos(mesh.vertices.at(mesh.polygons.vertex_indices.at(vertIndex)));
     }
 
-    inline XMVECTOR getPosModelZkit(const zenkit::MultiResolutionMesh& mesh, const zenkit::SubMesh& submesh, uint32_t vertIndex)
+    inline XMVECTOR getPosModelZkit(const zenkit::MultiResolutionMesh& mesh, const zenkit::SubMesh& submesh, uint32_t faceIndex, uint32_t faceVertIndex)
     {
-        uint32_t faceIndex = vertIndex / 3;
-        uint32_t faceVertIndex = vertIndex % 3;
         const auto wedgeIndex = submesh.triangles.at(faceIndex).wedges[faceVertIndex];
         return toXM4Pos(mesh.positions.at(submesh.wedges.at(wedgeIndex).index));
     }
 
-    // POSITIONS - GET FACE POSITIONS
-
-    template<typename Mesh, typename Submesh, GetPos<Mesh, Submesh> getPos, bool rescale, bool transform>
+    template<typename MESH, typename SUBMESH, bool rescale, bool transform>
     array<XMVECTOR, 3> facePosToXm(
-        const Mesh& mesh,
-        const Submesh& submesh,
-        uint32_t indexStart,
+        const MESH& mesh,
+        const SUBMESH& submesh,
+        uint32_t faceIndex,
+        uint32_t vertIndex,
         const XMMATRIX& posTransform = identity)
     {
         array<XMVECTOR, 3> result;
         for (uint32_t i = 0; i < 3; i++) {
-            result[i] = getPos(mesh, submesh, indexStart + i);
-            if (rescale) {
+            if constexpr (IS_WORLD_MESH<MESH, SUBMESH>) {
+                result[i] = getPosWorldZkit(mesh, vertIndex + i);
+            }
+            else if constexpr (IS_MODEL_MESH<MESH, SUBMESH>) {
+                result[i] = getPosModelZkit(mesh, submesh, faceIndex, i);
+            }
+            else {
+                static_assert(false);
+            }
+            if constexpr (rescale) {
                 result[i] = XMVectorMultiply(result[i], XMVectorSet(G_ASSET_RESCALE, G_ASSET_RESCALE, G_ASSET_RESCALE, 1.f));
             }
-            if (transform) {
+            if constexpr (transform) {
                 result[i] = XMVector4Transform(result[i], posTransform);
             }
         }
@@ -240,7 +251,17 @@ namespace assets
     // UTIL FUNCTIONS
     // ###########################################################################
 
-    void insertFace(VEC_VERTEX_DATA& target, const array<VERTEX_POS, 3>& facePos, const array<VERTEX_OTHER, 3>& faceOther) {
+    template <typename VERTEX_FEATURE>
+    void insertFace(Verts<VERTEX_FEATURE>& target, const array<VertexPos, 3>& facePos, const array<VERTEX_FEATURE, 3>& faceOther) {
+        // manual reservation strategy helps with big vectors
+        // TODO might also reduce speed massively
+        // TODO find out what our actual memory problem is, we should be able to allocate 3.2G!! does DX11 driver take a lot?
+        static uint32_t vertReserveCount = 160 * 3;
+        if (!target.vecPos.empty() && target.vecPos.size() % vertReserveCount == 0) {
+            uint32_t blocks = (target.vecPos.size() / vertReserveCount) + 1;
+            target.vecPos.reserve(blocks * vertReserveCount);
+            target.vecOther.reserve(blocks * vertReserveCount);
+        }
         target.vecPos.push_back(facePos[0]);
         target.vecPos.push_back(facePos[1]);
         target.vecPos.push_back(facePos[2]);
@@ -249,7 +270,7 @@ namespace assets
         target.vecOther.push_back(faceOther[2]);
     }
 
-    array<VEC3, 2> createVertlistBbox(const vector<VERTEX_POS>& verts)
+    array<VEC3, 2> createVertlistBbox(const vector<VertexPos>& verts)
     {
         BoundingBox bbox;
         BoundingBox::CreateFromPoints(bbox, verts.size(), (XMFLOAT3*) verts.data(), sizeof(VEC3));
@@ -306,8 +327,81 @@ namespace assets
     // LOAD WORLD
     // ###########################################################################
 
+    template<typename VERTEX_FEATURE>
+    void loadWorldFace(
+        unordered_map<ChunkIndex, Verts<VERTEX_FEATURE>>& target,
+        const zenkit::Mesh& mesh,
+        uint32_t faceIndex,
+        uint32_t vertIndex,
+        OPT_PARAM<IS_VERTEX_BLEND<VERTEX_FEATURE>, BlendType> blendType,
+        bool debugChecksEnabled,
+        NormalsStats& normalStats)
+    {
+        constexpr bool isFeatureBasic = IS_VERTEX_BASIC<VERTEX_FEATURE>;
+        constexpr bool isFeatureBlend = IS_VERTEX_BLEND<VERTEX_FEATURE>;
+
+        // positions
+        auto facePosXm = facePosToXm<zenkit::Mesh, Unused, true, false>(mesh, {}, faceIndex, vertIndex);
+
+        // normals
+        array<XMVECTOR, 3> faceNormalsXm;
+        NormalsStats faceNormalStats;
+        if (debugChecksEnabled) {
+            std::tie(faceNormalStats, faceNormalsXm) = faceNormalsToXm<zenkit::Mesh, Unused, getNormalZkit, false, true>(
+                mesh, {}, vertIndex, facePosXm);
+        }
+        else {
+            std::tie(faceNormalStats, faceNormalsXm) = faceNormalsToXm<zenkit::Mesh, Unused, getNormalZkit, false, false>(
+                mesh, {}, vertIndex, facePosXm);
+        }
+        normalStats += faceNormalStats;
+
+        // other
+        array<VertexPos, 3> facePos;
+        array<VERTEX_FEATURE, 3> faceOther;
+
+        for (uint32_t i = 0; i < 3; i++) {
+            VertexPos pos = toVec3(facePosXm[i]);
+
+            const auto& featureZkit = mesh.features.at(mesh.polygons.feature_indices.at(vertIndex));
+            VERTEX_FEATURE feature;
+            if constexpr (IS_VERTEX_BASIC<VERTEX_FEATURE>) {
+                VertexBasic& other = feature;
+                other.normal = toVec3(faceNormalsXm[i]);
+                const auto& glmUvDiffuse = featureZkit.texture;
+                other.uvDiffuse = toUv(glmUvDiffuse);
+                other.colLight = fromSRGB(COLOR(featureZkit.light));
+                other.dirLight = { -100.f, -100.f, -100.f };// value that is easy to check as not normalized in shader
+                other.lightSun = 1.0f;
+                other.uvLightmap = getLightmapUvsZkit(mesh, faceIndex, facePosXm[i]);
+            }
+            else if constexpr (IS_VERTEX_BLEND<VERTEX_FEATURE>) {
+                VertexBlend& other = feature;
+                other.normal = toVec3(faceNormalsXm[i]);
+                const auto& glmUvDiffuse = featureZkit.texture;
+                other.uvDiffuse = toUv(glmUvDiffuse);
+                other.colLight = fromSRGB(COLOR(featureZkit.light));
+                other.dirLight = { -100.f, -100.f, -100.f };// value that is easy to check as not normalized in shader
+                other.lightSun = 1.0f;
+                other.uvLightmap = getLightmapUvsZkit(mesh, faceIndex, facePosXm[i]);
+                other.blendType = blendType;
+            }
+            else {
+                static_assert(false);
+            }
+
+            facePos.at(2 - i) = pos;
+            faceOther.at(2 - i) = feature;
+            vertIndex++;
+        }
+        const ChunkIndex chunkIndex = toChunkIndex(centroidPos(facePosXm));
+        Verts<VERTEX_FEATURE>& chunkData = util::getOrCreateDefault(target, chunkIndex);
+        insertFace<VERTEX_FEATURE>(chunkData, facePos, faceOther);
+    }
+
     void loadWorldMeshActual(
-        VERT_CHUNKS_BY_MAT& target,
+        MatToChunksToVertsBasic& target,
+        MatToChunksToVertsBlend& targetBlend,
         const zenkit::Mesh& worldMesh,
         bool debugChecksEnabled)
     {
@@ -322,6 +416,7 @@ namespace assets
             uint32_t meshMatIndex = worldMesh.polygons.material_indices.at(faceIndex);
             zenkit::Material meshMat = worldMesh.materials.at(meshMatIndex);
             bool unusual = checkForUnusualMatProperties(meshMat);
+            bool isBlend = meshMat.group == zenkit::MaterialGroup::WATER;
 
             if (debugChecksEnabled) {
                 ::util::getOrCreateDefault(loadStats.materialGroups, meshMat.group)++;
@@ -329,59 +424,33 @@ namespace assets
             }
 
             const Material material = { getTexId(::util::asciiToLower(meshMat.texture)) };
-            unordered_map<ChunkIndex, VEC_VERTEX_DATA>& materialData = ::util::getOrCreateDefault(target, material);
-
             uint32_t nextMeshMatIndex;
-            do {
-                // positions
-                auto facePosXm = facePosToXm<zenkit::Mesh, Unused, getPosZkit, true, false>(worldMesh, {}, vertIndex);
 
-                // normals
-                array<XMVECTOR, 3> faceNormalsXm;
-                NormalsStats faceNormalStats;
-                if (debugChecksEnabled) {
-                    std::tie(faceNormalStats, faceNormalsXm) = faceNormalsToXm<zenkit::Mesh, Unused, getNormalZkit, false, true>(
-                        worldMesh, {}, vertIndex, facePosXm);
-                }
-                else {
-                    std::tie(faceNormalStats, faceNormalsXm) = faceNormalsToXm<zenkit::Mesh, Unused, getNormalZkit, false, false>(
-                        worldMesh, {}, vertIndex, facePosXm);
-                }
-                normalStats += faceNormalStats;
+            if (!isBlend) {
+                ChunkToVerts<VertexBasic>& vertexData = util::getOrCreateDefault(target, material);
+                do {
+                    loadWorldFace<VertexBasic>(vertexData, worldMesh, faceIndex, vertIndex, {}, debugChecksEnabled, normalStats);
 
-                // other
-                array<VERTEX_POS, 3> facePos;
-                array<VERTEX_OTHER, 3> faceOther;
-
-                for (uint32_t i = 0; i < 3; i++) {
-                    const auto& feature = worldMesh.features.at(worldMesh.polygons.feature_indices.at(vertIndex));
-
-                    VERTEX_POS pos = toVec3(facePosXm[i]);
-                    VERTEX_OTHER other;
-                    other.normal = toVec3(faceNormalsXm[i]);
-                    const auto& glmUvDiffuse = feature.texture;
-                    other.uvDiffuse = toUv(glmUvDiffuse);
-                    other.colLight = fromSRGB(COLOR(feature.light));
-                    other.dirLight = { -100.f, -100.f, -100.f };// value that is easy to check as not normalized in shader
-                    other.lightSun = 1.0f;
-                    other.uvLightmap = getLightmapUvsZkit(worldMesh, faceIndex, facePosXm[i]);
-
-                    facePos.at(2 - i) = pos;
-                    faceOther.at(2 - i) = other;
-                    vertIndex++;
-                }
-
-                const ChunkIndex chunkIndex = toChunkIndex(centroidPos(facePosXm));
-                VEC_VERTEX_DATA& chunkData = ::util::getOrCreateDefault(materialData, chunkIndex);
-                insertFace(chunkData, facePos, faceOther);
-
-                faceIndex++;
-                if (faceIndex >= faceCount) {
-                    break;
-                }
-                nextMeshMatIndex = worldMesh.polygons.material_indices.at(faceIndex);
+                    faceIndex++; vertIndex += 3;
+                    if (faceIndex >= faceCount) {
+                        break;
+                    }
+                    nextMeshMatIndex = worldMesh.polygons.material_indices.at(faceIndex);
+                } while (nextMeshMatIndex == meshMatIndex);
+               
             }
-            while (nextMeshMatIndex == meshMatIndex);
+            else {
+                ChunkToVerts<VertexBlend>& vertexData = util::getOrCreateDefault(targetBlend, material);
+                do {
+                    loadWorldFace<VertexBlend>(vertexData, worldMesh, faceIndex, vertIndex, BlendType::BLEND, debugChecksEnabled, normalStats);
+
+                    faceIndex++; vertIndex += 3;
+                    if (faceIndex >= faceCount) {
+                        break;
+                    }
+                    nextMeshMatIndex = worldMesh.polygons.material_indices.at(faceIndex);
+                } while (nextMeshMatIndex == meshMatIndex);
+            }
         }
 
         if (debugChecksEnabled) {
@@ -390,13 +459,14 @@ namespace assets
     }
 
     void loadWorldMesh(
-        VERT_CHUNKS_BY_MAT& target,
+        MatToChunksToVertsBasic& target,
+        MatToChunksToVertsBlend& targetBlend,
         const zenkit::Mesh& worldMesh,
         bool debugChecksEnabled)
     {
         uint32_t instances = 1;
         for (uint32_t i = 0; i < instances; ++i) {
-            loadWorldMeshActual(target, worldMesh, debugChecksEnabled);
+            loadWorldMeshActual(target, targetBlend, worldMesh, debugChecksEnabled);
         }
     }
 
@@ -410,7 +480,7 @@ namespace assets
     }
 
     void loadInstanceMesh(
-        VERT_CHUNKS_BY_MAT& target,
+        MatToChunksToVertsBasic& target,
         const zenkit::MultiResolutionMesh& mesh,
         const StaticInstance& instance,
         bool debugChecksEnabled)
@@ -444,14 +514,14 @@ namespace assets
             }
 
             const Material material = { getTexId(::util::asciiToLower(meshMat.texture)) };
-            unordered_map<ChunkIndex, VEC_VERTEX_DATA>& materialData = ::util::getOrCreateDefault(target, material);
+            unordered_map<ChunkIndex, VertsBasic>& materialData = ::util::getOrCreateDefault(target, material);
 
             uint32_t faceCount = submesh.triangles.size();
 
             for (uint32_t faceIndex = 0, vertIndex = 0; faceIndex < faceCount; faceIndex++) {
                 // positions
-                array<XMVECTOR, 3> facePosXm = facePosToXm<Mesh, Submesh, getPosModelZkit, true, true>(
-                    mesh, submesh, vertIndex, instance.transform);
+                array<XMVECTOR, 3> facePosXm = facePosToXm<Mesh, Submesh, true, true>(
+                    mesh, submesh, faceIndex, vertIndex, instance.transform);
 
                 // normals
                 array<XMVECTOR, 3> faceNormalsXm;
@@ -467,12 +537,12 @@ namespace assets
                 normalStats += faceNormalStats;
 
                 // other
-                array<VERTEX_POS, 3> facePos;
-                array<VERTEX_OTHER, 3> faceOther;
+                array<VertexPos, 3> facePos;
+                array<VertexBasic, 3> faceOther;
 
                 for (uint32_t i = 0; i < 3; i++) {
-                    VERTEX_POS pos = toVec3(facePosXm[i]);
-                    VERTEX_OTHER other;
+                    VertexPos pos = toVec3(facePosXm[i]);
+                    VertexBasic other;
                     other.normal = toVec3(faceNormalsXm[i]);
                     other.uvDiffuse = getUvModelZkit({}, submesh, vertIndex);
                     other.uvLightmap = { 0, 0, -1 };
@@ -488,7 +558,7 @@ namespace assets
                 }
 
                 const ChunkIndex chunkIndex = toChunkIndex(centroidPos(facePosXm));
-                VEC_VERTEX_DATA& chunkData = ::util::getOrCreateDefault(materialData, chunkIndex);
+                VertsBasic& chunkData = ::util::getOrCreateDefault(materialData, chunkIndex);
                 insertFace(chunkData, facePos, faceOther);
             }
         }
@@ -510,7 +580,7 @@ namespace assets
     }
 
     void loadInstanceModel(
-        VERT_CHUNKS_BY_MAT& target,
+        MatToChunksToVertsBasic& target,
         const zenkit::ModelHierarchy& hierarchy,
         const zenkit::ModelMesh& model,
         const StaticInstance& instance,
@@ -578,7 +648,7 @@ namespace assets
     }
 
     void loadInstanceDecal(
-        VERT_CHUNKS_BY_MAT& target,
+        MatToChunksToVertsBasic& target,
         const StaticInstance& instance,
         bool debugChecksEnabled
     )
@@ -591,7 +661,7 @@ namespace assets
         }
 
         const Material material = { getTexId(::util::asciiToLower(instance.visual_name)) };
-        unordered_map<ChunkIndex, VEC_VERTEX_DATA>& materialData = ::util::getOrCreateDefault(target, material);
+        unordered_map<ChunkIndex, VertsBasic>& materialData = ::util::getOrCreateDefault(target, material);
 
         auto quadFacesXm = createQuadPositions(decal);
 
@@ -608,13 +678,13 @@ namespace assets
             const auto faceNormal = toVec3(calcFlatFaceNormal(facePosXm));
 
             //other
-            array<VERTEX_POS, 3> facePos;
-            array<VERTEX_OTHER, 3> faceOther;
+            array<VertexPos, 3> facePos;
+            array<VertexBasic, 3> faceOther;
 
             for (int32_t i = 2; i >= 0; i--) {
                 facePos[i] = toVec3(facePosXm.at(i));
 
-                VERTEX_OTHER other;
+                VertexBasic other;
                 other.normal = faceNormal;
                 other.uvDiffuse = quadFaceXm.at(i).second;
                 other.uvLightmap = { 0, 0, -1 };
@@ -625,7 +695,7 @@ namespace assets
             }
 
             const ChunkIndex chunkIndex = toChunkIndex(centroidPos(facePosXm));
-            VEC_VERTEX_DATA& chunkData = ::util::getOrCreateDefault(materialData, chunkIndex);
+            VertsBasic& chunkData = ::util::getOrCreateDefault(materialData, chunkIndex);
             insertFace(chunkData, facePos, faceOther);
         }
     }
