@@ -247,9 +247,9 @@ namespace render::pass::world
 	DrawStats drawVertexBuffers(D3d d3d, const vector<Mesh>& meshes)
 	{
 		// TODO separate draw distance / camera frustum for worldmesh vs vobs (smaller for vobs)
-		// TODO select closest chunks (by adjustable distance, but at least the 4 closest) and render them first for early-z discards
+		// TODO select closest chunks (any that overlap a "min render box" around camera) and render them first for early-z discards
 		// TODO fix view-coordinate normal lighting and move to pixel shader so lighting can profit from early-z
-		// TODO check if loading textures in lower res improces performance
+		// TODO check if uploading and using textures with lower res/mip improves performance
 		//   - if yes, load textures arrays twice, once with reduced resolution (256 or lower?) and use low-res textures for non-near chunks (-> GRM)
 
 		DrawStats stats;
@@ -318,40 +318,30 @@ namespace render::pass::world
 	};
 
 	template<int VbCount, VERTEX_FEATURE F, GetVertexBuffers<MeshBatch<F>, VbCount> GetVbs>
-	DrawStats drawVertexBuffersWorld(D3d d3d, bool bindTex)
+	DrawStats drawVertexBuffersWorld(D3d d3d, bool bindTex, BlendType pass)
 	{
 		DrawStats stats;
 		if (worldSettings.drawWorld) {
 			d3d.annotation->BeginEvent(L"World");
-			vector<MeshBatch<F>>* batchesPtr = nullptr;
-			if constexpr (IS_VERTEX_BASIC<F>) {
-				batchesPtr = &world.meshBatchesWorld;
-			}
-			else if constexpr (IS_VERTEX_BLEND<F>) {
-				batchesPtr = &world.meshBatchesWorldBlend;
-			}
-			else {
-				static_assert(false);
-			}
+			auto& batches = world.meshBatchesWorld.getBatches(pass);
 			if (bindTex) {
-				stats += drawVertexBuffers<MeshBatch<F>, VbCount, GetVbs, batchGetTex, true>(d3d, *batchesPtr);
+				stats += drawVertexBuffers<MeshBatch<F>, VbCount, GetVbs, batchGetTex, true>(d3d, batches);
 			}
 			else {
-				stats += drawVertexBuffers<MeshBatch<F>, VbCount, GetVbs, nullptr, true>(d3d, *batchesPtr);
+				stats += drawVertexBuffers<MeshBatch<F>, VbCount, GetVbs, nullptr, true>(d3d, batches);
 			}
 			d3d.annotation->EndEvent();
 		}
-		if constexpr (IS_VERTEX_BASIC<F>) {
-			if (worldSettings.drawStaticObjects) {
-				d3d.annotation->BeginEvent(L"Objects");
-				if (bindTex) {
-					stats += drawVertexBuffers<MeshBatch<F>, VbCount, GetVbs, batchGetTex, true>(d3d, world.meshBatchesObjects);
-				}
-				else {
-					stats += drawVertexBuffers<MeshBatch<F>, VbCount, GetVbs, nullptr, true>(d3d, world.meshBatchesObjects);
-				}
-				d3d.annotation->EndEvent();
+		if (worldSettings.drawStaticObjects) {
+			d3d.annotation->BeginEvent(L"Objects");
+			auto& batches = world.meshBatchesObjects.getBatches(pass);
+			if (bindTex) {
+				stats += drawVertexBuffers<MeshBatch<F>, VbCount, GetVbs, batchGetTex, true>(d3d, batches);
 			}
+			else {
+				stats += drawVertexBuffers<MeshBatch<F>, VbCount, GetVbs, nullptr, true>(d3d, batches);
+			}
+			d3d.annotation->EndEvent();
 		}
 		return stats;
 	};
@@ -359,33 +349,26 @@ namespace render::pass::world
 	void drawPrepass(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs)
 	{
 		d3d.annotation->BeginEvent(L"Prepass");
-		Shader* shader = shaders->getShader("depthPrepass");
+		Shader* shader = shaders->getShader("forward/depthPrepass");
 		d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
 		d3d.deviceContext->VSSetShader(shader->getVertexShader(), 0, 0);
 		d3d.deviceContext->PSSetShader(nullptr, 0, 0);
-		d3d.deviceContext->VSSetConstantBuffers(1, 1, &cbs.cameraCb);
 
 		drawVertexBuffers<PrepassMeshes, 1, prepassGetVbPos, nullptr, true>(d3d, world.prepassMeshes);
 		d3d.annotation->EndEvent();
 	}
 
-	void drawWireframe(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs, RenderPass pass)
+	void drawWireframe(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs, BlendType pass)
 	{
-		Shader* shader = shaders->getShader("wireframe");
+		Shader* shader = shaders->getShader("forward/wireframe");
 		d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
 		d3d.deviceContext->VSSetShader(shader->getVertexShader(), 0, 0);
 		d3d.deviceContext->PSSetShader(shader->getPixelShader(), 0, 0);
-		d3d.deviceContext->VSSetConstantBuffers(1, 1, &cbs.cameraCb);
 
-		if (pass == RenderPass::BASIC) {
-			drawVertexBuffersWorld<1, VertexBasic, batchGetVbPos>(d3d, false);
-		}
-		if (pass == RenderPass::BLEND) {
-			drawVertexBuffersWorld<1, VertexBlend, batchGetVbPos>(d3d, false);
-		}
+		drawVertexBuffersWorld<1, VertexBasic, batchGetVbPos>(d3d, false, pass);
 	}
 
-	void drawWorld(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs, RenderPass pass)
+	void drawWorld(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs, BlendType pass)
 	{
 		d3d.annotation->BeginEvent(L"Main");
 
@@ -393,11 +376,11 @@ namespace render::pass::world
 
 		// set the shader objects avtive
 		Shader* shader;
-		if (worldSettings.debugWorldShaderEnabled) {
-			shader = shaders->getShader("mainPassTexOnly");
+		if (pass == BlendType::MULTIPLY || worldSettings.debugWorldShaderEnabled) {
+			shader = shaders->getShader("forward/mainTexColorOnly");
 		}
 		else {
-			shader = shaders->getShader("mainPass");
+			shader = shaders->getShader("forward/main");
 		}
 		
 		d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
@@ -406,26 +389,14 @@ namespace render::pass::world
 
 		d3d.deviceContext->PSSetSamplers(0, 1, &linearSamplerState);
 
-		// constant buffers
-		d3d.deviceContext->VSSetConstantBuffers(0, 1, &cbs.settingsCb);
-		d3d.deviceContext->PSSetConstantBuffers(0, 1, &cbs.settingsCb);
-		d3d.deviceContext->VSSetConstantBuffers(1, 1, &cbs.cameraCb);
-		d3d.deviceContext->PSSetConstantBuffers(1, 1, &cbs.cameraCb);
-
 		// lightmaps
 		d3d.deviceContext->PSSetShaderResources(1, 1, &world.lightmapTexArray);
 
 		maxDrawCalls = currentDrawCall;
 		currentDrawCall = 0;
 
-		DrawStats stats;
-		if (pass == RenderPass::BASIC) {
-			stats = drawVertexBuffersWorld<3, VertexBasic, batchGetVbAll>(d3d, true);
-		}
-		else {
-			// TODO set RTV as SRV
-			stats = drawVertexBuffersWorld<3, VertexBlend, batchGetVbAll>(d3d, true);
-		}
+		DrawStats stats = drawVertexBuffersWorld<3, VertexBasic, batchGetVbAll>(d3d, true, pass);
+
 		stats::takeSample(samplers.stateChanges, stats.stateChanges);
 		stats::takeSample(samplers.draws, stats.draws);
 		stats::takeSample(samplers.verts, stats.verts);

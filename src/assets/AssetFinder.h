@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Util.h"
 #include "render/Loader.h"
 
 #include <filesystem>
@@ -10,7 +11,31 @@
 
 namespace assets
 {
-	const std::filesystem::path DEFAULT_TEXTURE = "./default_texture.png";
+	struct AssetFormats {
+		std::initializer_list<util::FileExt> formatsFile;
+		std::initializer_list<util::FileExt> formatsVfs;
+	};
+
+	const AssetFormats FORMATS_TEXTURE = {
+		{
+			FormatsSource::TGA,
+			FormatsSource::PNG,
+			FormatsCompiled::TEX
+		}, {
+			FormatsCompiled::TEX
+		}
+	};
+	const AssetFormats FORMATS_LEVEL = {
+		{
+			FormatsCompiled::ZEN
+		}, {
+			FormatsCompiled::ZEN
+		}
+	};
+
+	enum class AssetsIntern {
+		DEFAULT_TEXTURE
+	};
 
 	// abstracts over real vs VFS files, allows getting byte contents
 	struct FileHandle {
@@ -22,11 +47,14 @@ namespace assets
 
 	const render::FileData getData(const FileHandle handle);
 
+	FileHandle getInternal(const AssetsIntern asset);
 	std::optional<FileHandle> getIfExistsAsFile(const std::string_view assetName);
 	std::optional<FileHandle> getIfExistsInVfs(const std::string_view assetName);
 	std::optional<FileHandle> getIfExists(const std::string_view assetName);
+	std::optional<std::pair<FileHandle, util::FileExt>> getIfAnyExists(const std::string_view assetName, const AssetFormats& formats);
 	bool exists(const std::string_view assetName);
 
+	void initAssetsIntern();
 	void initFileAssetSourceDir(std::filesystem::path& rootDir);
 	void initVdfAssetSourceDir(std::filesystem::path& rootDir);
 }

@@ -48,7 +48,16 @@ namespace render::gui::settings {
 					ImGui::EndCombo();
 				}
 				ImGui::PopItemWidth();
-				ImGui::Checkbox("Depth Prepass", &settings.depthPrepass);
+
+				ImGui::VerticalSpacing();
+				//ImGui::Checkbox("Depth Prepass", &settings.depthPrepass);
+				ImGui::Checkbox("Opaque Passes", &settings.passesOpaque);
+				ImGui::Checkbox("Blend Passes", &settings.passesBlend);
+
+				ImGui::VerticalSpacing();
+				ImGui::SliderFloat("##Debug1", &settings.debugFloat1, -1.f, 1.f, "%.2f Debug 1");
+				ImGui::SliderFloat("##Debug2", &settings.debugFloat2, -1.f, 1.f, "%.2f Debug 2");
+				
 				ImGui::PopStyleColor();
 			}
 		});

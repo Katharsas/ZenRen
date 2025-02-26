@@ -126,7 +126,7 @@ namespace render
 			forward::initRasterizerStates(d3d, settings.multisampleCount, settings.wireframe);
 		}
 		if (flags.forwardBlendState) {
-			forward::initBlendState(d3d, settings.multisampleCount, settings.multisampleTransparency);
+			forward::initBlendStates(d3d, settings.multisampleCount, settings.multisampleTransparency);
 		}
 		if (flags.diffuseTexSampler) {
 			world::initLinearSampler(d3d, settings);

@@ -74,11 +74,8 @@ namespace render
 	{
 		ID3D11Buffer* settingsCb = nullptr;
 		ID3D11Buffer* cameraCb = nullptr;
-	};
-
-	enum class RenderPass {
-		BASIC,
-		BLEND
+		ID3D11Buffer* blendModeCb = nullptr;
+		ID3D11Buffer* debugCb = nullptr;
 	};
 
 	struct LoadWorldResult {

@@ -92,7 +92,7 @@ namespace util
 		return fromU8(path.u8string());
 	}
 
-	bool endsWithEither(std::string_view str, std::initializer_list<FileExt> extensions)
+	bool endsWithEither(std::string_view str, const std::initializer_list<FileExt>& extensions)
 	{
 		for (const auto& ext : extensions) {
 			if (ext.isExtOf(str)) {
@@ -102,12 +102,20 @@ namespace util
 		return false;
 	}
 
-	std::string replaceExtension(const std::string_view filename, const std::string_view extension) {
-		size_t lastdot = filename.find_last_of(".");
-		if (lastdot == std::string::npos) {
-			return string(filename) + string(extension);
+	std::pair<string, string> replaceExtensionAndGetOld(const std::string_view filename, const std::string_view extension)
+	{
+		size_t lastDot = filename.find_last_of(".");
+		if (lastDot == string::npos) {
+			return { string(filename) + string(extension), "" };
 		}
-		return string(filename.substr(0, lastdot)) + string(extension);
+		return {
+			string(filename.substr(0, lastDot)) + string(extension),
+			string(filename.substr(lastDot, filename.length() - lastDot))
+		};
+	}
+
+	std::string replaceExtension(const std::string_view filename, const std::string_view extension) {
+		return replaceExtensionAndGetOld(filename, extension).first;
 	}
 
 	void throwError(const std::string& message) {

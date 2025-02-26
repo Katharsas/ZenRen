@@ -13,6 +13,6 @@ namespace render::pass::forward
 	void initViewport(BufferSize& size);
 	void initDepthBuffer(D3d d3d, BufferSize& size, uint32_t multisampleCount, bool reverseZ);
 	void initRasterizerStates(D3d d3d, uint32_t multisampleCount, bool wireframe);
-	void initBlendState(D3d d3d, uint32_t multisampleCount, bool multisampleTransparency);
+	void initBlendStates(D3d d3d, uint32_t multisampleCount, bool multisampleTransparency);
 	void initConstantBuffers(D3d d3d);
 }

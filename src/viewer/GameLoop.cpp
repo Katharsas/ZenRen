@@ -84,6 +84,7 @@ namespace viewer
 		input::setRdpCompatMode(args.rdpCompatMode);
 		initActions();
 
+		assets::initAssetsIntern();
 		if (args.vdfFilesRoot.has_value()) {
 			assets::initVdfAssetSourceDir(args.vdfFilesRoot.value());
 		}

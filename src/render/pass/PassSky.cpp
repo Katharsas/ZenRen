@@ -104,19 +104,7 @@ namespace render::pass::sky
 
     Texture* loadSkyTexture(D3d d3d, std::string texName)
     {
-        // TODO centralize code duplication with world, move into separate texture cache?
-        auto sourceAssetOpt = assets::getIfExists(texName);
-        if (sourceAssetOpt.has_value()) {
-            auto fileData = assets::getData(sourceAssetOpt.value());
-            return assets::createTextureFromImageFormat(d3d, fileData);
-        }
-        texName = ::util::replaceExtension(texName, "-c.tex");// compiled textures have -C suffix
-        auto compiledAssetOpt = assets::getIfExists(texName);
-        if (compiledAssetOpt.has_value()) {
-            FileData file = assets::getData(compiledAssetOpt.value());
-            return assets::createTextureFromGothicTex(d3d, file);
-        }
-        return assets::createDefaultTexture(d3d);
+        return assets::createTextureOrDefault(d3d, texName, true);
     }
 
     void loadSky(D3d d3d)
@@ -218,18 +206,14 @@ namespace render::pass::sky
         d3d.annotation->BeginEvent(L"sky");
 
         // set the shader objects avtive
-        Shader* shader = shaders->getShader("sky");
+        Shader* shader = shaders->getShader("forward/sky");
         d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
         d3d.deviceContext->VSSetShader(shader->getVertexShader(), 0, 0);
         d3d.deviceContext->PSSetShader(shader->getPixelShader(), 0, 0);
 
-        // constant buffers
-        d3d.deviceContext->VSSetConstantBuffers(0, 1, &cbs.settingsCb);
-        d3d.deviceContext->PSSetConstantBuffers(0, 1, &cbs.settingsCb);
-        d3d.deviceContext->VSSetConstantBuffers(1, 1, &cbs.cameraCb);
-        d3d.deviceContext->PSSetConstantBuffers(1, 1, &cbs.cameraCb);
-        d3d.deviceContext->VSSetConstantBuffers(2, 1, &skyLayerSettingsCb);
-        d3d.deviceContext->PSSetConstantBuffers(2, 1, &skyLayerSettingsCb);
+        // constant buffer
+        d3d.deviceContext->VSSetConstantBuffers(4, 1, &skyLayerSettingsCb);
+        d3d.deviceContext->PSSetConstantBuffers(4, 1, &skyLayerSettingsCb);
 
         // textures
         d3d.deviceContext->PSSetSamplers(0, 1, &layerSampler);

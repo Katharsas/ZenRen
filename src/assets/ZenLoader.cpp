@@ -68,10 +68,10 @@ namespace assets
         const zenkit::VirtualObject& vob = *vobPtr;
         const auto& visualName = vob.visual->name;
         if (vob.show_visual && !visualName.empty()) {
-            if (endsWithEither(visualName, { __3DS, ASC, MDS })) {
+            if (endsWithEither(visualName, { __3DS, ASC, MDS, TGA })) {
                 return true;
             }
-            if (endsWithEither(visualName, { PFX, MMS, TGA })) {
+            if (endsWithEither(visualName, { PFX, MMS })) {
                 // TODO effects, morphmeshes, decals
             }
             else {
@@ -128,6 +128,10 @@ namespace assets
                 VobLighting lighting = calculateStaticVobLighting(instance.bbox, worldMeshContext, lightsStaticContext, isOutdoorLevel, debug);
                 if (debug.vobsTint) {
                     lighting.color.r = (lighting.color.r / 3.f) * 2.f;
+                }
+                if (instance.decal.has_value()) {
+                    //float delta = 0.2;
+                    //lighting.color = add(lighting.color, COLOR{ delta, delta, delta, 0});
                 }
                 instance.lighting = lighting;
             }
@@ -215,7 +219,7 @@ namespace assets
         bool isOutdoorLevel = world.world_bsp_tree.mode == zenkit::BspTreeType::OUTDOOR;
         sampler.logMillisAndRestart("Loader: World data parsed");
 
-        loadWorldMesh(out.worldMesh, out.staticMeshesBlend, world.world_mesh, true);
+        loadWorldMesh(out.worldMesh, world.world_mesh, true);
 
         for (uint32_t i = 0; i < world.world_mesh.lightmap_textures.size(); i++) {
             auto& lightmap = world.world_mesh.lightmap_textures.at(i);

@@ -91,6 +91,9 @@ namespace render::pass::post
 
 	void draw(D3d d3d, ID3D11ShaderResourceView* linearBackBuffer, ShaderManager* shaders, const RenderSettings& settings)
 	{
+		// default blend state
+		d3d.deviceContext->OMSetBlendState(nullptr, nullptr, 0xffffffff);
+
 		bool renderDirectlyToBackBuffer = !settings.downsampling;
 		// draw HDR back buffer to real back buffer via tone mapping
 

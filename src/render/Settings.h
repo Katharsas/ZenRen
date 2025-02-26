@@ -40,9 +40,15 @@ namespace render
 
 		bool skyTexBlur = true;
 
-		float contrast = 1.f;
-		float brightness = 0.f;
-		float gamma = 0.87f;
+		bool passesOpaque = true;
+		bool passesBlend = true;
+
+		float contrast = 1.0f;
+		float brightness = 0.001f;
+		float gamma = 0.92f;
+
+		float debugFloat1 = 1.f;
+		float debugFloat2 = 1.f;
 	};
 }
 

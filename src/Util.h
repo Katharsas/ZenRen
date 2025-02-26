@@ -33,9 +33,19 @@ namespace util
 			return extUpper;
 		}
 	};
-	bool endsWithEither(std::string_view str, std::initializer_list<FileExt> extensions);
+	bool endsWithEither(std::string_view str, const std::initializer_list<FileExt>& extensions);
 
+	// extension must include dot
+	std::pair<std::string, std::string> replaceExtensionAndGetOld(const std::string_view filename, const std::string_view extension);
 	std::string replaceExtension(const std::string_view filename, const std::string_view extension);
+
+	// the boost hash_combine function
+	template <class Hashable>
+	inline void hashCombine(std::size_t& hash, const Hashable& value)
+	{
+		std::hash<Hashable> hasher;
+		hash ^= hasher(value) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+	}
 
 	void throwError(const std::string& message);
 

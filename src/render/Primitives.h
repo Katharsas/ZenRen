@@ -138,25 +138,19 @@ inline std::ostream& operator <<(std::ostream& os, const VertexBasic& that)
 	return os << "[NOR:" << that.normal << " COL_LIGHT:" << that.colLight << " DIR_LIGHT:" << that.dirLight << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
 }
 
-enum class BlendType : uint8_t {
-	BLEND = 1,
-	ADD = 2,
-	MULTIPLY = 3,
-};
-
-struct VertexBlend {
-	VEC3 normal;
-	UV uvDiffuse;
-	ARRAY_UV uvLightmap;
-	COLOR colLight;
-	VEC3 dirLight;
-	float lightSun;
-	BlendType blendType;
-};
-inline std::ostream& operator <<(std::ostream& os, const VertexBlend& that)
-{
-	return os << "[NOR:" << that.normal << " COL_LIGHT:" << that.colLight << " DIR_LIGHT:" << that.dirLight << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
-}
+//struct VertexBlend {
+//	VEC3 normal;
+//	UV uvDiffuse;
+//	ARRAY_UV uvLightmap;
+//	COLOR colLight;
+//	VEC3 dirLight;
+//	float lightSun;
+//	BlendType blendType;
+//};
+//inline std::ostream& operator <<(std::ostream& os, const VertexBlend& that)
+//{
+//	return os << "[NOR:" << that.normal << " COL_LIGHT:" << that.colLight << " DIR_LIGHT:" << that.dirLight << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
+//}
 
 typedef uint32_t TEX_INDEX;
 

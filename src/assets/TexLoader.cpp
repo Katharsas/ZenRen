@@ -88,12 +88,17 @@ namespace assets
 		return initialData;
 	}
 
-	FormatInfo getDxgiFormatIfSupported(zenkit::TextureFormat format)
+	FormatInfo getDxgiFormatIfSupported(zenkit::TextureFormat format, bool srgb)
 	{
 		FormatInfo info;
 		switch (format) {
-		case zenkit::TextureFormat::DXT1: info.dxgi = DXGI_FORMAT::DXGI_FORMAT_BC1_UNORM_SRGB; break;
-		case zenkit::TextureFormat::DXT3: info.dxgi = DXGI_FORMAT::DXGI_FORMAT_BC2_UNORM_SRGB; info.hasAlpha = true; break;
+		case zenkit::TextureFormat::DXT1: {
+			info.dxgi = srgb ? DXGI_FORMAT::DXGI_FORMAT_BC1_UNORM_SRGB : DXGI_FORMAT::DXGI_FORMAT_BC1_UNORM;
+		} break;
+		case zenkit::TextureFormat::DXT3: {
+			info.dxgi = srgb ? DXGI_FORMAT::DXGI_FORMAT_BC2_UNORM_SRGB : DXGI_FORMAT::DXGI_FORMAT_BC2_UNORM;
+			info.hasAlpha = true;
+		} break;
 		//case zenkit::TextureFormat::DXT5: format = DXGI_FORMAT::DXGI_FORMAT_BC3_UNORM_SRGB; hasAlpha = true; break;
 		}
 		return info;
@@ -133,7 +138,7 @@ namespace assets
 		imageAndTarget = std::move(imageWithMips);
 	}
 
-	Texture* createTexture(D3d d3d, BufferSize size, FormatInfo format, const vector<d3d::InitialData>& initialData)
+	Texture* createTexture(D3d d3d, BufferSize size, FormatInfo format, bool srgb, const vector<d3d::InitialData>& initialData)
 	{
 		ID3D11Texture2D* buffer = nullptr;
 		d3d::createTexture2dBuf(d3d, &buffer, size, format.dxgi, initialData);
@@ -147,12 +152,13 @@ namespace assets
 			.mipLevels = (uint16_t)initialData.size(),
 			.hasAlpha = format.hasAlpha,
 			.format = (uint32_t)format.dxgi,
+			.srgb = srgb,
 		};
 
 		return new Texture(info, srv);
 	}
 
-	Texture* createTextureFromImageFormat(D3d d3d, const FileData& imageFile)
+	Texture* createTextureFromImageFormat(D3d d3d, const FileData& imageFile, bool srgb)
 	{
 		std::string name = ::util::asciiToLower(imageFile.name);
 		HRESULT hr;
@@ -160,12 +166,19 @@ namespace assets
 		DirectX::TexMetadata metadata;
 
 		if (::util::endsWith(name, ".tga")) {
-			DirectX::TGA_FLAGS flags = DirectX::TGA_FLAGS_DEFAULT_SRGB | DirectX::TGA_FLAGS_ALLOW_ALL_ZERO_ALPHA;
+			DirectX::TGA_FLAGS flags = DirectX::TGA_FLAGS_ALLOW_ALL_ZERO_ALPHA;
+			if (srgb) {
+				flags |= DirectX::TGA_FLAGS_DEFAULT_SRGB;
+			}
 			hr = DirectX::LoadFromTGAMemory(imageFile.data, imageFile.size, flags, &metadata, image);
 			throwOnError(hr, name);
 		}
 		else if (::util::endsWith(name, ".png")) {
-			hr = DirectX::LoadFromWICMemory(imageFile.data, imageFile.size, DirectX::WIC_FLAGS_DEFAULT_SRGB, &metadata, image);
+			DirectX::WIC_FLAGS flags = DirectX::WIC_FLAGS_NONE;
+			if (srgb) {
+				flags |= DirectX::WIC_FLAGS_DEFAULT_SRGB;
+			}
+			hr = DirectX::LoadFromWICMemory(imageFile.data, imageFile.size, flags, &metadata, image);
 			throwOnError(hr, name);
 		}
 		else {
@@ -182,30 +195,29 @@ namespace assets
 			.hasAlpha = metadata.GetAlphaMode() != DirectX::TEX_ALPHA_MODE::TEX_ALPHA_MODE_OPAQUE,
 		};
 		vector<d3d::InitialData> initialData = getInitialData(image);
-		return createTexture(d3d, getSize(metadata), format, initialData);
+		return createTexture(d3d, getSize(metadata), format, srgb, initialData);
 	}
 
 	Texture* createDefaultTexture(D3d d3d)
 	{
-		// TODO this should probably exist in AssetFinder, maybe even with ready-made FileData instance
-		FileHandle defaultHandle = {
-			.name = assets::DEFAULT_TEXTURE.filename().string(),
-			.path = &assets::DEFAULT_TEXTURE,
-		};
-		FileData data = assets::getData(defaultHandle);
-		return createTextureFromImageFormat(d3d, data);
+		// TODO maybe interal assets should be cached as well in AssetCache
+		FileData data = assets::getData(assets::getInternal(AssetsIntern::DEFAULT_TEXTURE));
+		return createTextureFromImageFormat(d3d, data, true);
 	}
 
-	Texture* createTextureFromGothicTex(D3d d3d, const zenkit::Texture& tex, const std::string name, std::optional<BufferSize> targetSizeOpt)
+	Texture* createTextureFromGothicTex(D3d d3d, const zenkit::Texture& tex, const std::string name, bool srgb, std::optional<BufferSize> targetSizeOpt)
 	{
 		bool decompress = false;
-		FormatInfo format = getDxgiFormatIfSupported(tex.format());
+		FormatInfo format = getDxgiFormatIfSupported(tex.format(), srgb);
 
 		if (format.dxgi == DXGI_FORMAT_UNKNOWN) {
 			if (tex.format() == zenkit::TextureFormat::R5G6B5) {
 				// basically only one G1 sky texture and lightmaps are R5G6B5 but what can you do
 				decompress = true;
-				format = { .dxgi = DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, .hasAlpha = false };
+				format = {
+					.dxgi = srgb ? DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM,
+					.hasAlpha = false
+				};
 			}
 			else {
 				LOG(WARNING) << "Texture Load: Failed to load TEX because of unsupported format!";
@@ -229,7 +241,7 @@ namespace assets
 				}
 			}
 			
-			format.dxgi = DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+			format.dxgi = srgb ? DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM;
 			d3d::SurfaceInfo surface = d3d::calcSurfaceInfo(size, format.dxgi);
 			auto uncompressedMipZero = tex.as_rgba8(0);
 			DirectX::Image mipZero = createDirectXTexImage(size, format.dxgi, surface, uncompressedMipZero.data());
@@ -248,26 +260,46 @@ namespace assets
 			createMipmaps(image, name);
 
 			vector<d3d::InitialData> initialData = getInitialData(image);
-			return createTexture(d3d, size, format, initialData);
+			return createTexture(d3d, size, format, srgb, initialData);
 		}
 		else {
 			// decompressedData must be kept alive until texture is created
 			vector<vector<uint8_t>> decompressedMips;
 			vector<d3d::InitialData> initialData = getInitialData(tex, format.dxgi, decompress, decompressedMips);
-			return createTexture(d3d, size, format, initialData);
+			return createTexture(d3d, size, format, srgb, initialData);
 		}
 	}
 
-	Texture* createTextureFromGothicTex(D3d d3d, const FileData& file)
+	Texture* createTextureFromGothicTex(D3d d3d, const FileData& file, bool srgb)
 	{
 		auto name = ::util::asciiToLower(file.name);
-		assert(::util::endsWith(name, "tex"));
+		assert(::util::endsWith(name, ".tex"));
 
 		zenkit::Texture tex = {};
 		auto read = zenkit::Read::from(file.data, file.size);
 		tex.load(read.get());
 
-		return createTextureFromGothicTex(d3d, tex, name, std::nullopt);
+		return createTextureFromGothicTex(d3d, tex, name, srgb, std::nullopt);
+	}
+
+	Texture* createTextureOrDefault(D3d d3d, const std::string& assetName, bool srgb)
+	{
+		// TODO consider passing TexId instead of assetName
+
+		auto opt = assets::getIfAnyExists(assetName, FORMATS_TEXTURE);
+		if (opt.has_value()) {
+			auto& [handle, ext] = opt.value();
+			auto data = assets::getData(handle);
+			if (ext.str() == FormatsCompiled::TEX.str()) {
+				return assets::createTextureFromGothicTex(d3d, data, srgb);
+			}
+			else {
+				return assets::createTextureFromImageFormat(d3d, data, srgb);
+			}
+		}
+		else {
+			return createDefaultTexture(d3d);
+		}
 	}
 
 	BufferSize getMaxSize(const vector<zenkit::Texture>& textures)
@@ -299,7 +331,7 @@ namespace assets
 		result.reserve(textures.size());
 		for (uint32_t i = 0; i < textures.size(); i++) {
 			auto& name = lightmapFiles.at(i).name;
-			result.push_back(createTextureFromGothicTex(d3d, textures.at(i), name, targetSize));
+			result.push_back(createTextureFromGothicTex(d3d, textures.at(i), name, true, targetSize));
 		}
 		return result;
 	}

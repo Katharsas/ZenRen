@@ -65,7 +65,7 @@ namespace assets
             // The more lights get summed, the bigger the SRGB summing error is. 
             // More light additions -> brighter in SRGB than linar; less lights -> closer brightness
             // The final weight (0.71f) in Vanilla Gothic might be there to counteract this error, but should lead to objects
-            // hit by less objects to be overly dark. Maybe adjust weight to lower value? Check low hit objects.
+            // hit by less lights to be overly dark. Maybe adjust weight to lower value? Check low hit objects.
 
             auto optLight = getLightAtPos(center, lightsStatic.data, lightsStatic.spatialTree, worldMesh.data, worldMesh.spatialTree);
             if (optLight.has_value()) {
@@ -99,7 +99,12 @@ namespace assets
                 }
             }
             else {
-                result.color = fromSRGB(COLOR(0.63f, 0.63f, 0.63f, 1));// fallback lightness of (160, 160, 160)
+                if (debug.vobsTintUnlit) {
+                    result.color = COLOR{ 0.5, 0.f, 0.f, 1.f };
+                }
+                else {
+                    result.color = fromSRGB(greyscale(0.63f));// fallback lightness of (160, 160, 160)
+                }
             }
             result.color.a = 1;// indicates that this VOB receives full sky light
         }

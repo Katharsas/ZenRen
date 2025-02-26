@@ -28,10 +28,9 @@
 #include <d3d11.h>
 //#include <d3dx11.h>
 
-namespace render {
-
-	void release(IUnknown *const dx11object);
-	void release(const std::vector<IUnknown*>& dx11objects);
+namespace render
+{
+	void release(IUnknown* const dx11object);
 
 	template<typename T>
 	void release(T* const dx11object)
@@ -40,5 +39,14 @@ namespace render {
 		// but this should give us better errors since the Dx.h declaration accepts objects of any type.
 		static_assert(std::is_base_of<IUnknown, T>::value);
 		release((IUnknown* const)dx11object);
+	}
+
+	void release(const std::vector<IUnknown*>& dx11objects);
+
+	template <typename T, size_t N>
+	void release(const std::array<T*, N>& dx11objects) {
+		for (auto object : dx11objects) {
+			release(object);
+		}
 	}
 }

@@ -37,14 +37,14 @@ namespace render {
 			};
 			shaders[shaderName] = new Shader(d3d, filePath(shaderName), layoutDesc);
 		} {
-			std::string shaderName("depthPrepass");
+			std::string shaderName("forward/depthPrepass");
 			std::vector<VertexInputLayoutDesc> layoutDesc =
 			{
 				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT }
 			};
 			shaders[shaderName] = new Shader(d3d, filePath(shaderName), layoutDesc, true);
 		} {
-			std::string shaderName("mainPass");
+			std::string shaderName("forward/main");
 			std::vector<VertexInputLayoutDesc> layoutDesc =
 			{
 				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0 },
@@ -59,7 +59,7 @@ namespace render {
 			};
 			shaders[shaderName] = new Shader(d3d, filePath(shaderName), layoutDesc);
 		} {
-			std::string shaderName("mainPassTexOnly");
+			std::string shaderName("forward/mainTexColorOnly");
 			std::vector<VertexInputLayoutDesc> layoutDesc =
 			{
 				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0 },
@@ -73,14 +73,14 @@ namespace render {
 			};
 			shaders[shaderName] = new Shader(d3d, filePath(shaderName), layoutDesc);
 		} {
-			std::string shaderName("wireframe");
+			std::string shaderName("forward/wireframe");
 			std::vector<VertexInputLayoutDesc> layoutDesc =
 			{
 				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0 },
 			};
 			shaders[shaderName] = new Shader(d3d, filePath(shaderName), layoutDesc);
 		} {
-			std::string shaderName("sky");
+			std::string shaderName("forward/sky");
 			std::vector<VertexInputLayoutDesc> layoutDesc =
 			{
 				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0 },

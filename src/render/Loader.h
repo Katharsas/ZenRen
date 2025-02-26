@@ -1,6 +1,7 @@
 #pragma once
 
-#include "Common.h"
+#include "Util.h"
+#include "render/Common.h"
 
 #include "zenkit/Mmap.hh" 
 #include "zenkit/Material.hh"
@@ -11,10 +12,42 @@ namespace assets
 		bool validateMeshData = true;
 
 		bool vobsTint = false;
+		bool vobsTintUnlit = false;
 		bool staticLights = false;
 		bool staticLightRays = false;
 		bool staticLightTintUnreached = false;
 	};
+
+	namespace FormatsSource
+	{
+		const ::util::FileExt __3DS = ::util::FileExt::create(".3DS");
+		const ::util::FileExt ASC = ::util::FileExt::create(".ASC");
+		const ::util::FileExt MDS = ::util::FileExt::create(".MDS");
+		const ::util::FileExt PFX = ::util::FileExt::create(".PFX");
+		const ::util::FileExt MMS = ::util::FileExt::create(".MMS");
+		const ::util::FileExt TGA = ::util::FileExt::create(".TGA");
+		const ::util::FileExt PNG = ::util::FileExt::create(".PNG");
+
+		const std::initializer_list ALL = { __3DS, ASC, MDS, PFX, MMS, TGA, PNG };
+	}
+
+	// see https://github.com/Try/OpenGothic/wiki/Gothic-file-formats
+	// MRM = single mesh (multiresolution)
+	// MDM = single mesh
+	// MDH = model hierarchy
+	// MDL = model hierarchy including all used single meshes
+	namespace FormatsCompiled
+	{
+		const ::util::FileExt ZEN = ::util::FileExt::create(".ZEN");
+		const ::util::FileExt TEX = ::util::FileExt::create(".TEX");
+		const ::util::FileExt MRM = ::util::FileExt::create(".MRM");
+		const ::util::FileExt MDM = ::util::FileExt::create(".MDM");
+		const ::util::FileExt MDH = ::util::FileExt::create(".MDH");
+		const ::util::FileExt MDL = ::util::FileExt::create(".MDL");
+		const ::util::FileExt MAN = ::util::FileExt::create(".MAN");
+
+		const std::initializer_list ALL = { ZEN, TEX, MRM, MDM, MDH, MDL, MAN };
+	}
 }
 //namespace zenkit
 //{
@@ -110,7 +143,7 @@ namespace render
 		MatToChunksToVertsBasic worldMesh;
 		MatToChunksToVertsBasic staticMeshes;
 		//VERTEX_DATA_BY_MAT dynamicMeshes;
-		MatToChunksToVertsBlend staticMeshesBlend;
+		//MatToChunksToVertsBlend staticMeshesBlend;
 		std::vector<FileData> worldMeshLightmaps;
 	};
 }

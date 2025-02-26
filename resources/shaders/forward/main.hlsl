@@ -1,60 +1,35 @@
+#include "common.hlsl"
+
 //--------------------------------------------------------------------------------------
 // Vertex Shader
 //--------------------------------------------------------------------------------------
-
-static const uint OUTPUT_FULL = 0;
-static const uint OUTPUT_SOLID = 1;
-static const uint OUTPUT_DIFFUSE = 2;
-static const uint OUTPUT_NORMAL = 3;
-static const uint OUTPUT_LIGHT_SUN = 4;
-static const uint OUTPUT_LIGHT_STATIC = 5;
-
-cbuffer cbSettings : register(b0) {
-    float4 skyLight;
-    
-    bool multisampleTransparency;
-    bool distantAlphaDensityFix;
-
-    uint outputType;
-
-    float timeOfDay;
-    bool skyTexBlur;
-};
-
-cbuffer cbPerObject : register(b1)
-{
-    float4x4 worldViewMatrix;
-    float4x4 worldViewMatrixInverseTranposed;
-    float4x4 projectionMatrix;
-};
 
 struct VS_IN
 {
     float4 position : POSITION;
     float4 normal : NORMAL0;
-    float2 uvBaseColor : TEXCOORD0; // TODO should be called uvTexColor
-    float3 uvLightmap : TEXCOORD1; // TODO should be called uviTexLightmap
+    float2 uvTexColor : TEXCOORD0;
+    float3 uviTexLightmap : TEXCOORD1;
     float4 colLight : COLOR;
     float3 dirLight : NORMAL1;
     float sunLight : TEXCOORD2;
     uint1 iTexColor : TEXCOORD3;
-    //uint1 blendType : ENUM;
 };
 
 struct VS_OUT
 {
-    nointerpolation float iBaseColor : TEX_INDEX0;
-    nointerpolation float iLightmap : TEX_INDEX1;
+    nointerpolation float iTexColor : TEX_INDEX0;
+    nointerpolation float iTexLightmap : TEX_INDEX1;
     
-    float2 uvBaseColor : TEXCOORD0;
-    float2 uvLightmap : TEXCOORD1;
+    float2 uvTexColor : TEXCOORD0;
+    float2 uvTexLightmap : TEXCOORD1;
     float3 light : LIGHT_INTENSITY;
     float4 position : SV_POSITION;
 };
 
 // Returns factor for amount of light received (between 0 and 1).
 // To simulate bounce lighting, backside faces also get a bit of light and there is a fixed ambient amount.
-float CalcLightDirectional(float3 dirLight, float3 dirNormal, float lightRatioAt90, float ambientLight)
+float CalcLightDirectional(float3 dirLight, float3 dirNormal, float lightRatioAt90)
 {
     // for normalized input: range of -1 (down) to 1 (up)
     float lightNormalDotProduct = dot(dirNormal, dirLight);
@@ -69,22 +44,15 @@ float CalcLightDirectional(float3 dirLight, float3 dirNormal, float lightRatioAt
     else {
         lightReceivedRatio = (lightNormalDotProduct + lightRatioAt90) / (1 + lightRatioAt90);
     }
-    lightReceivedRatio = (lightReceivedRatio + ambientLight) / (1 + ambientLight);
     return lightReceivedRatio;
 }
 
-float CalcLightSun(float3 dirLight, float3 dirNormal)
+// Keeps max, anything below or above max is pushed towards max by ambientLight, light is scaled by (max - ambientLight).
+// This means a light value of 1 with a max of 1.5 will result in 1.5 regardless of ambientLight.
+float3 RescaleOntoAmbient(float3 light, float3 ambientLight, float max = 1)
 {
-    float lightReceived = CalcLightDirectional(dirLight, dirNormal, 0.6f, 0.3f);
-    float strength = 1.0f;
-    return lightReceived * strength;
-}
+    return ambientLight + (((float3) max - ambientLight) * light);
 
-float CalcLightStaticVob(float3 dirLight, float3 dirNormal)
-{
-    float lightReceived = CalcLightDirectional(dirLight, dirNormal, 0.f, 0.f);
-    float strength = 1.2f;
-    return lightReceived * strength;
 }
 
 VS_OUT VS_Main(VS_IN input)
@@ -104,52 +72,23 @@ VS_OUT VS_Main(VS_IN input)
     //float3 viewLight3 = normalize((float3) mul(float4(0, 1, 0, 0), worldViewMatrixInverseTranposed));
     //float3 viewLight3 = normalize(mul(float3(0, 1, 0), (float3x3) worldViewMatrixInverseTranposed));
 
-    bool enableLightSun = false;
-    bool enableLightStatic = false;
+    bool isVob = input.dirLight.x > -99;// world sets dirLight to -100
+    bool hasLightmap = input.uviTexLightmap.z >= 0;
+    bool hasVertexLight = !isVob && !hasLightmap;
 
-    if (outputType == OUTPUT_FULL || outputType == OUTPUT_SOLID) {
-        enableLightSun = true;
-        enableLightStatic = true;
-    }
-    else {
-        if (outputType == OUTPUT_LIGHT_SUN) {
-            enableLightSun = true;
-        }
-        if (outputType == OUTPUT_LIGHT_STATIC) {
-            enableLightStatic = true;
-        }
-    }
-    
-    if (enableLightSun || enableLightStatic) {
-        bool isVob = (input.dirLight.x > -99);
-        
-        // alpha indicates show much skylight should be received
-        float3 whiteOrSkyLight = lerp((float3) 1, skyLight.rgb, input.colLight.a);
-        float3 lightStaticCol = input.colLight.rgb * whiteOrSkyLight;
-
-        float sunStrengthForCurrentTime = abs(timeOfDay - 0.5f) * 2; // (0 = midnight, 1 = midday)
-        float lightSunAmount = lerp(0, 0.0f, sunStrengthForCurrentTime);
-        float3 lightSun = (float3) (input.sunLight * CalcLightSun(viewLight3, viewNormal3));
-        float3 lightStatic;
-        float3 lightAmbient;
-        if (isVob) {
-            lightStatic = lightStaticCol * CalcLightStaticVob(input.dirLight, viewNormal3);
-            lightAmbient = lightStaticCol * 0.27f; // original SRGB factor = 0.4f
+    if (outputType == OUTPUT_FULL || outputType == OUTPUT_SOLID || outputType == OUTPUT_LIGHT_SUN) {
+        float3 light = (float3) 1.f;
+        float3 lightColor = input.colLight.rgb;
+        if (!isVob) {
+            light = RescaleOntoAmbient(lightColor * .9f, (float3) .0f);
         }
         else {
-            lightStatic = lightStaticCol;
-            lightAmbient = 0.f;
+            float lightReceived = CalcLightDirectional(input.dirLight, viewNormal3, .0f);
+            float3 directionalLight = lightColor * lightReceived;
+            light = RescaleOntoAmbient(directionalLight, lightColor * .15f, 1.25f);
         }
-
-        output.light = (float3) 0;
-        if (enableLightSun) {
-            output.light += lightSun * lightSunAmount;
-        }
-        if (enableLightStatic) {
-            output.light = (lightAmbient + lightStatic) * (1.f - lightSunAmount);
-        }
-
-        output.light *= 1.0; // balance VOBs and non-lightmap world vs. lightmaps of world
+        // TODO it is unclear if vob ambient factor is applied before or after skylight
+        output.light = light * skyLight.rgb;
     }
     else if (outputType == OUTPUT_NORMAL) {
         output.light = input.normal.xyz;
@@ -159,12 +98,10 @@ VS_OUT VS_Main(VS_IN input)
     }
 
     output.position = mul(viewPosition, projectionMatrix);
-    output.uvBaseColor = input.uvBaseColor;
-    output.iBaseColor = input.iTexColor;
-    //output.uvBaseColor = float3(input.uvBaseColor, input.iTexColor);
-    //output.uvBaseColor = input.uvBaseColor;
-    output.uvLightmap = input.uvLightmap.xy;
-    output.iLightmap = input.uvLightmap.z;
+    output.uvTexColor = input.uvTexColor;
+    output.iTexColor = input.iTexColor;
+    output.uvTexLightmap = input.uviTexLightmap.xy;
+    output.iTexLightmap = input.uviTexLightmap.z;
    
     return output;
 }
@@ -180,11 +117,11 @@ SamplerState SampleType : register(s0);
 struct PS_IN
 {
     // TODO values that do not need to be interpolated like tex array index should be marked as such
-    nointerpolation float iBaseColor : TEX_INDEX0;
-    nointerpolation float iLightmap : TEX_INDEX1;
+    nointerpolation float iTexColor : TEX_INDEX0;
+    nointerpolation float iTexLightmap : TEX_INDEX1;
     
-    float2 uvBaseColor : TEXCOORD0; // TODO should be called uviTexColor
-    float2 uvLightmap : TEXCOORD1; // TODO should be called uviTexLightmap
+    float2 uvTexColor : TEXCOORD0;
+    float2 uvTexLightmap : TEXCOORD1; // TODO should be called uviTexLightmap
     float3 light : LIGHT_INTENSITY;
 };
 
@@ -205,7 +142,7 @@ float CalcDistantAlphaDensityFactor(Texture2DArray<float4> sourceTex, float2 tex
         float texWidth;
         float texHeight;
         float elements;
-        sourceTex.GetDimensions(texWidth, texHeight, elements); // TODO this info could be passed with cb
+        sourceTex.GetDimensions(texWidth, texHeight, elements); // TODO this info could be passed with cb/sb
         float distAlphaMipScale = 0.25f;
         return 1 + CalcMipLevel(texCoord * float2(texWidth, texHeight)) * distAlphaMipScale;
     }
@@ -223,10 +160,11 @@ float AlphaTestAndSharpening(float alpha)
     // sharpen the multisampled alpha to remove banding and interior transparency; outputs close to 1 or 0
     if (multisampleTransparency) {
         alpha = (alpha - alphaCutoff) / max(fwidth(alpha), 0.0001) + 0.5;
+        // Clipping will be effectively performed by  Alpha-To-Coverage based on output alpha
     }
-
-    // Alpha Test - if sharpening is used, the alphaCutoff its pretty much irrelevant here (we could just use 0.5)
-    clip(alpha < alphaCutoff ? -1 : 1);
+    else {
+        clip(alpha < alphaCutoff ? -1 : 1);
+    }
     return alpha;
 }
 
@@ -254,22 +192,21 @@ float4 PS_Main(PS_IN input) : SV_TARGET
             || outputType == OUTPUT_SOLID
             || outputType == OUTPUT_LIGHT_STATIC) {
             
-            if (input.iLightmap >= 0) /* dynamic branch */ {
-                lightColor = SampleLightmap(float3(input.uvLightmap, input.iLightmap));
+            if (input.iTexLightmap >= 0) /* dynamic branch */ {
+                lightColor = SampleLightmap(float3(input.uvTexLightmap, input.iTexLightmap));
             }
         }
-    
-        // TODO balance world lighting against sky, TODO indoor/outdoor and dynamic light
-        lightColor.rgb *= 1.3;
     }
 
     // diffuse (calculate always so alpha clipping works regardless of outputType)
     float4 diffuseColor;
     {
-        diffuseColor = baseColor.Sample(SampleType, float3(input.uvBaseColor, input.iBaseColor));
-        //diffuseColor = baseColor.Sample(SampleType, float3(input.uvBaseColor, 0));
-        diffuseColor.a *= CalcDistantAlphaDensityFactor(baseColor, input.uvBaseColor.xy);
-        diffuseColor.a = AlphaTestAndSharpening(diffuseColor.a);
+        diffuseColor = baseColor.Sample(SampleType, float3(input.uvTexColor, input.iTexColor));
+        if (alphaTest) {
+            // TODO if this costs significant performance we should separate alpha tested geometry from fully opaque geometry
+            diffuseColor.a *= CalcDistantAlphaDensityFactor(baseColor, input.uvTexColor);
+            diffuseColor.a = AlphaTestAndSharpening(diffuseColor.a);
+        }
     }
 
     // albedo color
@@ -281,9 +218,11 @@ float4 PS_Main(PS_IN input) : SV_TARGET
         albedoColor = float4(input.light, 1);
     }
     else {
-        albedoColor = float4((float3) 0.5, 1);
+        // full white material shading, TODO make adjustable
+        float3 debugMaterialColor = (float3) 1;
+        albedoColor = float4(debugMaterialColor, 1);
     }
     
     float4 shadedColor = albedoColor * lightColor;
-    return shadedColor;
+    return shadedColor; //float4(shadedColor.rgb, 1);
 }

@@ -1,9 +1,14 @@
 #pragma once
 
-#include "Primitives.h"
 #include <string>
 #include <ostream>
 #include <vector>
+
+#include "Util.h"
+#include "render/Primitives.h"
+#include "render/d3d/BlendState.h"
+
+#include "magic_enum.hpp"
 
 //enum DXGI_FORMAT : int;
 
@@ -26,6 +31,7 @@ namespace render
 		// compression and color space
 		// DXGI_FORMAT
 		uint32_t format = 0; // DXGI_FORMAT_UNKNOWN
+		bool srgb = true;
 
 		auto operator<=>(const TexInfo&) const = default;
 
@@ -54,11 +60,11 @@ namespace render
 	template<typename F>
 	concept IS_VERTEX_BASIC = std::is_same_v<F, VertexBasic>;
 
-	template<typename F>
-	concept IS_VERTEX_BLEND = std::is_same_v<F, VertexBlend>;
+	//template<typename F>
+	//concept IS_VERTEX_BLEND = std::is_same_v<F, VertexBlend>;
 
 	template <typename F>
-	concept VERTEX_FEATURE = IS_VERTEX_BASIC<F> || IS_VERTEX_BLEND<F>;
+	concept VERTEX_FEATURE = IS_VERTEX_BASIC<F>;// || IS_VERTEX_BLEND<F>;
 
 
 	template <VERTEX_FEATURE F>
@@ -68,10 +74,20 @@ namespace render
 	};
 
 	typedef Verts<VertexBasic> VertsBasic;
-	typedef Verts<VertexBlend> VertsBlend;
+	//typedef Verts<VertexBlend> VertsBlend;
 
+	constexpr uint16_t PASS_COUNT = 5;
+
+	static_assert(magic_enum::enum_count<BlendType>() == PASS_COUNT);
+
+	enum class ColorSpace {
+		LINEAR, SRGB
+	};
+	
 	struct Material {
 		TexId texBaseColor;
+		BlendType blendType;
+		ColorSpace colorSpace;
 
 		auto operator<=>(const Material&) const = default;
 	};
@@ -82,7 +98,7 @@ namespace render
 	template <VERTEX_FEATURE F>
 	using MatToChunksToVerts = std::unordered_map<Material, ChunkToVerts<F>>;
 	using MatToChunksToVertsBasic = MatToChunksToVerts<VertexBasic>;
-	using MatToChunksToVertsBlend = MatToChunksToVerts<VertexBlend>;
+	//using MatToChunksToVertsBlend = MatToChunksToVerts<VertexBlend>;
 
 	template <VERTEX_FEATURE F>
 	using MatToVerts = std::unordered_map<Material, Verts<F>>;
@@ -116,14 +132,6 @@ namespace render
 			}
 		}
 	}
-
-	// the boost hash_combine function
-	template <class Hashable>
-	inline void hashCombine(std::size_t& hash, const Hashable& value)
-	{
-		std::hash<Hashable> hasher;
-		hash ^= hasher(value) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-	}
 }
 
 namespace std
@@ -136,11 +144,11 @@ namespace std
 		size_t operator()(const TexInfo& key) const
 		{
 			size_t res = 0;
-			hashCombine(res, key.width);
-			hashCombine(res, key.height);
-			hashCombine(res, key.mipLevels);
-			hashCombine(res, key.hasAlpha);
-			hashCombine(res, key.format);
+			util::hashCombine(res, key.width);
+			util::hashCombine(res, key.height);
+			util::hashCombine(res, key.mipLevels);
+			util::hashCombine(res, key.hasAlpha);
+			util::hashCombine(res, key.format);
 			return res;
 		}
 	};
@@ -151,7 +159,9 @@ namespace std
 		size_t operator()(const Material& key) const
 		{
 			size_t res = 0;
-			hashCombine(res, key.texBaseColor);
+			util::hashCombine(res, key.texBaseColor);
+			util::hashCombine(res, key.blendType);
+			util::hashCombine(res, key.colorSpace);
 			return res;
 		}
 	};
@@ -162,8 +172,8 @@ namespace std
 		size_t operator()(const ChunkIndex& key) const
 		{
 			size_t res = 0;
-			hashCombine(res, key.x);
-			hashCombine(res, key.y);
+			util::hashCombine(res, key.x);
+			util::hashCombine(res, key.y);
 			return res;
 		}
 	};

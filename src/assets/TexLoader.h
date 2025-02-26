@@ -11,13 +11,14 @@
 
 namespace assets
 {
-	render::Texture* createDefaultTexture(render::D3d d3d);
-
 	render::Texture* createTextureFromImageFormat(
-		render::D3d d3d, const render::FileData& imageFile);
+		render::D3d d3d, const render::FileData& imageFile, bool srgb);
 
 	render::Texture* createTextureFromGothicTex(
-		render::D3d d3d, const render::FileData& cTexFile);
+		render::D3d d3d, const render::FileData& cTexFile, bool srgb);
+
+	render::Texture* createTextureOrDefault(
+		render::D3d d3d, const std::string& assetName, bool srgb);
 
 	std::vector<render::Texture*> createTexturesFromLightmaps(
 		render::D3d d3d, const std::vector<render::FileData>& lightmapFiles);

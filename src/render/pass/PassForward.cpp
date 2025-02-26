@@ -2,6 +2,7 @@
 #include "PassForward.h"
 
 #include "render/d3d/ConstantBuffer.h"
+#include "render/d3d/BlendState.h"
 #include "render/RenderUtil.h"
 
 #include "render/Camera.h"
@@ -14,9 +15,10 @@ namespace render::pass::forward
 {
 	using DirectX::XMMATRIX;
 
+	// Note: smallest type for constant buffer values is 32 bit; cannot use bool or uint_16 without packing
+
 	__declspec(align(16))
 	struct CbGlobalSettings {
-		// Note: smallest type for constant buffer values is 32 bit; cannot use bool or uint_16 without packing
 		COLOR skyLight;
 		int32_t multisampleTransparency;
 		int32_t distantAlphaDensityFix;
@@ -27,10 +29,20 @@ namespace render::pass::forward
 	
 	__declspec(align(16))
 	struct CbCamera {
-		// Note: smallest type for constant buffer values is 32 bit; cannot use bool or uint_16 without packing
 		DirectX::XMMATRIX worldViewMatrix;
 		DirectX::XMMATRIX worldViewMatrixInverseTranposed;
 		DirectX::XMMATRIX projectionMatrix;
+	};
+
+	__declspec(align(16))
+	struct CbBlendMode {
+		bool alphaTestEnabled;
+	};
+
+	__declspec(align(16))
+	struct CbDebug {
+		float debugFloat1;
+		float debugFloat2;
 	};
 
 	ID3D11Texture2D* targetTex = nullptr;// linear color, 64-bit, potentially multisampled
@@ -44,13 +56,15 @@ namespace render::pass::forward
 	ID3D11DepthStencilState* depthState = nullptr;
 	ID3D11RasterizerState* rasterizer = nullptr;
 	ID3D11RasterizerState* rasterizerWf = nullptr;
-	ID3D11BlendState* blendState = nullptr;
+	std::array<ID3D11BlendState*, PASS_COUNT> blendStates = { nullptr, nullptr, nullptr, nullptr };
 	ID3D11BlendState* blendStateNoAtc = nullptr;// Alpha to coverage must be disabled for transparent surfaces; always nullptr (default blendstate)
 
 	ShaderCbs shaderCbs;
 
+
 	void clean()
 	{
+		release(blendStates);
 		release(std::vector<IUnknown*> {
 			targetTex,
 			targetRtv,
@@ -61,11 +75,11 @@ namespace render::pass::forward
 			depthState,
 			rasterizer,
 			rasterizerWf,
-			blendState,
 			blendStateNoAtc,
 
 			shaderCbs.settingsCb,
 			shaderCbs.cameraCb,
+			shaderCbs.blendModeCb,
 		});
 	}
 
@@ -81,6 +95,9 @@ namespace render::pass::forward
 		cbGlobalSettings.skyTexBlurEnabled = settings.skyTexBlur;
 
 		d3d::updateConstantBuf(d3d, shaderCbs.settingsCb, cbGlobalSettings);
+
+		// debug sliders
+		d3d::updateConstantBuf(d3d, shaderCbs.debugCb, CbDebug{ settings.debugFloat1, settings.debugFloat2 });
 	}
 
 	void updateCamera(D3d d3d, bool fixedPosAtOrigin = false)
@@ -104,7 +121,20 @@ namespace render::pass::forward
 		d3d::updateConstantBuf(d3d, shaderCbs.cameraCb, camera);
 	}
 
+	void updateBlendMode(D3d d3d, bool alphaTestEnabled)
+	{
+		CbBlendMode blendMode { alphaTestEnabled };
+		d3d::updateConstantBuf(d3d, shaderCbs.blendModeCb, blendMode);
+	}
+
+	std::wstring toWString(const std::string prefix, BlendType blendType)
+	{
+		return ::util::utf8ToWide(prefix + std::string(magic_enum::enum_name(blendType)));
+	}
+
 	void draw(D3d d3d, ShaderManager* shaders, const RenderSettings& settings) {
+		d3d.annotation->BeginEvent(L"Pass Foward");
+
 		// set the linear back buffer as rtv
 		d3d.deviceContext->OMSetRenderTargets(1, &targetRtv, depthView);
 		d3d.deviceContext->RSSetViewports(1, &viewport);
@@ -118,7 +148,6 @@ namespace render::pass::forward
 
 		// set rasterizer state
 		d3d.deviceContext->RSSetState(rasterizer);
-		d3d.deviceContext->OMSetBlendState(blendState, NULL, 0xffffffff);
 
 		// enable depth
 		d3d.deviceContext->OMSetDepthStencilState(depthState, 1);
@@ -126,29 +155,61 @@ namespace render::pass::forward
 		// update common constant buffers
 		updateSettings(d3d, settings);
 
-		// draw world to linear buffer
+		// update camera
 		updateCamera(d3d);
 		world::updateCameraFrustum(camera::getFrustum());
-		if (settings.depthPrepass) {
-			world::drawPrepass(d3d, shaders, shaderCbs);
-		}
-		world::drawWorld(d3d, shaders, shaderCbs, RenderPass::BASIC);
-		if (settings.wireframe) {
-			d3d.deviceContext->RSSetState(rasterizerWf);
-			world::drawWireframe(d3d, shaders, shaderCbs, RenderPass::BASIC);
-			world::drawWireframe(d3d, shaders, shaderCbs, RenderPass::BLEND);
-			d3d.deviceContext->RSSetState(rasterizer);
+
+		// set common constant buffers
+		d3d.deviceContext->VSSetConstantBuffers(0, 1, &shaderCbs.settingsCb);
+		d3d.deviceContext->PSSetConstantBuffers(0, 1, &shaderCbs.settingsCb);
+		d3d.deviceContext->VSSetConstantBuffers(1, 1, &shaderCbs.cameraCb);
+		d3d.deviceContext->PSSetConstantBuffers(1, 1, &shaderCbs.cameraCb);
+		d3d.deviceContext->VSSetConstantBuffers(2, 1, &shaderCbs.blendModeCb);
+		d3d.deviceContext->PSSetConstantBuffers(2, 1, &shaderCbs.blendModeCb);
+		d3d.deviceContext->VSSetConstantBuffers(3, 1, &shaderCbs.debugCb);
+		d3d.deviceContext->PSSetConstantBuffers(3, 1, &shaderCbs.debugCb);
+
+		// opaque / alpha tested passes (unsorted)
+		uint8_t blendType = 0;
+		if (settings.passesOpaque) {
+			updateBlendMode(d3d, true);
+			d3d.annotation->BeginEvent(toWString("Pass Blend: ", (BlendType)blendType).c_str());
+			d3d.deviceContext->OMSetBlendState(blendStates.at(blendType), nullptr, 0xffffffff);
+			if (settings.depthPrepass) {
+				world::drawPrepass(d3d, shaders, shaderCbs);
+			}
+			world::drawWorld(d3d, shaders, shaderCbs, (BlendType)blendType);
+			if (settings.wireframe) {
+				d3d.deviceContext->RSSetState(rasterizerWf);
+				world::drawWireframe(d3d, shaders, shaderCbs, (BlendType)blendType);
+				d3d.deviceContext->RSSetState(rasterizer);
+			}
+			d3d.annotation->EndEvent();
+
+			// draw sky (depth disabled, camera at origin)
+			d3d.deviceContext->OMSetBlendState(blendStateNoAtc, NULL, 0xffffffff);
+			updateCamera(d3d, true);
+			world::drawSky(d3d, shaders, shaderCbs);
+			updateCamera(d3d);
 		}
 
-		// draw sky (depth disabled, camera at origin)
-		// TODO somehow make sure world is split into prepass, opaque renderer, transparency texture renderer, sky renderer, other renderers
-		// TODO create custom shader for sky (see https://www.braynzarsoft.net/viewtutorial/q16390-20-cube-mapping-skybox )
-		//   - instead of using different depth state, just set z value in shader to infinity after projection matrix is applied
-		//   - this will effectively draw the sky behind all other geometry without disabling early z and reduces state changes in pipeline
-		//   - test drawing sky last (especially against trees)
-		d3d.deviceContext->OMSetBlendState(blendStateNoAtc, NULL, 0xffffffff);
-		updateCamera(d3d, true);
-		world::drawSky(d3d, shaders, shaderCbs);
+		// transparent / (alpha) blend passes
+		if (settings.passesBlend) {
+			updateBlendMode(d3d, false);
+			COLOR blendFactorCol = greyscale(.920f);// used by BlendType::BLEND_FACTOR pass
+
+			for (blendType = 1; blendType < PASS_COUNT; blendType++) {
+				d3d.annotation->BeginEvent(toWString("Pass Blend: ", (BlendType)blendType).c_str());
+				d3d.deviceContext->OMSetBlendState(blendStates.at(blendType), blendFactorCol.vec, 0xffffffff);
+				world::drawWorld(d3d, shaders, shaderCbs, (BlendType)blendType);
+				if (settings.wireframe) {
+					d3d.deviceContext->RSSetState(rasterizerWf);
+					world::drawWireframe(d3d, shaders, shaderCbs, (BlendType)blendType);
+					d3d.deviceContext->RSSetState(rasterizer);
+				}
+				d3d.annotation->EndEvent();
+			}
+		}
 
 		if (settings.multisampleCount > 1) {
 			d3d.deviceContext->ResolveSubresource(
@@ -156,6 +217,8 @@ namespace render::pass::forward
 				targetTex, D3D11CalcSubresource(0, 0, 1),
 				DXGI_FORMAT_R16G16B16A16_FLOAT);
 		}
+
+		d3d.annotation->EndEvent();
 	}
 
 	ID3D11ShaderResourceView* initRenderBuffer(D3d d3d, BufferSize& size, uint32_t multisampleCount)
@@ -299,16 +362,11 @@ namespace render::pass::forward
 		}
 	}
 
-	void initBlendState(D3d d3d, uint32_t multisampleCount, bool multisampleTransparency) {
-		release(blendState);
-
-		if (multisampleCount > 1) {
-			D3D11_BLEND_DESC blendStateDesc = CD3D11_BLEND_DESC(CD3D11_DEFAULT{});
-			blendStateDesc.AlphaToCoverageEnable = multisampleTransparency;
-			d3d.device->CreateBlendState(&blendStateDesc, &blendState);
-		}
-		else {
-			blendState = nullptr;
+	void initBlendStates(D3d d3d, uint32_t multisampleCount, bool multisampleTransparency) {
+		for (uint8_t blendTypeIndex = 0; blendTypeIndex < PASS_COUNT; blendTypeIndex++) {
+			auto blendType = (BlendType)blendTypeIndex;
+			bool alphaToCoverage = multisampleCount > 1 && multisampleTransparency;
+			dx::createBlendState(d3d, &blendStates.at(blendTypeIndex), blendType, alphaToCoverage);
 		}
 	}
 
@@ -317,5 +375,7 @@ namespace render::pass::forward
 		// TODO these should probably be dynamic, see https://www.gamedev.net/forums/topic/673486-difference-between-d3d11-usage-default-and-d3d11-usage-dynamic/
 		d3d::createConstantBuf<CbGlobalSettings>(d3d, &shaderCbs.settingsCb, BufferUsage::WRITE_GPU);
 		d3d::createConstantBuf<CbCamera>(d3d, &shaderCbs.cameraCb, BufferUsage::WRITE_GPU);
+		d3d::createConstantBuf<CbBlendMode>(d3d, &shaderCbs.blendModeCb, BufferUsage::WRITE_GPU);
+		d3d::createConstantBuf<CbDebug>(d3d, &shaderCbs.debugCb, BufferUsage::WRITE_GPU);
 	}
 }

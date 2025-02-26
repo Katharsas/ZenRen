@@ -1,26 +1,41 @@
 #include "stdafx.h"
 #include "AssetFinder.h"
 
-#include "DebugTextures.h"
-#include "../Util.h"
-#include <zenkit/Logger.hh>
-
 #include <iostream>
 #include <fstream>
 #include <span>
 #include <spanstream>
+
+#include "DebugTextures.h"
+#include "../Util.h"
+
+#include "zenkit/Logger.hh"
+#include "magic_enum.hpp"
+
 
 namespace assets
 {
 	namespace fs = std::filesystem;
 	using render::FileData;
 	using std::byte;
+	using std::unordered_map;
+	using std::unordered_set;
 	using std::vector;
 	using std::string;
 	using std::string_view;
 
-	std::unordered_map<string, const fs::path> assetNamesToPaths;
-	std::unordered_set<string> zensFoundInVdfs;
+	// name is lowercase
+	unordered_map<string, const fs::path> assetNamesToPaths;
+	unordered_set<string> zensFoundInVdfs;
+
+	unordered_set<AssetsIntern> assetsIntern = {
+		AssetsIntern::DEFAULT_TEXTURE,
+	};
+	unordered_map<AssetsIntern, FileHandle> assetsInternHandles;
+	unordered_map<AssetsIntern, const fs::path> assetsInternPaths;
+
+	const std::string DEFAULT_TEXTURE = "default_texture.png";
+	const fs::path DEFAULT_TEXTURE_PATH = fs::path("./" + DEFAULT_TEXTURE);
 
 	struct Vfs {
 		zenkit::Vfs* zkit = nullptr;
@@ -47,6 +62,13 @@ namespace assets
 		}
 	}
 
+	FileHandle getInternal(const AssetsIntern asset)
+	{
+		auto it = assetsInternHandles.find(asset);
+		assert(it != assetsInternHandles.end());
+		return it->second;
+	}
+
 	// for that we need AssetFinder to provide generic file byte streaming / in-memory-buffering and other code use that as input
 	std::optional<FileHandle> getIfExistsAsFile(const string_view assetName)
 	{
@@ -67,7 +89,17 @@ namespace assets
 	std::optional<FileHandle> getIfExistsInVfs(const string_view assetName)
 	{
 		assert(vfs.initialized());
-		std::string assetNameStr = string(assetName);
+		std::string assetNameStr;
+
+		// add -c suffix for compiled textures
+		if (util::endsWithEither(assetName, { FormatsCompiled::TEX })) {
+			auto [nameNoExt, oldExt] = util::replaceExtensionAndGetOld(assetName, "");
+			assetNameStr = nameNoExt + "-c" + oldExt;
+		}
+		else {
+			assetNameStr = string(assetName);
+		}
+
 		const zenkit::VfsNode* node = vfs.zkit->find(assetNameStr);
 		if (node != nullptr) {
 			return FileHandle{
@@ -83,13 +115,32 @@ namespace assets
 
 	std::optional<FileHandle> getIfExists(const string_view assetName)
 	{
-		auto realFile = getIfExistsAsFile(assetName);
-		if (realFile.has_value()) {
-			return realFile;
+		auto handle = getIfExistsAsFile(assetName);
+		if (handle.has_value()) {
+			return handle;
 		}
-		else {
-			return getIfExistsInVfs(assetName);
+		return getIfExistsInVfs(assetName);
+	}
+
+	std::optional<std::pair<FileHandle, util::FileExt>> getIfAnyExists(const string_view assetName, const AssetFormats& formats)
+	{
+		// remove extension if any
+		string assetNameNoExtLower = util::replaceExtension(assetName, "");
+		util::asciiToLowerMut(assetNameNoExtLower);
+
+		for (auto& ext : formats.formatsFile) {
+			auto handle = getIfExistsAsFile(assetNameNoExtLower + ext.extLower);
+			if (handle.has_value()) {
+				return std::pair { handle.value(), ext };
+			}
 		}
+		for (auto& ext : formats.formatsVfs) {
+			auto handle = getIfExistsInVfs(assetNameNoExtLower + ext.extLower);
+			if (handle.has_value()) {
+				return std::pair{ handle.value(), ext };
+			}
+		}
+		return std::nullopt;
 	}
 
 	bool exists(const string_view assetName)
@@ -119,26 +170,49 @@ namespace assets
 		}
 	}
 
+	void initAssetsIntern()
+	{
+		for (auto& enumVal : assetsIntern) {
+			std:string assetFileName = util::asciiToLower(magic_enum::enum_name(enumVal)) + ".png";
+			auto [ it, wasInserted ] = assetsInternPaths.insert({ enumVal , fs::path("./" + assetFileName) });
+			assetsInternHandles.insert({ enumVal, FileHandle {
+					.name = std::move(assetFileName),
+					.path = &(it->second),
+					.node = nullptr,
+				}
+			});
+		}
+	}
+
 	void initFileAssetSourceDir(fs::path& rootDir)
 	{
 		assetNamesToPaths.clear();
+
 		LOG(INFO) << "Scanning dir for asset files: " << util::toString(rootDir);
+		std::initializer_list<util::FileExt> extensions = {
+			FormatsSource::TGA,
+			FormatsSource::PNG,
+			FormatsCompiled::ZEN,
+			FormatsCompiled::TEX,
+			FormatsCompiled::MRM,
+			FormatsCompiled::MDM,
+			FormatsCompiled::MDH,
+			FormatsCompiled::MDL,
+			FormatsCompiled::MAN,
+		};
 
-		walkFilesRecursively(rootDir, [](const fs::path& path, const string& filename) -> void {
-			// textures
-			if (util::endsWith(filename, ".dds")) {
-				assetNamesToPaths.insert(std::pair(filenameWithTga(filename), path));
-			}
-			if (util::endsWith(filename, ".png")) {
-				assetNamesToPaths.insert(std::pair(filenameWithTga(filename), path));
-			}
-			if (util::endsWith(filename, ".tga")) {
-				assetNamesToPaths.insert(std::pair(filename, path));
-			}
-
-			// meshes
-			if (util::endsWith(filename, ".3ds")) {
-				assetNamesToPaths.insert(std::pair(filename, path));
+		walkFilesRecursively(rootDir, [&](const fs::path& path, const string& filenameLower) -> void {
+			if (util::endsWithEither(filenameLower, extensions)) {
+				// remove -c suffix for compiled textures (TODO do these even exist as single files or is -c suffix only used inside VDF?)
+				if (util::endsWithEither(filenameLower, { FormatsCompiled::TEX })) {
+					auto [nameNoExt, oldExt] = util::replaceExtensionAndGetOld(filenameLower, "");
+					if (util::endsWith(nameNoExt, "-c")) {
+						string suffixRemoved = string(filenameLower.substr(0, filenameLower.length() - 2)) + oldExt;
+						assetNamesToPaths.insert(std::pair(suffixRemoved, path));
+						return;
+					}
+				}
+				assetNamesToPaths.insert(std::pair(filenameLower, path));
 			}
 		});
 

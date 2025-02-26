@@ -12,7 +12,6 @@ namespace assets
 {
     void loadWorldMesh(
         render::MatToChunksToVertsBasic& target,
-        render::MatToChunksToVertsBlend& targetBlend,
         const zenkit::Mesh& worldMesh,
         bool debugChecksEnabled = false);
     

@@ -21,6 +21,7 @@ namespace assets
     using ::std::vector;
     using ::std::unordered_map;
     using ::std::unordered_set;
+    using ::std::optional;
 	using ::util::getOrCreate;
 
     const float zeroThreshold = 0.000001f;
@@ -323,23 +324,90 @@ namespace assets
         return unusual;
     }
 
+    optional<BlendType> getBlendType(zenkit::AlphaFunction alphaFunc)
+    {
+        switch (alphaFunc) {
+        case zenkit::AlphaFunction::DEFAULT:
+        case zenkit::AlphaFunction::NONE:
+            return BlendType::NONE;
+        case zenkit::AlphaFunction::BLEND:
+            // TODO is actual alpha channel blending even a thing?
+            return BlendType::BLEND_FACTOR;
+        case zenkit::AlphaFunction::ADD:
+            return BlendType::ADD;
+        case zenkit::AlphaFunction::MULTIPLY_ALT:
+            return BlendType::MULTIPLY;
+        default:
+            LOG(WARNING) << "Skipping material due to unsupported blend type! " << magic_enum::enum_name(alphaFunc);
+            return std::nullopt;
+        }
+    }
+
+    optional<BlendType> getBlendType(zenkit::Material material)
+    {
+        auto result = getBlendType(material.alpha_func);
+        if (result.has_value() && result.value() == BlendType::NONE && material.group == zenkit::MaterialGroup::WATER) {
+            // TODO is this a G1 only thing or does G2 also want this?
+            return BlendType::BLEND_FACTOR;
+        }
+        return result;
+    }
+
+    optional<Material> createMaterial(zenkit::Material material, bool debugChecksEnabled)
+    {
+        bool unusual = checkForUnusualMatProperties(material);
+
+        if (debugChecksEnabled) {
+            util::getOrCreateDefault(loadStats.materialGroups, material.group)++;
+            util::getOrCreateDefault(loadStats.materialAlphas, material.alpha_func)++;
+        }
+
+        auto blendTypeOpt = getBlendType(material);
+        if (!blendTypeOpt.has_value()) {
+            return std::nullopt;
+        }
+        BlendType blendType = blendTypeOpt.value();
+        bool isLinear = blendType == BlendType::MULTIPLY;
+
+        return Material {
+            .texBaseColor = getTexId(util::asciiToLower(material.texture)),
+            .blendType = blendType,
+            .colorSpace = isLinear ? ColorSpace::LINEAR : ColorSpace::SRGB,
+        };
+    }
+
+    optional<Material> createMaterialDecal(const std::string textureName, const Decal& decal, bool debugChecksEnabled)
+    {
+        if (debugChecksEnabled) {
+            util::getOrCreateDefault(loadStats.materialAlphas, decal.alpha)++;
+        }
+
+        auto blendTypeOpt = getBlendType(decal.alpha);
+        if (!blendTypeOpt.has_value()) {
+            return std::nullopt;
+        }
+        BlendType blendType = blendTypeOpt.value();
+        bool isLinear = blendType == BlendType::MULTIPLY;
+
+        return Material {
+            .texBaseColor = getTexId(util::asciiToLower(textureName)),
+            .blendType = blendType,
+            .colorSpace = isLinear ? ColorSpace::LINEAR : ColorSpace::SRGB,
+        };
+    }
+
     // ###########################################################################
     // LOAD WORLD
     // ###########################################################################
 
-    template<typename VERTEX_FEATURE>
     void loadWorldFace(
-        unordered_map<ChunkIndex, Verts<VERTEX_FEATURE>>& target,
+        unordered_map<ChunkIndex, VertsBasic>& target,
         const zenkit::Mesh& mesh,
         uint32_t faceIndex,
         uint32_t vertIndex,
-        OPT_PARAM<IS_VERTEX_BLEND<VERTEX_FEATURE>, BlendType> blendType,
         bool debugChecksEnabled,
         NormalsStats& normalStats)
     {
-        constexpr bool isFeatureBasic = IS_VERTEX_BASIC<VERTEX_FEATURE>;
-        constexpr bool isFeatureBlend = IS_VERTEX_BLEND<VERTEX_FEATURE>;
-
         // positions
         auto facePosXm = facePosToXm<zenkit::Mesh, Unused, true, false>(mesh, {}, faceIndex, vertIndex);
 
@@ -358,50 +426,32 @@ namespace assets
 
         // other
         array<VertexPos, 3> facePos;
-        array<VERTEX_FEATURE, 3> faceOther;
+        array<VertexBasic, 3> faceOther;
 
         for (uint32_t i = 0; i < 3; i++) {
             VertexPos pos = toVec3(facePosXm[i]);
 
             const auto& featureZkit = mesh.features.at(mesh.polygons.feature_indices.at(vertIndex));
-            VERTEX_FEATURE feature;
-            if constexpr (IS_VERTEX_BASIC<VERTEX_FEATURE>) {
-                VertexBasic& other = feature;
-                other.normal = toVec3(faceNormalsXm[i]);
-                const auto& glmUvDiffuse = featureZkit.texture;
-                other.uvDiffuse = toUv(glmUvDiffuse);
-                other.colLight = fromSRGB(COLOR(featureZkit.light));
-                other.dirLight = { -100.f, -100.f, -100.f };// value that is easy to check as not normalized in shader
-                other.lightSun = 1.0f;
-                other.uvLightmap = getLightmapUvsZkit(mesh, faceIndex, facePosXm[i]);
-            }
-            else if constexpr (IS_VERTEX_BLEND<VERTEX_FEATURE>) {
-                VertexBlend& other = feature;
-                other.normal = toVec3(faceNormalsXm[i]);
-                const auto& glmUvDiffuse = featureZkit.texture;
-                other.uvDiffuse = toUv(glmUvDiffuse);
-                other.colLight = fromSRGB(COLOR(featureZkit.light));
-                other.dirLight = { -100.f, -100.f, -100.f };// value that is easy to check as not normalized in shader
-                other.lightSun = 1.0f;
-                other.uvLightmap = getLightmapUvsZkit(mesh, faceIndex, facePosXm[i]);
-                other.blendType = blendType;
-            }
-            else {
-                static_assert(false);
-            }
+            VertexBasic other;
+            other.normal = toVec3(faceNormalsXm[i]);
+            const auto& glmUvDiffuse = featureZkit.texture;
+            other.uvDiffuse = toUv(glmUvDiffuse);
+            other.colLight = fromSRGB(COLOR(featureZkit.light));
+            other.dirLight = { -100.f, -100.f, -100.f };// value that is easy to check as not normalized in shader
+            other.lightSun = 1.0f;
+            other.uvLightmap = getLightmapUvsZkit(mesh, faceIndex, facePosXm[i]);
 
             facePos.at(2 - i) = pos;
-            faceOther.at(2 - i) = feature;
+            faceOther.at(2 - i) = other;
             vertIndex++;
         }
         const ChunkIndex chunkIndex = toChunkIndex(centroidPos(facePosXm));
-        Verts<VERTEX_FEATURE>& chunkData = util::getOrCreateDefault(target, chunkIndex);
-        insertFace<VERTEX_FEATURE>(chunkData, facePos, faceOther);
+        VertsBasic& chunkData = util::getOrCreateDefault(target, chunkIndex);
+        insertFace<VertexBasic>(chunkData, facePos, faceOther);
     }
 
     void loadWorldMeshActual(
         MatToChunksToVertsBasic& target,
-        MatToChunksToVertsBlend& targetBlend,
         const zenkit::Mesh& worldMesh,
         bool debugChecksEnabled)
     {
@@ -415,34 +465,23 @@ namespace assets
 
             uint32_t meshMatIndex = worldMesh.polygons.material_indices.at(faceIndex);
             zenkit::Material meshMat = worldMesh.materials.at(meshMatIndex);
-            bool unusual = checkForUnusualMatProperties(meshMat);
-            bool isBlend = meshMat.group == zenkit::MaterialGroup::WATER;
-
-            if (debugChecksEnabled) {
-                ::util::getOrCreateDefault(loadStats.materialGroups, meshMat.group)++;
-                ::util::getOrCreateDefault(loadStats.materialAlphas, meshMat.alpha_func)++;
-            }
-
-            const Material material = { getTexId(::util::asciiToLower(meshMat.texture)) };
+            const optional<Material> materialOpt = createMaterial(meshMat, debugChecksEnabled);
+            
             uint32_t nextMeshMatIndex;
-
-            if (!isBlend) {
-                ChunkToVerts<VertexBasic>& vertexData = util::getOrCreateDefault(target, material);
+            if (!materialOpt.has_value()) {
+                // skip faces with unsupported material
                 do {
-                    loadWorldFace<VertexBasic>(vertexData, worldMesh, faceIndex, vertIndex, {}, debugChecksEnabled, normalStats);
-
                     faceIndex++; vertIndex += 3;
                     if (faceIndex >= faceCount) {
                         break;
                     }
                     nextMeshMatIndex = worldMesh.polygons.material_indices.at(faceIndex);
                 } while (nextMeshMatIndex == meshMatIndex);
-               
             }
             else {
-                ChunkToVerts<VertexBlend>& vertexData = util::getOrCreateDefault(targetBlend, material);
+                ChunkToVerts<VertexBasic>& vertexData = util::getOrCreateDefault(target, materialOpt.value());
                 do {
-                    loadWorldFace<VertexBlend>(vertexData, worldMesh, faceIndex, vertIndex, BlendType::BLEND, debugChecksEnabled, normalStats);
+                    loadWorldFace(vertexData, worldMesh, faceIndex, vertIndex, debugChecksEnabled, normalStats);
 
                     faceIndex++; vertIndex += 3;
                     if (faceIndex >= faceCount) {
@@ -460,13 +499,12 @@ namespace assets
 
     void loadWorldMesh(
         MatToChunksToVertsBasic& target,
-        MatToChunksToVertsBlend& targetBlend,
         const zenkit::Mesh& worldMesh,
         bool debugChecksEnabled)
     {
         uint32_t instances = 1;
         for (uint32_t i = 0; i < instances; ++i) {
-            loadWorldMeshActual(target, targetBlend, worldMesh, debugChecksEnabled);
+            loadWorldMeshActual(target, worldMesh, debugChecksEnabled);
         }
     }
 
@@ -501,20 +539,15 @@ namespace assets
             // TODO check empty geometry?
 
             zenkit::Material meshMat = submesh.mat;
-            bool unusual = checkForUnusualMatProperties(meshMat);
-
-            if (debugChecksEnabled) {
-                ::util::getOrCreateDefault(loadStats.materialGroups, meshMat.group)++;
-                ::util::getOrCreateDefault(loadStats.materialAlphas, meshMat.alpha_func)++;
-            }
-
             if (meshMat.texture.empty() && !util::hasKey(loadStats.skippedNoTexSubmeshInstances, instance.visual_name)) {
                 loadStats.skippedNoTexSubmeshInstances[instance.visual_name] = true;
                 continue;
             }
-
-            const Material material = { getTexId(::util::asciiToLower(meshMat.texture)) };
-            unordered_map<ChunkIndex, VertsBasic>& materialData = ::util::getOrCreateDefault(target, material);
+            const optional<Material> materialOpt = createMaterial(meshMat, debugChecksEnabled);
+            if (!materialOpt.has_value()) {
+                continue;
+            }
+            unordered_map<ChunkIndex, VertsBasic>& materialData = util::getOrCreateDefault(target, materialOpt.value());
 
             uint32_t faceCount = submesh.triangles.size();
 
@@ -628,7 +661,7 @@ namespace assets
     {
         auto& size = decal.quad_size;
         auto& offset = decal.uv_offset;
-        float base = 0.5f;
+        float base = 1.f;
         std::pair quadA = { toXM4Pos(VEC3{ -base * size.x,  base * size.y, 0 }), UV{ 0 + offset.u, 0 + offset.v } };
         std::pair quadB = { toXM4Pos(VEC3{  base * size.x,  base * size.y, 0 }), UV{ 1 + offset.u, 0 + offset.v } };
         std::pair quadC = { toXM4Pos(VEC3{  base * size.x, -base * size.y, 0 }), UV{ 1 + offset.u, 1 + offset.v } };
@@ -656,12 +689,11 @@ namespace assets
         assert(instance.decal.has_value());
         auto decal = instance.decal.value();
 
-        if (debugChecksEnabled) {
-            ::util::getOrCreateDefault(loadStats.materialAlphas, decal.alpha)++;
+        const optional<Material> materialOpt = createMaterialDecal(instance.visual_name, decal, debugChecksEnabled);
+        if (!materialOpt.has_value()) {
+            return;
         }
-
-        const Material material = { getTexId(::util::asciiToLower(instance.visual_name)) };
-        unordered_map<ChunkIndex, VertsBasic>& materialData = ::util::getOrCreateDefault(target, material);
+;       unordered_map<ChunkIndex, VertsBasic>& materialData = ::util::getOrCreateDefault(target, materialOpt.value());
 
         auto quadFacesXm = createQuadPositions(decal);
 

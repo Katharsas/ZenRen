@@ -46,7 +46,6 @@ namespace render::pass::world::chunkgrid
 		lengthY = (maxY - minY) + 1;
 	}
 	template void updateSize(const MatToChunksToVerts<VertexBasic>&);
-	template void updateSize(const MatToChunksToVerts<VertexBlend>&);
 
 	uint32_t finalizeSize()
 	{
@@ -80,7 +79,6 @@ namespace render::pass::world::chunkgrid
 		}
 	}
 	template void updateMesh(const MatToChunksToVerts<VertexBasic>&);
-	template void updateMesh(const MatToChunksToVerts<VertexBlend>&);
 
 	void strplace(std::string& str, uint32_t index, const std::string& str2)
 	{
