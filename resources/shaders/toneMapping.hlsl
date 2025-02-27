@@ -66,10 +66,9 @@ float4 PS_Main(PS_INPUT input, uint sampleIndex : SV_SAMPLEINDEX) : SV_TARGET
 {
 	float3 color = TX_BackBufferHDR.Sample(SS_Linear, input.texcoord).rgb;
 	
-    float3 hsv = RGBtoHSV(color);
-    hsv.y = saturate(hsv.y * 1.05f);// clamp
-	
-    color = HSVtoRGB(hsv);
+    //float3 hsv = RGBtoHSV(color);
+    //hsv.y = saturate(hsv.y * 1.05f);// clamp
+    //color = HSVtoRGB(hsv);
 
 	// This could be calculated by luminance of the picture to get eye adjustment effect.
 	float exposure = 1.f; 

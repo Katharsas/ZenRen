@@ -130,8 +130,7 @@ namespace assets
                     lighting.color.r = (lighting.color.r / 3.f) * 2.f;
                 }
                 if (instance.decal.has_value()) {
-                    //float delta = 0.2;
-                    //lighting.color = add(lighting.color, COLOR{ delta, delta, delta, 0});
+                    // TODO figure out decal lighting, especially ADD, instead of hacking it in shader
                 }
                 instance.lighting = lighting;
             }

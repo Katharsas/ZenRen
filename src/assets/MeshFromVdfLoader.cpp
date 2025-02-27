@@ -721,7 +721,7 @@ namespace assets
                 other.uvDiffuse = quadFaceXm.at(i).second;
                 other.uvLightmap = { 0, 0, -1 };
                 other.colLight = instance.lighting.color;
-                other.dirLight = toVec3(XMVector3Normalize(instance.lighting.direction));
+                other.dirLight = faceNormal;// TODO does the original game do this??
                 other.lightSun = instance.lighting.receiveLightSun ? 1.f : 0.f;
                 faceOther[i] = other;
             }

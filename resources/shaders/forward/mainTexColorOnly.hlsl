@@ -21,6 +21,8 @@ struct VS_OUT
     nointerpolation float iTexColor : TEX_INDEX0;
     
     float2 uvTexColor : TEXCOORD0;
+    float distance : DISTANCE;
+    
     float4 position : SV_POSITION;
 };
 
@@ -30,6 +32,7 @@ VS_OUT VS_Main(VS_IN input)
     VS_OUT output;
     float4 viewPosition = mul(input.position, worldViewMatrix);
     output.position = mul(viewPosition, projectionMatrix);
+    output.distance = length(viewPosition);
     output.uvTexColor = input.uvBaseColor;
     output.iTexColor = input.iTexColor;
 	return output;
@@ -47,12 +50,16 @@ struct PS_IN
     nointerpolation float iTexColor : TEX_INDEX0;
     
     float2 uvTexColor : TEXCOORD0;
+    float distance : DISTANCE;
 };
 
 
 float4 PS_Main(PS_IN input) : SV_TARGET
 {
     float4 diffuseColor = baseColor.Sample(SampleType, float3(input.uvTexColor, input.iTexColor));
-    //clip(diffuseColor.a < 0.4 ? -1 : 1);
+    
+    diffuseColor = SwitchDiffuseByOutputMode(diffuseColor, (float3) 0.5f, input.distance);
+    diffuseColor = ApplyFog(diffuseColor, input.distance);
+    
     return diffuseColor;
 }

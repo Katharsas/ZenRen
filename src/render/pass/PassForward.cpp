@@ -20,9 +20,17 @@ namespace render::pass::forward
 	__declspec(align(16))
 	struct CbGlobalSettings {
 		COLOR skyLight;
+		COLOR skyColor;
+		float viewDistance;
+		int32_t distanceFog;
+		float distanceFogStart;
+		float distanceFogEnd;
+		float distanceFogSkyFactor;
 		int32_t multisampleTransparency;
 		int32_t distantAlphaDensityFix;
+		int32_t reverseZ;
 		uint32_t outputType;
+		int32_t outputAlpha;
 		float timeOfDay;
 		int32_t skyTexBlurEnabled;
 	};
@@ -36,7 +44,7 @@ namespace render::pass::forward
 
 	__declspec(align(16))
 	struct CbBlendMode {
-		bool alphaTestEnabled;
+		uint32_t blendType;
 	};
 
 	__declspec(align(16))
@@ -56,7 +64,7 @@ namespace render::pass::forward
 	ID3D11DepthStencilState* depthState = nullptr;
 	ID3D11RasterizerState* rasterizer = nullptr;
 	ID3D11RasterizerState* rasterizerWf = nullptr;
-	std::array<ID3D11BlendState*, PASS_COUNT> blendStates = { nullptr, nullptr, nullptr, nullptr };
+	std::array<ID3D11BlendState*, BLEND_TYPE_COUNT> blendStates = { nullptr, nullptr, nullptr, nullptr };
 	ID3D11BlendState* blendStateNoAtc = nullptr;// Alpha to coverage must be disabled for transparent surfaces; always nullptr (default blendstate)
 
 	ShaderCbs shaderCbs;
@@ -86,12 +94,21 @@ namespace render::pass::forward
 	void updateSettings(D3d d3d, const RenderSettings& settings)
 	{
 		CbGlobalSettings cbGlobalSettings;
-		cbGlobalSettings.multisampleTransparency = settings.multisampleTransparency;
-		cbGlobalSettings.distantAlphaDensityFix = settings.distantAlphaDensityFix;
-		cbGlobalSettings.outputType = settings.shader.mode;
-
 		cbGlobalSettings.timeOfDay = world::getWorldSettings().timeOfDay;
 		cbGlobalSettings.skyLight = getSkyLightFromIntensity(1, cbGlobalSettings.timeOfDay);
+		cbGlobalSettings.skyColor = getSkyColor(cbGlobalSettings.timeOfDay);
+		cbGlobalSettings.viewDistance = settings.viewDistance;
+		cbGlobalSettings.distanceFog = settings.distanceFog;
+		cbGlobalSettings.distanceFogStart = settings.distanceFogStart;
+		cbGlobalSettings.distanceFogEnd = settings.distanceFogEnd;
+		cbGlobalSettings.distanceFogSkyFactor = settings.distanceFogSkyFactor;
+
+		cbGlobalSettings.multisampleTransparency = settings.multisampleTransparency;
+		cbGlobalSettings.distantAlphaDensityFix = settings.distantAlphaDensityFix;
+		cbGlobalSettings.reverseZ = settings.reverseZ;
+		cbGlobalSettings.outputType = settings.shader.mode;
+		cbGlobalSettings.outputAlpha = settings.outputAlpha;
+
 		cbGlobalSettings.skyTexBlurEnabled = settings.skyTexBlur;
 
 		d3d::updateConstantBuf(d3d, shaderCbs.settingsCb, cbGlobalSettings);
@@ -121,9 +138,9 @@ namespace render::pass::forward
 		d3d::updateConstantBuf(d3d, shaderCbs.cameraCb, camera);
 	}
 
-	void updateBlendMode(D3d d3d, bool alphaTestEnabled)
+	void updateBlendMode(D3d d3d, BlendType blendType)
 	{
-		CbBlendMode blendMode { alphaTestEnabled };
+		CbBlendMode blendMode { static_cast<uint32_t>(blendType) };
 		d3d::updateConstantBuf(d3d, shaderCbs.blendModeCb, blendMode);
 	}
 
@@ -170,11 +187,13 @@ namespace render::pass::forward
 		d3d.deviceContext->PSSetConstantBuffers(3, 1, &shaderCbs.debugCb);
 
 		// opaque / alpha tested passes (unsorted)
-		uint8_t blendType = 0;
+		uint8_t blendTypeIndex = 0;
+		BlendType blendType = static_cast<BlendType>(blendTypeIndex);
+
 		if (settings.passesOpaque) {
-			updateBlendMode(d3d, true);
-			d3d.annotation->BeginEvent(toWString("Pass Blend: ", (BlendType)blendType).c_str());
-			d3d.deviceContext->OMSetBlendState(blendStates.at(blendType), nullptr, 0xffffffff);
+			d3d.annotation->BeginEvent(toWString("Pass Blend: ", blendType).c_str());
+			updateBlendMode(d3d, blendType);
+			d3d.deviceContext->OMSetBlendState(blendStates.at(blendTypeIndex), nullptr, 0xffffffff);
 			if (settings.depthPrepass) {
 				world::drawPrepass(d3d, shaders, shaderCbs);
 			}
@@ -192,22 +211,27 @@ namespace render::pass::forward
 			world::drawSky(d3d, shaders, shaderCbs);
 			updateCamera(d3d);
 		}
+		blendTypeIndex++;
+		blendType = static_cast<BlendType>(blendTypeIndex);
 
 		// transparent / (alpha) blend passes
 		if (settings.passesBlend) {
-			updateBlendMode(d3d, false);
 			COLOR blendFactorCol = greyscale(.920f);// used by BlendType::BLEND_FACTOR pass
 
-			for (blendType = 1; blendType < PASS_COUNT; blendType++) {
-				d3d.annotation->BeginEvent(toWString("Pass Blend: ", (BlendType)blendType).c_str());
-				d3d.deviceContext->OMSetBlendState(blendStates.at(blendType), blendFactorCol.vec, 0xffffffff);
-				world::drawWorld(d3d, shaders, shaderCbs, (BlendType)blendType);
+			while (blendTypeIndex < BLEND_TYPE_COUNT) {
+				d3d.annotation->BeginEvent(toWString("Pass Blend: ", blendType).c_str());
+				updateBlendMode(d3d, blendType);
+				d3d.deviceContext->OMSetBlendState(blendStates.at(blendTypeIndex), blendFactorCol.vec, 0xffffffff);
+				world::drawWorld(d3d, shaders, shaderCbs, blendType);
 				if (settings.wireframe) {
 					d3d.deviceContext->RSSetState(rasterizerWf);
-					world::drawWireframe(d3d, shaders, shaderCbs, (BlendType)blendType);
+					world::drawWireframe(d3d, shaders, shaderCbs, blendType);
 					d3d.deviceContext->RSSetState(rasterizer);
 				}
 				d3d.annotation->EndEvent();
+
+				blendTypeIndex++;
+				blendType = static_cast<BlendType>(blendTypeIndex);
 			}
 		}
 
@@ -363,10 +387,11 @@ namespace render::pass::forward
 	}
 
 	void initBlendStates(D3d d3d, uint32_t multisampleCount, bool multisampleTransparency) {
-		for (uint8_t blendTypeIndex = 0; blendTypeIndex < PASS_COUNT; blendTypeIndex++) {
+		for (uint8_t blendTypeIndex = 0; blendTypeIndex < BLEND_TYPE_COUNT; blendTypeIndex++) {
 			auto blendType = (BlendType)blendTypeIndex;
-			bool alphaToCoverage = multisampleCount > 1 && multisampleTransparency;
-			dx::createBlendState(d3d, &blendStates.at(blendTypeIndex), blendType, alphaToCoverage);
+			// TODO we might want to restrict alphaToCoverage to MSAAx4 or higher
+			bool alphaToCoverage = (blendType == BlendType::NONE) && multisampleCount > 1 && multisampleTransparency;
+			d3d::createBlendState(d3d, &blendStates.at(blendTypeIndex), blendType, alphaToCoverage);
 		}
 	}
 

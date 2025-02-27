@@ -71,13 +71,21 @@ namespace render::pass::world
 
 		render::gui::addInfo("World", {
 			[]() -> void {
+				float hourTime = (worldSettings.timeOfDay * 24);
+				uint8_t hour = hourTime + 12;
+				if (hour >= 24) {
+					hour -= 24;
+				}
+				uint8_t minute = std::fmod(hourTime * 60, 60);
+
 				uint32_t stateChanges = render::stats::getSamplerStats(samplers.stateChanges).average;
 				uint32_t draws = render::stats::getSamplerStats(samplers.draws).average;
 				uint32_t verts = render::stats::getSamplerStats(samplers.verts).average / 1000;
 
 				std::stringstream buffer;
-				buffer << "States/Draws: " << stateChanges << " / " << draws << std::endl;
-				buffer << "Verts: " << verts << "k" << std::endl;
+				buffer << "TimeOfDay: " << std::format("{:02}:{:02}", hour, minute) << '\n';
+				buffer << "States/Draws: " << stateChanges << " / " << draws << '\n';
+				buffer << "Verts: " << verts << "k" << '\n';
 				ImGui::Text(buffer.str().c_str());
 			}
 		});

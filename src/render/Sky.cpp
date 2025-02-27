@@ -60,15 +60,17 @@ namespace render
 		timekey::day_start,
 	};
 
+	const COLOR daySkyColor = fromSRGB(116, 89, 75);// G1 defines 4 different variants of this inside INI, use first for now
+
 	const array skyStates = {
-		SkyState { timekey::day,         fromSRGB(255, 250, 235), fromSRGB(120, 140, 180) },
-		SkyState { timekey::day_end,     fromSRGB(255, 250, 235), fromSRGB(120, 140, 180) },
+		SkyState { timekey::day,         fromSRGB(255, 250, 235), daySkyColor },
+		SkyState { timekey::day_end,     fromSRGB(255, 250, 235), daySkyColor },
 		SkyState { timekey::evening,     fromSRGB(255, 185, 170), fromSRGB(180,  75,  60) },
 		SkyState { timekey::night_start, fromSRGB(105, 105, 195), fromSRGB( 20,  20,  60) },
 		SkyState { timekey::night,       fromSRGB( 40,  60, 210), fromSRGB(  5,   5,  20) },
 		SkyState { timekey::night_end,   fromSRGB( 40,  60, 210), fromSRGB(  5,   5,  20) },
 		SkyState { timekey::dawn,        fromSRGB(190, 160, 255), fromSRGB( 80,  60, 105) },
-		SkyState { timekey::day_start,   fromSRGB(255, 250, 235), fromSRGB(120, 140, 180) },
+		SkyState { timekey::day_start,   fromSRGB(255, 250, 235), daySkyColor },
 	};
 
 	const SkyTex base_DAY =   { "SKYDAY_LAYER1" };

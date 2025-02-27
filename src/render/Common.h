@@ -6,7 +6,6 @@
 
 #include "Util.h"
 #include "render/Primitives.h"
-#include "render/d3d/BlendState.h"
 
 #include "magic_enum.hpp"
 
@@ -76,9 +75,19 @@ namespace render
 	typedef Verts<VertexBasic> VertsBasic;
 	//typedef Verts<VertexBlend> VertsBlend;
 
-	constexpr uint16_t PASS_COUNT = 5;
-
-	static_assert(magic_enum::enum_count<BlendType>() == PASS_COUNT);
+	
+	// TODO disable depth writing
+	// TODO if face order can result in different outcome, we would need to sort these by distance 
+	// to camera theoretically (see waterfall near G2 start)
+	enum class BlendType : uint8_t {
+		NONE = 0,         // normal opaque or alpha-tested, shaded
+		BLEND_ALPHA = 1,  // alpha channel blending, ??
+		BLEND_FACTOR = 2, // fixed factor blending (water), shaded (?)
+		ADD = 3,          // alpha channel additive blending
+		MULTIPLY = 4,     // color multiplication, linear color textures, no shading
+	};
+	
+	constexpr uint8_t BLEND_TYPE_COUNT = magic_enum::enum_count<BlendType>();
 
 	enum class ColorSpace {
 		LINEAR, SRGB
@@ -144,11 +153,11 @@ namespace std
 		size_t operator()(const TexInfo& key) const
 		{
 			size_t res = 0;
-			util::hashCombine(res, key.width);
-			util::hashCombine(res, key.height);
-			util::hashCombine(res, key.mipLevels);
-			util::hashCombine(res, key.hasAlpha);
-			util::hashCombine(res, key.format);
+			::util::hashCombine(res, key.width);
+			::util::hashCombine(res, key.height);
+			::util::hashCombine(res, key.mipLevels);
+			::util::hashCombine(res, key.hasAlpha);
+			::util::hashCombine(res, key.format);
 			return res;
 		}
 	};
@@ -159,9 +168,9 @@ namespace std
 		size_t operator()(const Material& key) const
 		{
 			size_t res = 0;
-			util::hashCombine(res, key.texBaseColor);
-			util::hashCombine(res, key.blendType);
-			util::hashCombine(res, key.colorSpace);
+			::util::hashCombine(res, key.texBaseColor);
+			::util::hashCombine(res, key.blendType);
+			::util::hashCombine(res, key.colorSpace);
 			return res;
 		}
 	};
@@ -172,8 +181,8 @@ namespace std
 		size_t operator()(const ChunkIndex& key) const
 		{
 			size_t res = 0;
-			util::hashCombine(res, key.x);
-			util::hashCombine(res, key.y);
+			::util::hashCombine(res, key.x);
+			::util::hashCombine(res, key.y);
 			return res;
 		}
 	};

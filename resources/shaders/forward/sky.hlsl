@@ -28,6 +28,8 @@ struct VS_OUT
 {
     float2 uvBase : TEXCOORD0;
     float2 uvOverlay : TEXCOORD1;
+    
+    float4 worldPos : POSITION;
     float4 position : SV_POSITION;
 };
 
@@ -35,9 +37,10 @@ struct VS_OUT
 VS_OUT VS_Main(VS_IN input)
 {
     VS_OUT output;
+    output.worldPos = input.position;
     float4 viewPosition = mul(input.position, worldViewMatrix);
     output.position = mul(viewPosition, projectionMatrix);
-    output.position.z = 0.f;// TODO this needs to be 1 in non-reverse-z mode
+    output.position.z = reverseZ ? 0 : 1 * output.position.w;
     output.uvBase = input.uvBase;
     output.uvOverlay = input.uvOverlay;
     return output;
@@ -54,6 +57,9 @@ struct PS_IN
 {
     float2 uvBase : TEXCOORD0;
     float2 uvOverlay : TEXCOORD1;
+    
+    float4 worldPos : POSITION;
+    float4 position : SV_POSITION;
 };
 
 float4 FastGaussianBlur(Texture2D<float4> sourceTex, float2 uv)
@@ -96,6 +102,8 @@ float4 AlphaOverToRgba(float3 base, float baseAlpha, float3 over, float overAlph
 
 float4 SkyTexColor(int layer, float2 uv)
 {
+    // TODO refactor this stuff to be similar to main or even share functions
+    
     float4 color;
     if (skyTexBlur && !texLayers[layer].blurDisabled) {
         // blur layer textures (including alpha) to conceal banding
@@ -130,6 +138,10 @@ float4 PS_Main(PS_IN input) : SV_TARGET
 
     // adjust colors and blend sky over background
 	float4 shadedColor = float4(AlphaOverToRgb(colBackground.rgb, skyBlend.rgb, skyBlend.a), 1);
+    
+    // fog
+    float centerDist = length(input.worldPos.xz);
+    shadedColor = ApplyFog(shadedColor, centerDist * distanceFogSkyFactor, true);
     
 	return shadedColor;
 }

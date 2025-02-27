@@ -3,7 +3,7 @@
 
 #include "render/WinDx.h"
 
-namespace render::dx
+namespace render::d3d
 {
 	void createBlendState(D3d d3d, ID3D11BlendState** target, BlendType blendType, bool alphaToCoverage)
 	{
@@ -19,6 +19,8 @@ namespace render::dx
 
 		auto& renderTarget = blendStateDesc.RenderTarget[0];
 		if (blendType != BlendType::NONE) {
+			assert(alphaToCoverage == false);
+
 			renderTarget.BlendEnable = true;
 			renderTarget.BlendOp = D3D11_BLEND_OP_ADD;
 
@@ -28,9 +30,7 @@ namespace render::dx
 
 			switch (blendType) {
 			case BlendType::ADD: {
-				// TODO shading is too dark in dark areas... are these actually shaded in Gothic??
-				// or is it just that our static light precalculation ends up different than in original? check static light
-				// should the textures be treated as linear or srgb??
+				// TODO shading is still different from original... how are these actually shaded in Gothic?
 				renderTarget.SrcBlend = D3D11_BLEND_SRC_ALPHA;
 				renderTarget.DestBlend = D3D11_BLEND_ONE;
 			} break;

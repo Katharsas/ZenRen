@@ -1,17 +1,18 @@
 #include "stdafx.h"
 #include "SettingsGui.h"
 
-#include <imgui.h>
-
 #include "Gui.h"
-#include "imgui/imgui_custom.h"
 
+#include "imgui.h"
+#include "imgui/imgui_custom.h"
+#include "magic_enum.hpp"
 
 namespace render::gui::settings {
 
 	// TODO we should have checkbox toggles for each light type so we can add them up however we want
-	const std::array<std::string, 6> shaderModeItems = { "Full", "Solid Only", "Diffuse Only", "Normals Only", "Light Sun", "Light Static" };
-	std::string shaderModeSelected = shaderModeItems[0];
+	constexpr auto shaderModeItems = magic_enum::enum_names<ShaderMode>();
+	std::string_view shaderModeSelected = shaderModeItems[0];
+
 	const std::array<std::string, 5> filterSettingsItems = { "Trilinear", "AF  x2", "AF  x4", "AF  x8", "AF x16" };
 	std::string filterSettingsSelected = filterSettingsItems[4];
 
@@ -24,23 +25,27 @@ namespace render::gui::settings {
 			[&]()  -> void {
 				ImGui::PushItemWidth(constants().elementWidth);
 				ImGui::SliderFloat("##ViewDistance", &settings.viewDistance, 1, 2000, "%.0f View Distance");
-				ImGui::PopItemWidth();
 
-				ImGui::Checkbox("Wireframe Mode", &settings.wireframe);
+				ImGui::VerticalSpacing();
+				ImGui::Checkbox("Fog", &settings.distanceFog);
+				ImGui::SliderFloat("##FogStart", &settings.distanceFogStart, 1, 200, "%.0f Fog Start");
+				ImGui::SliderFloat("##FogEnd", &settings.distanceFogEnd, 1, 2000, "%.0f Fog End");
+				ImGui::SliderFloat("##FogSky", &settings.distanceFogSkyFactor, 1, 10, "%.2f Fog Sky");
+
+				ImGui::VerticalSpacing();
 				ImGui::PushStyleColorDebugText();
-				ImGui::Checkbox("Reverse Z", &settings.reverseZ);
-
+				
 				const auto& items = shaderModeItems;
-				auto& selected = shaderModeSelected;
+				std::string_view& selected = shaderModeSelected;
 
 				ImGui::PushItemWidth(120);// TODO whats up with this??
-				if (ImGui::BeginCombo("Shader Mode", selected.c_str()))
+				if (ImGui::BeginCombo("Shader Mode", std::string(selected).c_str()))
 				{
 					for (uint32_t n = 0; n < items.size(); n++)
 					{
-						auto current = items[n].c_str();
+						auto current = items[n];
 						bool isSelected = (selected == current);
-						if (ImGui::Selectable(current, isSelected)) {
+						if (ImGui::Selectable(std::string(current).c_str(), isSelected)) {
 							selected = items[n];
 							settings.shader.mode = static_cast<ShaderMode>(n);
 						}
@@ -48,6 +53,8 @@ namespace render::gui::settings {
 					ImGui::EndCombo();
 				}
 				ImGui::PopItemWidth();
+				ImGui::Checkbox("Wireframe Mode", &settings.wireframe);
+				ImGui::Checkbox("Enable Alpha", &settings.outputAlpha);
 
 				ImGui::VerticalSpacing();
 				//ImGui::Checkbox("Depth Prepass", &settings.depthPrepass);
@@ -58,7 +65,11 @@ namespace render::gui::settings {
 				ImGui::SliderFloat("##Debug1", &settings.debugFloat1, -1.f, 1.f, "%.2f Debug 1");
 				ImGui::SliderFloat("##Debug2", &settings.debugFloat2, -1.f, 1.f, "%.2f Debug 2");
 				
+				ImGui::VerticalSpacing();
+				ImGui::Checkbox("Reverse Z", &settings.reverseZ);
+
 				ImGui::PopStyleColor();
+				ImGui::PopItemWidth();
 			}
 		});
 

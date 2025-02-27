@@ -288,9 +288,9 @@ namespace render::pass::world
 	}
 
 	template <VERTEX_FEATURE F>
-	array<unordered_map<Material, const ChunkToVerts<F>* >, PASS_COUNT> splitByPass(const MatToChunksToVerts<F>& meshData)
+	array<unordered_map<Material, const ChunkToVerts<F>* >, BLEND_TYPE_COUNT> splitByPass(const MatToChunksToVerts<F>& meshData)
 	{
-		array<unordered_map<Material, const ChunkToVerts<F>* >, PASS_COUNT> result;
+		array<unordered_map<Material, const ChunkToVerts<F>* >, BLEND_TYPE_COUNT> result;
 		for (auto& [material, chunkToVerts] : meshData) {
 			uint8_t blendTypeIndex = (uint8_t)material.blendType;
 			auto& matToChunks = result.at(blendTypeIndex);
@@ -315,9 +315,9 @@ namespace render::pass::world
 		D3d d3d, MeshBatches<F>& targetAllPasses, const MatToChunksToVerts<F>& meshDataAllPasses, TEX_INDEX maxTexturesPerBatch)
 	{
 		LoadResult result;
-		array<unordered_map<Material, const ChunkToVerts<F>* >, PASS_COUNT> perPassMeshData = splitByPass(meshDataAllPasses);
+		array<unordered_map<Material, const ChunkToVerts<F>* >, BLEND_TYPE_COUNT> perPassMeshData = splitByPass(meshDataAllPasses);
 
-		for (uint16_t passIndex = 0; passIndex < PASS_COUNT; passIndex++) {
+		for (uint16_t passIndex = 0; passIndex < BLEND_TYPE_COUNT; passIndex++) {
 			const auto& meshData = perPassMeshData.at(passIndex);
 			auto& target = targetAllPasses.passes.at(passIndex);
 

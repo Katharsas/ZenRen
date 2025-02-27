@@ -24,6 +24,7 @@ struct VS_OUT
     float2 uvTexColor : TEXCOORD0;
     float2 uvTexLightmap : TEXCOORD1;
     float3 light : LIGHT_INTENSITY;
+    float distance : DISTANCE;
     float4 position : SV_POSITION;
 };
 
@@ -85,7 +86,13 @@ VS_OUT VS_Main(VS_IN input)
         else {
             float lightReceived = CalcLightDirectional(input.dirLight, viewNormal3, .0f);
             float3 directionalLight = lightColor * lightReceived;
-            light = RescaleOntoAmbient(directionalLight, lightColor * .15f, 1.25f);
+            if (blendType != BLEND_ADD) {
+                light = RescaleOntoAmbient(directionalLight, lightColor * .15f, 1.25f);
+            }
+            else {
+                // TODO this is just hacking around the fact that ADD decals just look way less bright in original (always or not?)
+                light = directionalLight * 0.2f;
+            }
         }
         // TODO it is unclear if vob ambient factor is applied before or after skylight
         output.light = light * skyLight.rgb;
@@ -98,6 +105,14 @@ VS_OUT VS_Main(VS_IN input)
     }
 
     output.position = mul(viewPosition, projectionMatrix);
+    
+    // Use View length since it is independent of near/far plane and relative to camera origin (circular, stable during rotations).
+    // Projection length would be relative to planes, Z-value alone would be non-circular (unstable during rotations for big FOV angles).
+    // Projection-Z can be easily obtained in Pixel Shader by reading SV_POSITION Z (use only Z, not W).
+    // See: https://learn.microsoft.com/en-us/windows/win32/direct3d9/projection-transform
+    // See: https://developer.download.nvidia.com/assets/gamedev/docs/Fog2.pdf
+    output.distance = length(viewPosition);
+    
     output.uvTexColor = input.uvTexColor;
     output.iTexColor = input.iTexColor;
     output.uvTexLightmap = input.uviTexLightmap.xy;
@@ -123,6 +138,9 @@ struct PS_IN
     float2 uvTexColor : TEXCOORD0;
     float2 uvTexLightmap : TEXCOORD1; // TODO should be called uviTexLightmap
     float3 light : LIGHT_INTENSITY;
+    
+    float distance : DISTANCE;
+    //float4 position : SV_POSITION;
 };
 
 float CalcMipLevel(float2 texCoord)
@@ -154,11 +172,14 @@ float CalcDistantAlphaDensityFactor(Texture2DArray<float4> sourceTex, float2 tex
 float AlphaTestAndSharpening(float alpha)
 {
     // Alpha Cutoff - lower values will result in thinner coverage
+    // TODO make configurable
     float alphaCutoff = 0.4;
 
     // Alpha to Coverage Sharpening
     // sharpen the multisampled alpha to remove banding and interior transparency; outputs close to 1 or 0
     if (multisampleTransparency) {
+        // TODO sharpening should be experimented with, especially since it massively changes perceived densitity
+        //      and since it seems to only have an actual positive effect if texture resolution is high enough for sampler
         alpha = (alpha - alphaCutoff) / max(fwidth(alpha), 0.0001) + 0.5;
         // Clipping will be effectively performed by  Alpha-To-Coverage based on output alpha
     }
@@ -180,8 +201,13 @@ float4 SampleLightmap(float3 uvLightmap)
 
 float4 PS_Main(PS_IN input) : SV_TARGET
 {
+    // do our own circular clipping (stable during rotations)
+    if (input.distance > 1000) {
+        discard;
+    }
+    
     // light color
-    float4 lightColor;
+        float4 lightColor;
     if (outputType == OUTPUT_NORMAL) {
         lightColor = float4((float3) 0.5, 1);
     }
@@ -202,27 +228,21 @@ float4 PS_Main(PS_IN input) : SV_TARGET
     float4 diffuseColor;
     {
         diffuseColor = baseColor.Sample(SampleType, float3(input.uvTexColor, input.iTexColor));
-        if (alphaTest) {
+        if (blendType == BLEND_NONE) {
             // TODO if this costs significant performance we should separate alpha tested geometry from fully opaque geometry
             diffuseColor.a *= CalcDistantAlphaDensityFactor(baseColor, input.uvTexColor);
             diffuseColor.a = AlphaTestAndSharpening(diffuseColor.a);
         }
     }
 
-    // albedo color
-    float4 albedoColor;
-    if (outputType == OUTPUT_FULL || outputType == OUTPUT_DIFFUSE) {
-        albedoColor = diffuseColor;
-    }
-    else if (outputType == OUTPUT_NORMAL) {
-        albedoColor = float4(input.light, 1);
-    }
-    else {
-        // full white material shading, TODO make adjustable
-        float3 debugMaterialColor = (float3) 1;
-        albedoColor = float4(debugMaterialColor, 1);
-    }
+    diffuseColor = SwitchDiffuseByOutputMode(diffuseColor, input.light, input.distance);
     
-    float4 shadedColor = albedoColor * lightColor;
+    float4 shadedColor = diffuseColor * lightColor;
+    
+    shadedColor = ApplyFog(shadedColor, input.distance);
+    
+    // TODO additive blending could use its own shader anyway since it basically does not need a ton of vertex features
+    // and basically has its own alpha and light adjustment code?
+    
     return shadedColor; //float4(shadedColor.rgb, 1);
 }

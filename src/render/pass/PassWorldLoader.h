@@ -7,7 +7,7 @@ namespace render::pass::world
 {
 	template <VERTEX_FEATURE F>
 	struct MeshBatches {
-		std::array<std::vector<MeshBatch<F>>, PASS_COUNT> passes;
+		std::array<std::vector<MeshBatch<F>>, BLEND_TYPE_COUNT> passes;
 
 		std::vector<MeshBatch<VertexBasic>>& getBatches(BlendType blendType)
 		{

@@ -3,10 +3,11 @@
 namespace render
 {
 	enum ShaderMode {
-		Default,
+		Full,
 		Solid,
 		Diffuse,
 		Normals,
+		Depth,
 		Light_Sun,
 		Light_Static
 	};
@@ -17,6 +18,11 @@ namespace render
 
 	struct RenderSettings {
 		float viewDistance = 1000;
+		bool distanceFog = true;
+		// fog settings about match 300% view distance in G1 
+		float distanceFogStart = 120;
+		float distanceFogEnd = 600;
+		float distanceFogSkyFactor = 3;
 
 		bool wireframe = false;
 		bool reverseZ = true;
@@ -25,8 +31,9 @@ namespace render
 		uint32_t anisotropicLevel = 16;
 
 		ShaderSettings shader = {
-			ShaderMode::Default,
+			ShaderMode::Full,
 		};
+		bool outputAlpha = true;
 
 		float resolutionScaling = 1.0f;
 		bool resolutionUpscaleSmooth = true;
@@ -47,8 +54,8 @@ namespace render
 		float brightness = 0.001f;
 		float gamma = 0.92f;
 
-		float debugFloat1 = 1.f;
-		float debugFloat2 = 1.f;
+		float debugFloat1 = 0.f;
+		float debugFloat2 = 0.f;
 	};
 }
 

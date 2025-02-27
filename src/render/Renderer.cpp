@@ -34,7 +34,7 @@ namespace render
 		IDXGIAdapter3* adapter = nullptr;// we need this for VRAM usage queries
 	};
 
-	D3d d3d;
+	D3d dx11;
 	Dx12 dx12;
 	
 	IDXGISwapChain1* swapchain;
@@ -103,7 +103,7 @@ namespace render
 		}
 	};
 
-	void reinitRenderer(RenderDirtyFlags& flags) {
+	void reinitRenderer(D3d d3d, RenderDirtyFlags& flags) {
 		if (flags.backBuffer) {
 			post::initDownsampleBuffers(d3d, clientSize);
 			post::initBackBuffer(d3d, swapchain);
@@ -138,6 +138,8 @@ namespace render
 
 	void initD3D(void* hWnd, const BufferSize& startSize)
 	{
+		auto& d3d = dx11;
+
 		windowHandle = (HWND) hWnd;
 		clientSize = startSize;
 		updateRenderSize();
@@ -153,7 +155,7 @@ namespace render
 
 		RenderDirtyFlags flags;
 		flags.onInit();
-		reinitRenderer(flags);
+		reinitRenderer(d3d, flags);
 		post::initDepthBuffer(d3d, clientSize);
 		post::initConstantBuffers(d3d);
 
@@ -170,6 +172,8 @@ namespace render
 
 	bool loadLevel(const std::optional<std::string>& level, bool defaultSky)
 	{
+		auto& d3d = dx11;
+
 		bool loaded = false;
 		if (level.has_value()) {
 			const auto [loaded, isOutdoorLevel] = world::loadWorld(d3d, level.value());
@@ -185,6 +189,8 @@ namespace render
 
 	void onWindowResize(const BufferSize& changedSize)
 	{
+		auto& d3d = dx11;
+
 		clientSize = changedSize;
 		updateRenderSize();
 
@@ -194,7 +200,7 @@ namespace render
 
 			RenderDirtyFlags flags;
 			flags.onChangeClientSize();
-			reinitRenderer(flags);
+			reinitRenderer(d3d, flags);
 		}
 	}
 
@@ -205,6 +211,8 @@ namespace render
 
 	void cleanD3D()
 	{
+		auto& d3d = dx11;
+
 		swapchain->SetFullscreenState(FALSE, nullptr);    // switch to windowed mode
 
 		// close and release all existing COM objects
@@ -247,7 +255,7 @@ namespace render
 
 	void renderFrame()
 	{
-		auto deviceContext = d3d.deviceContext;
+		auto& d3d = dx11;
 
 		RenderDirtyFlags renderState;
 		if (settings.resolutionScaling != settingsPrevious.resolutionScaling) {
@@ -272,7 +280,7 @@ namespace render
 		//if (settings.shader.ambientLight != settingsPrevious.shader.ambientLight || settings.shader.mode != settingsPrevious.shader.mode) {
 		//	renderState.shaderSettingsGlobal = true;
 		//}
-		reinitRenderer(renderState);
+		reinitRenderer(d3d, renderState);
 
 		camera::updateCamera(settings.reverseZ, renderSize, settings.viewDistance);
 
@@ -293,6 +301,7 @@ namespace render
 
 	void initDeviceAndSwapChain(HWND hWnd)
 	{
+		auto& d3d = dx11;
 		// TODO HR handling
 
 		ComPtr<ID3D11Device> device_11_0;

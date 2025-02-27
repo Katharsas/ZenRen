@@ -54,7 +54,7 @@ namespace render
     XMVECTOR calcFlatFaceNormal(const array<XMVECTOR, 3>& posXm)
     {
         // counter-clockwise winding, flip XMVector3Cross argument order for clockwise winding
-        return  XMVector3Cross(XMVectorSubtract(posXm[2], posXm[0]), XMVectorSubtract(posXm[1], posXm[0]));
+        return  XMVector3Normalize(XMVector3Cross(XMVectorSubtract(posXm[2], posXm[0]), XMVectorSubtract(posXm[1], posXm[0])));
     }
 
     ChunkIndex toChunkIndex(XMVECTOR posXm)
