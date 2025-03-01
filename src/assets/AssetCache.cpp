@@ -16,79 +16,59 @@ namespace assets
 	using ::std::unordered_map;
 	using ::util::createOrGet;
 
-	unordered_map<string, MultiResolutionMesh> cacheMeshesZkit;
+	unordered_map<string, MultiResolutionMesh> cacheMrm;
 	unordered_map<string, ModelHierarchy> cacheMdh;
-	unordered_map<string, ModelMesh> cacheModelMeshesZkit;
-	unordered_map<string, Model> cacheModelsZkit;
+	unordered_map<string, ModelMesh> cacheMdm;
+	unordered_map<string, Model> cacheMdl;
 
 	vector<string> cacheTexNames;
 	unordered_map<int32_t, TexId> cacheTexNameHashToIds;
 
-	template <typename L> concept HasLoad =
-		requires(L loadable) {
-			{ loadable.load((Read*)nullptr) } -> std::same_as<void>;
-	};
 
 	template<HasLoad T>
-	bool loadVisualZkit(T& parseTarget, const string& assetName)
-	{
-		const auto& assetFileOpt = assets::getIfExists(assetName);
-		if (assetFileOpt.has_value()) {
-			auto visualData = assets::getData(assetFileOpt.value());
-			auto read = zenkit::Read::from(visualData.data, visualData.size);
-			parseTarget.load(read.get());
-			return true;
+	unordered_map<string, T>& getCache() {
+		if constexpr (std::is_same_v<T, MultiResolutionMesh>) {
+			return cacheMrm;
 		}
-		return false;
+		if constexpr (std::is_same_v<T, ModelHierarchy>) {
+			return cacheMdh;
+		}
+		if constexpr (std::is_same_v<T, ModelMesh>) {
+			return cacheMdm;
+		}
+		if constexpr (std::is_same_v<T, Model>) {
+			return cacheMdl;
+		}
 	}
 
-	std::optional<const MultiResolutionMesh*> getOrParseMrm(const string& assetName)
+	template<HasLoad T>
+	std::optional<const T*> getOrParse(const string& assetName)
 	{
-		auto [it, wasInserted] = cacheMeshesZkit.try_emplace(assetName);
-		MultiResolutionMesh& result = it->second;
-		if (wasInserted) {
-			if (!loadVisualZkit(result, assetName)) {
+		auto& cache = getCache<T>();
+		auto it = cache.find(assetName);
+		if (it == cache.end()) {
+			const auto& assetFileOpt = assets::getIfExists(assetName);
+			if (assetFileOpt.has_value()) {
+				auto [itNew, wasInserted] = cache.try_emplace(assetName);
+				auto visualData = assets::getData(assetFileOpt.value());
+				auto read = zenkit::Read::from(visualData.data, visualData.size);
+				itNew->second.load(read.get());
+				return &itNew->second;
+			}
+			else {
 				return std::nullopt;
 			}
 		}
-		return &result;
+		else {
+			return &it->second;
+		}
 	}
 
-	std::optional<const ModelHierarchy*> getOrParseMdh(const string& assetName)
-	{
-		auto [it, wasInserted] = cacheMdh.try_emplace(assetName);
-		ModelHierarchy& result = it->second;
-		if (wasInserted) {
-			if (!loadVisualZkit(result, assetName)) {
-				return std::nullopt;
-			}
-		}
-		return &result;
-	}
+	template std::optional<const MultiResolutionMesh*> getOrParse(const string& assetName);
+	template std::optional<const ModelHierarchy*> getOrParse(const string& assetName);
+	template std::optional<const ModelMesh*> getOrParse(const string& assetName);
+	template std::optional<const Model*> getOrParse(const string& assetName);
 
-	std::optional<const ModelMesh*> getOrParseMdm(const string& assetName)
-	{
-		auto [it, wasInserted] = cacheModelMeshesZkit.try_emplace(assetName);
-		ModelMesh& result = it->second;
-		if (wasInserted) {
-			if (!loadVisualZkit(result, assetName)) {
-				return std::nullopt;
-			}
-		}
-		return &result;
-	}
-
-	std::optional<const Model*> getOrParseMdl(const string& assetName)
-	{
-		auto [it, wasInserted] = cacheModelsZkit.try_emplace(assetName);
-		Model& result = it->second;
-		if (wasInserted) {
-			if (!loadVisualZkit(result, assetName)) {
-				return std::nullopt;
-			}
-		}
-		return &result;
-	}
 
 	// TODO this should probably also lowercase everything, not callers
 	TexId getTexId(const std::string& texName) {

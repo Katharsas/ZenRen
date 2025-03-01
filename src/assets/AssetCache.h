@@ -8,10 +8,13 @@
 
 namespace assets
 {
-	std::optional<const zenkit::MultiResolutionMesh*> getOrParseMrm(const std::string& assetName);
-	std::optional<const zenkit::ModelHierarchy*> getOrParseMdh(const std::string& assetName);
-	std::optional<const zenkit::ModelMesh*> getOrParseMdm(const std::string& assetName);
-	std::optional<const zenkit::Model*> getOrParseMdl(const std::string& assetName);
+	template <typename L> concept HasLoad =
+		requires(L loadable) {
+			{ loadable.load((zenkit::Read*)nullptr) } -> std::same_as<void>;
+	};
+
+	template<HasLoad T>
+	std::optional<const T*> getOrParse(const std::string& assetName);
 
 	render::TexId getTexId(const std::string& texName);
 	std::string_view getTexName(render::TexId texId);

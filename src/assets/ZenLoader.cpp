@@ -147,7 +147,7 @@ namespace assets
         case VisualType::MULTI_RESOLUTION_MESH: {
             assert(__3DS.isExtOf(name));
             auto compiledName = ::util::replaceExtension(name, MRM.str());
-            auto meshOpt = getOrParseMrm(compiledName);
+            auto meshOpt = getOrParse<zenkit::MultiResolutionMesh>(compiledName);
             if (!meshOpt.has_value()) {
                 LOG(INFO) << "Failed to find MRM data for visual: " << name;
                 return false;
@@ -162,12 +162,13 @@ namespace assets
             {
                 // MDL
                 auto compiledName = ::util::replaceExtension(name, MDL.str());
-                auto meshOpt = getOrParseMdl(compiledName);
+                auto meshOpt = getOrParse<zenkit::Model>(compiledName);
                 if (!meshOpt.has_value()) {
                     if (isAsc) {
                         LOG(INFO) << "Failed to find MDL data for visual: " << name;
                         return false;
                     }
+                    // try MDH+MDM
                 }
                 else {
                     loadInstanceModel(target, meshOpt.value()->hierarchy, meshOpt.value()->mesh, instance, debugChecksEnabled);
@@ -176,9 +177,9 @@ namespace assets
             } {
                 // MDH+MDM
                 auto compiledName = ::util::replaceExtension(name, MDH.str());
-                auto mdhOpt = getOrParseMdh(compiledName);
+                auto mdhOpt = getOrParse<zenkit::ModelHierarchy>(compiledName);
                 compiledName = ::util::replaceExtension(name, MDM.str());
-                auto mdmOpt = getOrParseMdm(compiledName);
+                auto mdmOpt = getOrParse<zenkit::ModelMesh>(compiledName);
                 if (!mdhOpt.has_value() || !mdmOpt.has_value()) {
                     LOG(INFO) << "Failed to find MDH + MDM data for visual: " << name;
                     return false;
@@ -190,9 +191,10 @@ namespace assets
         case VisualType::DECAL: {
             assert(TGA.isExtOf(name));
             loadInstanceDecal(target, instance, debugChecksEnabled);
-            return false;
+            return true;
         }
         default: {
+            LOG(INFO) << "Visual not supported: " << name;
             return false;
         }
         }
