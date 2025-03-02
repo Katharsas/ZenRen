@@ -1,3 +1,7 @@
+// Disable: pow(f, e) will not work for negative f, use abs(f) or conditionally handle negative values if you expect them
+// We generally use pow(saturate(..), ..) which is always ok but still triggers warning.
+#pragma warning (disable : 3571)
+
 static const uint OUTPUT_FULL = 0;
 static const uint OUTPUT_SOLID = 1;
 static const uint OUTPUT_DIFFUSE = 2;

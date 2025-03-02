@@ -12,17 +12,20 @@ High performance DirectX11 viewer/renderer for Gothic assets (VDF or single file
   - Static Light
     - Indoor: Lightmaps
     - Outdoor: Per-Vertex Baked Brightness 
-- Static Objects (VOBs, MOBs)
+- Static Objects (VOBs, MOBs, Decals)
   - Static Light
     - Indoor: Static Voblight Accumulation (Color & Direction, Visibility Ray Testing)
     - Outdoor: Per-Vob Color from Ground Face
+- Transparent / Blended Surfaces
+- Distance Fog
 - Sky
   - Time-Of-Day Skylight
   - Sky Layer Animation
 - Asset File Formats
-  - Level: VDF
-  - Objects: VDF
-  - Textures: VDF, TGA, PNG
+  - Single Files or VDF/MOD Container
+  - Level: ZEN
+  - Objects: MRM, MDL, MDM+MDH
+  - Textures: TEX, TGA, PNG
 
 ### Features
 - Frame Limiter
@@ -35,6 +38,7 @@ High performance DirectX11 viewer/renderer for Gothic assets (VDF or single file
   - Tonemapping
   - Gamma, Brightness, Contrast
 - UI
+  - Detailed Settings
   - High DPI Aware
 
 ### TODO
@@ -42,12 +46,10 @@ High performance DirectX11 viewer/renderer for Gothic assets (VDF or single file
 - Dynamic Lights
 - Dynamic Objects
   - Light Updates
-- Transparent Surfaces (Water)
-- Distance Fog
+- Transparent Surface Sorting
 - Sky Celestials (Sun, Moon)
 - Asset File Formats
-  - Level: ZEN (outside VDF), OBJ
-  - Objects: 3DS, OBJ
+  - Objects: 3DS, MDS
 - Loading single objects without level
 
 ### Non-Goals
@@ -70,6 +72,7 @@ High performance DirectX11 viewer/renderer for Gothic assets (VDF or single file
 
 ### Screenshots
 ![Oldcamp](Screenshots/oldcamp.jpg)
+![Oldcamp](Screenshots/oldcamp_huts.jpg)
 ![Swampcamp](Screenshots/swampcamp.jpg)
 ![YBerions Temple](Screenshots/yberion_temple.jpg)
 

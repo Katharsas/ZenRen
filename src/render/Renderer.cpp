@@ -176,14 +176,19 @@ namespace render
 
 		bool loaded = false;
 		if (level.has_value()) {
-			const auto [loaded, isOutdoorLevel] = world::loadWorld(d3d, level.value());
-			if (loaded) {
-				defaultSky = isOutdoorLevel;
+			auto loadResult = world::loadWorld(d3d, level.value());
+			if (loadResult.loaded) {
+				defaultSky = loadResult.isOutdoorLevel;
+				loaded = true;
 			}
 		}
 		if (defaultSky) {
 			sky::loadSky(d3d);
 		}
+		else {
+			world::getWorldSettings().drawSky = false;
+		}
+		
 		return loaded;
 	}
 

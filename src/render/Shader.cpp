@@ -32,8 +32,8 @@ namespace render {
 		LPCSTR profile = type == ShaderType::Vertex ? "vs_5_0" : type == ShaderType::Pixel ? "ps_5_0" : "cs_5_0";
 		LPCSTR entry = type == ShaderType::Vertex ? "VS_Main" : type == ShaderType::Pixel ? "PS_Main" : "CS_Main";
 		std::wstring sourceW = util::utf8ToWide(source);
-		ID3D10Blob* result;
-		ID3D10Blob* error;
+		ID3D10Blob* result = nullptr;
+		ID3D10Blob* error = nullptr;
 
 		auto hr = D3DCompileFromFile(
 			sourceW.c_str(), defines, includeHandling, entry, profile, compileFlags, 0, &result, &error);

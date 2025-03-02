@@ -119,11 +119,11 @@ add_executable(${PROJECT_NAME} WIN32 ${PROJECT_SRC})
     endif()
 
     if (CMAKE_GENERATOR MATCHES "Visual Studio")
-        #set visual studio's working directory for debugging since launch.vs.json > currentDir does not work for MS project files
+        # set visual studio's working directory for debugging since launch.vs.json > currentDir does not work for MS project files
         set_target_properties(${PROJECT_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/resources")
-    else()
-        # TODO set working dir for Ninja (or set via launch.vs.json > currentDir > ${workspaceRoot})
-        # Note: It is apparently possible (but undocumented) to move launch.vs.json into project dir to check it into git
+        
+        # set command args since it seems like launch.vs.json does basically not work at all
+        #set_target_properties(${PROJECT_NAME} PROPERTIES VS_DEBUGGER_COMMAND_ARGUMENTS "--noLog --rdp --level \"WORLD.ZEN\"")
     endif()
  endif()
 

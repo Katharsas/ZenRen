@@ -153,7 +153,7 @@ namespace render::pass::world
 		}
 	}
 
-	const WorldSettings& getWorldSettings() {
+	WorldSettings& getWorldSettings() {
 		return worldSettings;
 	}
 

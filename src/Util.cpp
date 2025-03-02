@@ -119,7 +119,6 @@ namespace util
 	}
 
 	void throwError(const std::string& message) {
-		LOG(WARNING) << message;
-		throw std::exception((message).c_str());
+		LOG(FATAL) << message;
 	}
 }

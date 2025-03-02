@@ -48,13 +48,14 @@ namespace assets
 	const render::FileData getData(const FileHandle handle);
 
 	FileHandle getInternal(const AssetsIntern asset);
-	std::optional<FileHandle> getIfExistsAsFile(const std::string_view assetName);
-	std::optional<FileHandle> getIfExistsInVfs(const std::string_view assetName);
-	std::optional<FileHandle> getIfExists(const std::string_view assetName);
-	std::optional<std::pair<FileHandle, util::FileExt>> getIfAnyExists(const std::string_view assetName, const AssetFormats& formats);
+	std::optional<FileHandle> getIfExistsAsFile(const std::string_view assetNameLower);
+	std::optional<FileHandle> getIfExistsInVfs(const std::string_view assetNameLower);
+	std::optional<FileHandle> getIfExists(const std::string_view assetNameLower);
+	std::optional<std::pair<FileHandle, util::FileExt>> getIfAnyExists(const std::string_view assetNameAnyCase, const AssetFormats& formats);
 	bool exists(const std::string_view assetName);
 
 	void initAssetsIntern();
 	void initFileAssetSourceDir(std::filesystem::path& rootDir);
 	void initVdfAssetSourceDir(std::filesystem::path& rootDir);
+	void printFoundZens();
 }

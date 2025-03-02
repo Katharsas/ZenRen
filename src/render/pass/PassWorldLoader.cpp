@@ -57,9 +57,6 @@ namespace render::pass::world
 	{
 		return ::util::createOrGet<TexId, Texture*>(textureCache, texId, [&](Texture*& ref) {
 			std::string texName(::assets::getTexName(texId));
-			if (texId == 16) {
-				LOG(INFO) << "##################### " << texName;
-			}
 			ref = assets::createTextureOrDefault(d3d, texName, srgb);
 		});
 	}
@@ -371,27 +368,28 @@ namespace render::pass::world
 		auto sampler = render::stats::TimeSampler();
 		sampler.start();
 
+		LOG(INFO);
+		LOG(INFO) << "    #########################################";
+		LOG(INFO) << "    Loading data";
+		LOG(INFO) << "    #########################################";
+
 		bool levelDataFound = false;
 		RenderData data;
 		string level = ::util::asciiToLower(levelStr);
 
-		if (!::util::endsWith(level, ".obj") && !::util::endsWith(level, ".zen")) {
-			LOG(WARNING) << "Level file format not supported: " << level;
-		}
-
-		auto levelFileOpt = assets::getIfExists(level);
-		if (levelFileOpt.has_value()) {
-			if (::util::endsWith(level, ".zen")) {
+		if (::util::endsWith(level, ".zen")) {
+			auto levelFileOpt = assets::getIfExists(level);
+			if (levelFileOpt.has_value()) {
 				auto levelFile = levelFileOpt.value();
 				assets::loadZen(data, levelFile);
 				levelDataFound = true;
 			}
 			else {
-				LOG(WARNING) << "Loading from VDF file not supported: " << level;
+				LOG(WARNING) << "Failed to find level file '" << level << "'!";
 			}
 		}
 		else {
-			LOG(WARNING) << "Failed to find level file '" << level << "'!";
+			LOG(WARNING) << "Level file format not supported: " << level;
 		}
 
 		if (!levelDataFound) {
@@ -399,6 +397,11 @@ namespace render::pass::world
 		}
 
 		sampler.logMillisAndRestart("Level: Loaded all data");
+
+		LOG(INFO);
+		LOG(INFO) << "    #########################################";
+		LOG(INFO) << "    Uploading GPU data";
+		LOG(INFO) << "    #########################################";
 
 		clearZenLevel();
 		world.isOutdoorLevel = data.isOutdoorLevel;
@@ -440,15 +443,15 @@ namespace render::pass::world
 		LoadResult loadResult;
 		// TODO fix prepass
 		//loadResult = loadPrepassData(d3d, world.prepassMeshes, data.worldMesh);
-		LOG(INFO) << "Level: Uploaded depth prepass        - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
-		sampler.logMillisAndRestart("Level: Uploaded depth prepass");
+		//LOG(INFO) << "Level: Uploaded depth prepass  - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
+		//sampler.logMillisAndRestart("Level: Uploaded depth prepass");
 
 		loadResult = loadVertexDataBatched(d3d, world.meshBatchesWorld, data.worldMesh, texturesPerBatch);
-		LOG(INFO) << "Level: Uploaded world mesh           - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
+		LOG(INFO) << "Level: Uploaded world mesh       - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
 		sampler.logMillisAndRestart("Level: Uploaded world mesh");
 
 		loadResult = loadVertexDataBatched(d3d, world.meshBatchesObjects, data.staticMeshes, texturesPerBatch);
-		LOG(INFO) << "Level: Uploaded static instances     - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
+		LOG(INFO) << "Level: Uploaded static instances - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
 		sampler.logMillisAndRestart("Level: Uploaded static instances");
 
 		// since single textures have been copied to texture arrays, we can release them

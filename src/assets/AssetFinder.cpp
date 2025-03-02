@@ -1,11 +1,6 @@
 #include "stdafx.h"
 #include "AssetFinder.h"
 
-#include <iostream>
-#include <fstream>
-#include <span>
-#include <spanstream>
-
 #include "DebugTextures.h"
 #include "../Util.h"
 
@@ -26,7 +21,7 @@ namespace assets
 
 	// name is lowercase
 	unordered_map<string, const fs::path> assetNamesToPaths;
-	unordered_set<string> zensFoundInVdfs;
+	unordered_map<string, bool> zensFound;
 
 	unordered_set<AssetsIntern> assetsIntern = {
 		AssetsIntern::DEFAULT_TEXTURE,
@@ -46,11 +41,9 @@ namespace assets
 		}
 	} vfs;
 
-	string filenameWithTga(const string& filename) {
-		return util::replaceExtension(filename, ".tga");
-	}
 
-	void walkFilesRecursively(fs::path& rootDir, const std::function<void(const fs::path&, const string&)> onFile) {
+	void walkFilesRecursively(fs::path& rootDir, const std::function<void(const fs::path&, const string&)> onFile)
+	{
 		for (const auto& dirEntry : fs::recursive_directory_iterator(rootDir)) {
 			if (!std::filesystem::is_directory(dirEntry)) {
 				const auto& path = dirEntry.path();
@@ -62,6 +55,18 @@ namespace assets
 		}
 	}
 
+	void walkVfsNodesRecursively(const zenkit::VfsNode& parent, const std::function<void(const zenkit::VfsNode&)> onFile)
+	{
+		for (const auto& node : parent.children()) {
+			if (node.type() == zenkit::VfsNodeType::DIRECTORY) {
+				walkVfsNodesRecursively(node, onFile);
+			}
+			else {
+				onFile(node);
+			}
+		}
+	}
+
 	FileHandle getInternal(const AssetsIntern asset)
 	{
 		auto it = assetsInternHandles.find(asset);
@@ -69,10 +74,18 @@ namespace assets
 		return it->second;
 	}
 
-	// for that we need AssetFinder to provide generic file byte streaming / in-memory-buffering and other code use that as input
-	std::optional<FileHandle> getIfExistsAsFile(const string_view assetName)
+	std::optional<FileHandle> getIfExistsAsFile(const string_view assetNameLower)
 	{
-		auto assetNameStr = string(assetName);
+		// for tex we want to first look for -c suffix
+		if (util::endsWith(assetNameLower, ".tex") && !util::endsWith(assetNameLower, "-c.tex")) {
+			string assetNameNoExtLower = util::replaceExtension(assetNameLower, "");
+			auto result = getIfExistsAsFile(assetNameNoExtLower + "-c.tex");
+			if (result.has_value()) {
+				return result;
+			}
+		}
+
+		auto assetNameStr = string(assetNameLower);
 		auto it = assetNamesToPaths.find(assetNameStr);
 		if (it != assetNamesToPaths.end()) {
 			return FileHandle{
@@ -86,24 +99,23 @@ namespace assets
 		}
 	}
 
-	std::optional<FileHandle> getIfExistsInVfs(const string_view assetName)
+	std::optional<FileHandle> getIfExistsInVfs(const string_view assetNameLower)
 	{
 		assert(vfs.initialized());
-		std::string assetNameStr;
 
-		// add -c suffix for compiled textures
-		if (util::endsWithEither(assetName, { FormatsCompiled::TEX })) {
-			auto [nameNoExt, oldExt] = util::replaceExtensionAndGetOld(assetName, "");
-			assetNameStr = nameNoExt + "-c" + oldExt;
-		}
-		else {
-			assetNameStr = string(assetName);
+		// for tex we want to first look for -c suffix
+		if (util::endsWith(assetNameLower, ".tex") && !util::endsWith(assetNameLower, "-c.tex")) {
+			string assetNameNoExtLower = util::replaceExtension(assetNameLower, "");
+			auto result = getIfExistsInVfs(assetNameNoExtLower + "-c.tex");
+			if (result.has_value()) {
+				return result;
+			}
 		}
 
-		const zenkit::VfsNode* node = vfs.zkit->find(assetNameStr);
+		const zenkit::VfsNode* node = vfs.zkit->find(assetNameLower);
 		if (node != nullptr) {
 			return FileHandle{
-				.name = std::move(assetNameStr),
+				.name = std::string(assetNameLower),
 				.path = nullptr,
 				.node = node,
 			};
@@ -113,19 +125,19 @@ namespace assets
 		}
 	}
 
-	std::optional<FileHandle> getIfExists(const string_view assetName)
+	std::optional<FileHandle> getIfExists(const string_view assetNameLower)
 	{
-		auto handle = getIfExistsAsFile(assetName);
+		auto handle = getIfExistsAsFile(assetNameLower);
 		if (handle.has_value()) {
 			return handle;
 		}
-		return getIfExistsInVfs(assetName);
+		return getIfExistsInVfs(assetNameLower);
 	}
 
-	std::optional<std::pair<FileHandle, util::FileExt>> getIfAnyExists(const string_view assetName, const AssetFormats& formats)
+	std::optional<std::pair<FileHandle, util::FileExt>> getIfAnyExists(const string_view assetNameAnyCase, const AssetFormats& formats)
 	{
 		// remove extension if any
-		string assetNameNoExtLower = util::replaceExtension(assetName, "");
+		string assetNameNoExtLower = util::replaceExtension(assetNameAnyCase, "");
 		util::asciiToLowerMut(assetNameNoExtLower);
 
 		for (auto& ext : formats.formatsFile) {
@@ -203,14 +215,9 @@ namespace assets
 
 		walkFilesRecursively(rootDir, [&](const fs::path& path, const string& filenameLower) -> void {
 			if (util::endsWithEither(filenameLower, extensions)) {
-				// remove -c suffix for compiled textures (TODO do these even exist as single files or is -c suffix only used inside VDF?)
-				if (util::endsWithEither(filenameLower, { FormatsCompiled::TEX })) {
-					auto [nameNoExt, oldExt] = util::replaceExtensionAndGetOld(filenameLower, "");
-					if (util::endsWith(nameNoExt, "-c")) {
-						string suffixRemoved = string(filenameLower.substr(0, filenameLower.length() - 2)) + oldExt;
-						assetNamesToPaths.insert(std::pair(suffixRemoved, path));
-						return;
-					}
+				if (util::endsWith(filenameLower, ".zen")) {
+					auto [nameAndFoundInVfs, wasInserted] = zensFound.try_emplace(filenameLower);
+					nameAndFoundInVfs->second = false;// overwrite ZENs from VFS
 				}
 				assetNamesToPaths.insert(std::pair(filenameLower, path));
 			}
@@ -254,13 +261,24 @@ namespace assets
 			}
 		});
 
-		const auto& vdfFileList = vfs.zkit->root().children();
-		for (const auto& node : vdfFileList) {
-			LOG(INFO) << "VFS:  " << node.name();
-			const auto filenameLow = util::asciiToLower(node.name());
-			if (util::endsWith(filenameLow, ".zen")) {
-				zensFoundInVdfs.insert(filenameLow);
+		walkVfsNodesRecursively(vfs.zkit->root(), [](const zenkit::VfsNode& fileNode) -> void {
+			const auto filenameLower = util::asciiToLower(fileNode.name());
+			if (util::endsWith(filenameLower, ".zen")) {
+				auto [nameAndFoundInVfs, wasInserted] = zensFound.try_emplace(filenameLower);
+				if (wasInserted) { // don't overwrite ZENs from files
+					nameAndFoundInVfs->second = true;
+				}
 			}
+		});
+	}
+
+	void printFoundZens()
+	{
+		if (zensFound.empty()) {
+			LOG(WARNING) << "    No level files found!";
+		}
+		for (auto& [filename, foundInVfs] : zensFound) {
+			LOG(INFO) <<  "    " << (foundInVfs ? "VFS" : "FILE") << ": " << filename;
 		}
 	}
 }

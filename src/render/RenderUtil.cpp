@@ -16,9 +16,9 @@ namespace render::util {
 
 	void dumpVerts(const std::string& matName, const std::vector<VertexPos>& vertPos, const std::vector<NORMAL_UV_LUV>& vertOther) {
 		std::ostringstream buffer;
-		buffer << matName << std::endl;
+		buffer << matName << '\n';
 		for (uint32_t i = 0; i < vertPos.size(); i++) {
-			buffer << "    " << vertPos[i] << "  " << vertOther[i] << std::endl;
+			buffer << "    " << vertPos[i] << "  " << vertOther[i] << '\n';
 		}
 		LOG(INFO) << buffer.str();
 	}

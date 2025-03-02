@@ -29,8 +29,14 @@ namespace viewer
 	}
 	frameTimes;
 
+
 	void init(HWND hWnd, Arguments args, uint16_t width, uint16_t height)
 	{
+		LOG(INFO);
+		LOG(INFO) << "#############################################";
+		LOG(INFO) << "Initializing ZenRen";
+		LOG(INFO) << "#############################################";
+
 		auto sampler = render::stats::TimeSampler();
 		sampler.start();
 
@@ -55,17 +61,17 @@ namespace viewer
 				const int32_t fpsReal = fullTime == 0 ? 0 : (1000000 / fullTime);
 
 				std::stringstream buffer;
-				buffer << "FPS:  " << util::leftPad(std::to_string(fpsReal), 4) << std::endl;
+				buffer << "FPS:  " << util::leftPad(std::to_string(fpsReal), 4) << '\n';
 
 				// when frame limiter is enabled GPU time is masked by sleep time
 				if (!settings.frameLimiterEnabled) {
-					buffer << "  Render: " + util::leftPad(std::to_string(renderTime), 4) << " us" << std::endl;
+					buffer << "  Render: " + util::leftPad(std::to_string(renderTime), 4) << " us\n";
 				}
 				else {
-					buffer << "  Render: (limited)"  << std::endl;
+					buffer << "  Render: (limited)"  << '\n';
 				}
 
-				buffer << "  Update: " + util::leftPad(std::to_string(updateTime), 4) << " us" << std::endl;
+				buffer << "  Update: " + util::leftPad(std::to_string(updateTime), 4) << " us\n";
 				ImGui::Text(buffer.str().c_str());
 			}
 		});
@@ -99,10 +105,16 @@ namespace viewer
 		}
 		// disable sky by default if there are no assets to take sky textures from
 		bool defaultSky = args.vdfFilesRoot.has_value() || args.assetFilesRoot.has_value();
-		render::loadLevel(args.level, defaultSky);
+		bool levelLoaded = render::loadLevel(args.level, defaultSky);
+		if (!levelLoaded) {
+			LOG(WARNING) << "Available level files:";
+			assets::printFoundZens();
+		}
 
-		sampler.logMillisAndRestart("Viewer initialized total");
-		LOG(DEBUG) << "Statistics in microseconds";
+		LOG(INFO);
+		LOG(INFO) << "#############################################";
+		sampler.logMillisAndRestart("ZenRen initialized total");
+		LOG(INFO) << "#############################################";
 
 		frameTimes.full.start();
 	}

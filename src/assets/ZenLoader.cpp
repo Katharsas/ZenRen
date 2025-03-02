@@ -205,7 +205,11 @@ namespace assets
 
     void loadZen(render::RenderData& out, const FileHandle& levelFile, LoadDebugFlags debug)
     {
-        LOG(INFO) << "Loading World!";
+        LOG(INFO);
+        LOG(INFO) << "        #####################################";
+        LOG(INFO) << "        Loading World";
+        LOG(INFO) << "        #####################################";
+
         auto sampler = render::stats::TimeSampler();
         sampler.start();
 
@@ -213,7 +217,12 @@ namespace assets
         zenkit::World world{};
         {
             auto read = zenkit::Read::from(fileData.data, fileData.size);
-            world.load(read.get());
+            try {
+                world.load(read.get());
+            }
+            catch (const std::exception& ex) {
+                util::throwError(ex.what());
+            }
         }
         bool isOutdoorLevel = world.world_bsp_tree.mode == zenkit::BspTreeType::OUTDOOR;
         sampler.logMillisAndRestart("Loader: World data parsed");
@@ -227,6 +236,11 @@ namespace assets
         }
         sampler.logMillisAndRestart("Loader: World mesh loaded");
 
+        LOG(INFO);
+        LOG(INFO) << "        #####################################";
+        LOG(INFO) << "        Loading World Objects";
+        LOG(INFO) << "        #####################################";
+
         vector<Light> lightsStatic = loadLights(world.world_vobs);
 
         // TODO debug lightmap VOB lighting
@@ -239,6 +253,11 @@ namespace assets
         }
 
         sampler.logMillisAndRestart("Loader: VOB visuals loaded");
+
+        LOG(INFO);
+        LOG(INFO) << "        #####################################";
+        LOG(INFO) << "        Load statistics";
+        LOG(INFO) << "        #####################################";
 
         printAndResetLoadStats(debug.validateMeshData);
         out.isOutdoorLevel = isOutdoorLevel;

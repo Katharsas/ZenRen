@@ -2,7 +2,7 @@
   "configurations": [
     {
       "name": "VS-x86-Debug",
-      "generator": "Visual Studio 16 2019",
+      "generator": "Visual Studio 17 2022",
       "configurationType": "Debug",
       "inheritEnvironments": [ "msvc_x86_x64" ],
       "buildRoot": "${projectDir}\\out\\build\\${name}",
@@ -13,7 +13,7 @@
     },
     {
       "name": "VS-x86-Release",
-      "generator": "Visual Studio 16 2019",
+      "generator": "Visual Studio 17 2022",
       "configurationType": "Release",
       "inheritEnvironments": [ "msvc_x86_x64" ],
       "buildRoot": "${projectDir}\\out\\build\\${name}",

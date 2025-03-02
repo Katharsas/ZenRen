@@ -30,7 +30,7 @@ namespace render::pass::world
 	LoadWorldResult loadWorld(D3d d3d, const std::string& level);
 	void updateObjects(float deltaTime);
 	void updateCameraFrustum(const DirectX::BoundingFrustum& cameraFrustum);
-	const WorldSettings& getWorldSettings();
+	WorldSettings& getWorldSettings();
 	void initLinearSampler(D3d d3d, RenderSettings& settings);
 	void init(D3d d3d);
 	COLOR getBackgroundColor();

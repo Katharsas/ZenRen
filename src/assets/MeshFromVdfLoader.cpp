@@ -24,6 +24,8 @@ namespace assets
     using ::std::optional;
 	using ::util::getOrCreate;
 
+    constexpr bool manualReservation = false;
+
     const float zeroThreshold = 0.000001f;
     const XMMATRIX identity = XMMatrixIdentity();
 
@@ -255,13 +257,32 @@ namespace assets
     template <typename VERTEX_FEATURE>
     void insertFace(Verts<VERTEX_FEATURE>& target, const array<VertexPos, 3>& facePos, const array<VERTEX_FEATURE, 3>& faceOther) {
         // manual reservation strategy helps with big vectors
-        // TODO might also reduce speed massively
         // TODO find out what our actual memory problem is, we should be able to allocate 3.2G!! does DX11 driver take a lot?
-        static uint32_t vertReserveCount = 160 * 3;
-        if (!target.vecPos.empty() && target.vecPos.size() % vertReserveCount == 0) {
-            uint32_t blocks = (target.vecPos.size() / vertReserveCount) + 1;
-            target.vecPos.reserve(blocks * vertReserveCount);
-            target.vecOther.reserve(blocks * vertReserveCount);
+        if constexpr (manualReservation) {
+            uint32_t vertReserveCount = 200 * 3;
+            size_t blockSize = vertReserveCount;
+            size_t currentSize = target.vecPos.size();
+            if (currentSize == 0) {
+                target.vecPos.reserve(vertReserveCount);
+                target.vecOther.reserve(vertReserveCount);
+            }
+            else if (currentSize >= (vertReserveCount * 128)) {
+                blockSize = vertReserveCount * 128;
+            }
+            else if (currentSize >= (vertReserveCount * 12)) {
+                blockSize = vertReserveCount * 48;
+            }
+            else if (currentSize >= (vertReserveCount * 4)) {
+                blockSize = vertReserveCount * 12;
+            }
+            else if (currentSize >= (vertReserveCount * 1)) {
+                blockSize = vertReserveCount * 4;
+            }
+            if (currentSize != 0 && currentSize % vertReserveCount == 0) {
+                uint32_t blocks = (currentSize / blockSize) + 1;
+                target.vecPos.reserve(blocks * blockSize);
+                target.vecOther.reserve(blocks * blockSize);
+            }
         }
         target.vecPos.push_back(facePos[0]);
         target.vecPos.push_back(facePos[1]);
