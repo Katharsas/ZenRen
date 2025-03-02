@@ -81,17 +81,17 @@ VS_OUT VS_Main(VS_IN input)
         float3 light = (float3) 1.f;
         float3 lightColor = input.colLight.rgb;
         if (!isVob) {
-            light = RescaleOntoAmbient(lightColor * .9f, (float3) .0f);
+            light = RescaleOntoAmbient(lightColor * .9f, (float3) .06f);
         }
         else {
             float lightReceived = CalcLightDirectional(input.dirLight, viewNormal3, .0f);
             float3 directionalLight = lightColor * lightReceived;
             if (blendType != BLEND_ADD) {
-                light = RescaleOntoAmbient(directionalLight, lightColor * .15f, 1.25f);
+                light = RescaleOntoAmbient(directionalLight, lightColor * .17f, 1.25f);
             }
             else {
                 // TODO this is just hacking around the fact that ADD decals just look way less bright in original (always or not?)
-                light = directionalLight * 0.2f;
+                light = directionalLight * 0.4f;
             }
         }
         // TODO it is unclear if vob ambient factor is applied before or after skylight

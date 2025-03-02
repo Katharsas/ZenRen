@@ -35,6 +35,12 @@ cbuffer cbPostSettings : register(b0)
     float gamma;
 };
 
+cbuffer cbDebug : register(b3)
+{
+    float debugFloat1;
+    float debugFloat2;
+}
+
 SamplerState SS_Linear : register(s0);
 Texture2D TX_BackBufferHDR : register(t0);
 
@@ -66,8 +72,11 @@ float4 PS_Main(PS_INPUT input, uint sampleIndex : SV_SAMPLEINDEX) : SV_TARGET
 {
 	float3 color = TX_BackBufferHDR.Sample(SS_Linear, input.texcoord).rgb;
 	
-    //float3 hsv = RGBtoHSV(color);
-    //hsv.y = saturate(hsv.y * 1.05f);// clamp
+	// TODO something is wrong with our fog colors (some are too red),
+	// reverse and check again, and check the INI loading stuff also
+	
+	//float3 hsv = RGBtoHSV(color);
+    //hsv.y = saturate(hsv.y * (0.985f + debugFloat2 * 0.1f)); // clamp
     //color = HSVtoRGB(hsv);
 
 	// This could be calculated by luminance of the picture to get eye adjustment effect.

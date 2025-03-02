@@ -52,7 +52,7 @@ namespace render
 
 		float contrast = 1.0f;
 		float brightness = 0.001f;
-		float gamma = 0.92f;
+		float gamma = 1.0f;
 
 		float debugFloat1 = 0.f;
 		float debugFloat2 = 0.f;
