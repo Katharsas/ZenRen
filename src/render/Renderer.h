@@ -42,8 +42,11 @@ namespace render
 		ID3D11ShaderResourceView* texColorArray = nullptr;
 
 		std::vector<ChunkVertCluster> vertClusters;
-
 		uint32_t vertexCount = 0;
+
+		bool useIndices = false;
+		VertexBuffer vbIndices = { sizeof(VertexIndex) };
+
 		VertexBuffer vbPos = { sizeof(VertexPos) };
 		VertexBuffer vbOther = { sizeof(F) };
 		VertexBuffer vbTexIndices = { sizeof(TEX_INDEX) };// indices into texture array (base color textures)
@@ -51,6 +54,7 @@ namespace render
 		void release()
 		{
 			render::release(texColorArray);
+			render::release(vbIndices.buffer);
 			render::release(vbPos.buffer);
 			render::release(vbOther.buffer);
 			render::release(vbTexIndices.buffer);
@@ -60,12 +64,16 @@ namespace render
 	struct PrepassMeshes
 	{
 		std::vector<ChunkVertCluster> vertClusters;
-
 		uint32_t vertexCount = 0;
+
+		bool useIndices = false;
+		VertexBuffer vbIndices = { sizeof(VertexIndex) };// meh
+
 		VertexBuffer vbPos = { sizeof(VertexPos) };
 
 		void release()
 		{
+			render::release(vbIndices.buffer);
 			render::release(vbPos.buffer);
 		}
 	};

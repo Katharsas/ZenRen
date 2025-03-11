@@ -132,14 +132,18 @@ namespace assets
         else {
             vertKeys = rayDownIntersected(vertLookup, pos3, 100);
         }
+
         vector<VertexPos> belowVerts;
+        belowVerts.reserve(vertKeys.size() * 3);
+
         for (auto& vertKey : vertKeys) {
-            auto& vecPos = vertKey.get(meshData).vecPos;
-            belowVerts.push_back(vecPos[vertKey.vertIndex]);
-            belowVerts.push_back(vecPos[vertKey.vertIndex + 1]);
-            belowVerts.push_back(vecPos[vertKey.vertIndex + 2]);
+            auto facePos = vertKey.getPos(meshData);
+            belowVerts.push_back(facePos[0]);
+            belowVerts.push_back(facePos[1]);
+            belowVerts.push_back(facePos[2]);
         }
         int closestIndex = closestGroundFace(pos3, belowVerts);
+
         if (closestIndex == -1) {
             return std::nullopt;
         }

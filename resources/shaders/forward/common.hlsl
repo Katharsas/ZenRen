@@ -43,10 +43,10 @@ cbuffer cbCamera : register(b1)
 };
 
 static const uint BLEND_NONE = 0;
-static const uint BLEND_ALPHA = 1;
-static const uint BLEND_FACTOR = 2;
-static const uint BLEND_ADD = 3;
-static const uint BLEND_MULTIPLY = 4;
+static const uint BLEND_ADD = 1;
+static const uint BLEND_MULTIPLY = 2;
+static const uint BLEND_ALPHA = 3;
+static const uint BLEND_FACTOR = 4;
 
 cbuffer cbBlendMode : register(b2)
 {

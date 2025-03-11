@@ -227,11 +227,16 @@ namespace render::pass::world
 	template <VERTEX_FEATURE F> array<VertexBuffer, 2> batchGetVbPosTex(const MeshBatch<F>& mesh) { return { mesh.vbPos, mesh.vbTexIndices }; }
 	template <VERTEX_FEATURE F> array<VertexBuffer, 3> batchGetVbAll   (const MeshBatch<F>& mesh) { return { mesh.vbPos, mesh.vbOther, mesh.vbTexIndices }; }
 
-	DrawStats draw(D3d d3d, uint32_t count, uint32_t startIndex)
+	DrawStats draw(D3d d3d, uint32_t count, uint32_t start, bool indexed)
 	{
 		DrawStats stats; 
 		if (!worldSettings.debugSingleDrawEnabled || worldSettings.debugSingleDrawIndex == currentDrawCall) {
-			d3d.deviceContext->Draw(count, startIndex);
+			if (indexed) {
+				d3d.deviceContext->DrawIndexed(count, start, 0);
+			}
+			else {
+				d3d.deviceContext->Draw(count, start);
+			}
 
 			stats.verts += count;
 			stats.draws++;
@@ -240,6 +245,8 @@ namespace render::pass::world
 		currentDrawCall++;
 		return stats;
 	}
+
+	// TODO this usage of template stuff sucks big time. We don't even have many draw calls per frame, simplify this stuff!
 
 	// Mesh - the type of the mesh, usually MeshBatch
 	// VbCount - how many vertex buffer slots are used by a mesh
@@ -267,13 +274,18 @@ namespace render::pass::world
 				ID3D11ShaderResourceView* srv = GetTex(mesh);
 				d3d.deviceContext->PSSetShaderResources(0, 1, &srv);
 			}
+			
+			bool indexed = mesh.useIndices;
+			if (indexed) {
+				d3d::setIndexBuffer(d3d, mesh.vbIndices);
+			}
 			d3d::setVertexBuffers(d3d, GetVbs(mesh));
 
 			// TODO cutoff should be adjustable in GUI
 			uint32_t ignoreAllChunksVertThreshold = 1000;
 			if (!clusteredMesh || !worldSettings.enableFrustumCulling || mesh.vertexCount <= ignoreAllChunksVertThreshold) {
 				// for small number of verts per batch we ignore the clusters to save draw calls
-				stats += draw(d3d, mesh.vertexCount, 0);
+				stats += draw(d3d, mesh.vertexCount, 0, indexed);
 			}
 			else {
 				uint32_t ignoreChunkVertThreshold = 500;// TODO
@@ -315,7 +327,7 @@ namespace render::pass::world
 					vertCount = (uint32_t)(vertCount * worldSettings.debugDrawVertAmount);
 					vertCount -= (vertCount % 3);
 
-					stats += draw(d3d, vertCount, startIncl);
+					stats += draw(d3d, vertCount, startIncl, indexed);
 				}
 			}
 

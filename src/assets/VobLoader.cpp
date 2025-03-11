@@ -20,21 +20,23 @@ namespace assets
 
     COLOR interpolateColorFromFaceXZ(const VEC3& pos, const MatToChunksToVertsBasic& meshData, const VertKey& vertKey)
     {
-        auto& vecVertData = vertKey.get(meshData);
-        auto& vecPos = vecVertData.vecPos;
-        auto& others = vecVertData.vecOther;
-        auto vertIndex = vertKey.vertIndex;
-        float v0Distance = std::sqrt(std::pow(vecPos[vertIndex + 0].x - pos.x, 2.f) + std::pow(vecPos[vertIndex + 0].z - pos.z, 2.f));
-        float v1Distance = std::sqrt(std::pow(vecPos[vertIndex + 1].x - pos.x, 2.f) + std::pow(vecPos[vertIndex + 1].z - pos.z, 2.f));
-        float v2Distance = std::sqrt(std::pow(vecPos[vertIndex + 2].x - pos.x, 2.f) + std::pow(vecPos[vertIndex + 2].z - pos.z, 2.f));
+        auto facePos = vertKey.getPos(meshData);
+        float v0Distance = std::sqrt(std::pow(facePos[0].x - pos.x, 2.f) + std::pow(facePos[0].z - pos.z, 2.f));
+        float v1Distance = std::sqrt(std::pow(facePos[1].x - pos.x, 2.f) + std::pow(facePos[1].z - pos.z, 2.f));
+        float v2Distance = std::sqrt(std::pow(facePos[2].x - pos.x, 2.f) + std::pow(facePos[2].z - pos.z, 2.f));
         float totalDistance = v0Distance + v1Distance + v2Distance;
         float v0Contrib = 1 - (v0Distance / totalDistance);
         float v1Contrib = 1 - (v1Distance / totalDistance);
         float v2Contrib = 1 - (v2Distance / totalDistance);
-        COLOR v0Color = others[vertIndex + 0].colLight;
-        COLOR v1Color = others[vertIndex + 1].colLight;
-        COLOR v2Color = others[vertIndex + 2].colLight;
-        COLOR colorAverage = mul(add(add(mul(v0Color, v0Contrib), mul(v1Color, v1Contrib)), mul(v2Color, v2Contrib)), 0.5f);
+
+        auto faceOther = vertKey.getOther(meshData);
+        COLOR colorAverage = mul(
+            add(add(
+                mul(faceOther[0].colLight, v0Contrib),
+                mul(faceOther[1].colLight, v1Contrib)),
+                mul(faceOther[2].colLight, v2Contrib)),
+            0.5f);
+
         return colorAverage;
     }
 

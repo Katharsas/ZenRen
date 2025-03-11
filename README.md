@@ -91,3 +91,4 @@ This project's first-party code is "source available" for now.
 - lib/octree_attcs - MIT
 - lib/tinyobj - MIT
 - lib/ZenKit - MIT
+- lib/meshoptimizer - MIT

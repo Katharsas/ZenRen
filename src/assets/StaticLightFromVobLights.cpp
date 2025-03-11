@@ -23,7 +23,7 @@ namespace assets
         XMVECTOR direction = DirectX::XMVector3Normalize(rayEnd - rayStart);
         vector<VertKey> vertKeys = rayIntersected(vertLookup, rayStart, rayEnd);
         for (auto& vertKey : vertKeys) {
-            auto& face = vertKey.getPos(meshData);
+            auto face = vertKey.getPos(meshData);
             XMVECTOR faceA = toXM4Pos(face[0]);
             XMVECTOR faceB = toXM4Pos(face[1]);
             XMVECTOR faceC = toXM4Pos(face[2]);

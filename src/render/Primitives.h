@@ -152,7 +152,9 @@ inline std::ostream& operator <<(std::ostream& os, const VertexBasic& that)
 //	return os << "[NOR:" << that.normal << " COL_LIGHT:" << that.colLight << " DIR_LIGHT:" << that.dirLight << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
 //}
 
-typedef uint32_t TEX_INDEX;
+using VertexIndex = uint32_t;
+
+using TEX_INDEX = uint32_t;
 
 namespace render {
 

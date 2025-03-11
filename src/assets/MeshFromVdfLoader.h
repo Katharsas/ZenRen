@@ -13,12 +13,14 @@ namespace assets
     void loadWorldMesh(
         render::MatToChunksToVertsBasic& target,
         const zenkit::Mesh& worldMesh,
+        bool indexed,
         bool debugChecksEnabled = false);
     
     void loadInstanceMesh(
         render::MatToChunksToVertsBasic& target,
         const zenkit::MultiResolutionMesh& mesh,
         const render::StaticInstance& instance,
+        bool indexed,
         bool debugChecksEnabled);
 
     void loadInstanceModel(
@@ -26,6 +28,7 @@ namespace assets
         const zenkit::ModelHierarchy& hierarchy,
         const zenkit::ModelMesh& model,
         const render::StaticInstance& instance,
+        bool indexed,
         bool debugChecksEnabled);
 
     void loadInstanceDecal(

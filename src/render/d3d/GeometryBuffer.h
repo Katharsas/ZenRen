@@ -7,26 +7,40 @@
 
 namespace render::d3d
 {
+	void createGeometryBufUnsafe(D3d d3d, ID3D11Buffer** target, const void* data, uint32_t byteSize, BufferUsage usage, bool isIndexBuffer);
+
+	// TODO combine these? use GeoBufferType flag?
 	template<typename T>
 	void createVertexBuf(D3d d3d, ID3D11Buffer** target, const std::vector<T>& vertexData, BufferUsage usage = BufferUsage::IMMUTABLE)
 	{
-		release(*target);
-		D3D11_BUFFER_DESC bufferDesc = {};
-
-		bufferDesc.Usage = (D3D11_USAGE)usage;
-		bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-		bufferDesc.ByteWidth = sizeof(T) * vertexData.size();
-
-		D3D11_SUBRESOURCE_DATA initialData;
-		initialData.pSysMem = vertexData.data();
-		d3d.device->CreateBuffer(&bufferDesc, &initialData, target);
+		uint32_t byteSize = sizeof(T) * vertexData.size();
+		createGeometryBufUnsafe(d3d, target, vertexData.data(), byteSize, usage, false);
 	}
+
+	template<typename T>
+	void createIndexBuf(D3d d3d, ID3D11Buffer** target, const std::vector<T>& indexData, BufferUsage usage = BufferUsage::IMMUTABLE)
+	{
+		uint32_t byteSize = sizeof(T) * indexData.size();
+		createGeometryBufUnsafe(d3d, target, indexData.data(), byteSize, usage, true);
+	}
+
+	// TODO remove these? we don't even need the additional info in VertexBuffer? move it into VertexBuffer?
 
 	template<typename T>
 	void createVertexBuf(D3d d3d, VertexBuffer& target, const std::vector<T>& vertexData, BufferUsage usage = BufferUsage::IMMUTABLE)
 	{
 		createVertexBuf(d3d, &target.buffer, vertexData, usage);
 	}
+
+	template<typename T>
+	void createIndexBuf(D3d d3d, VertexBuffer& target, const std::vector<T>& vertexData, BufferUsage usage = BufferUsage::IMMUTABLE)
+	{
+		createIndexBuf(d3d, &target.buffer, vertexData, usage);
+	}
+
+	// TODO these set methods suck massively
+
+	void setIndexBuffer(D3d d3d, const VertexBuffer& buffer);
 
 	template<int N>
 	void setVertexBuffers(D3d d3d, const std::array<VertexBuffer, N>& vertexBuffers)

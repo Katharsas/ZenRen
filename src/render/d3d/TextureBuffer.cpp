@@ -74,7 +74,7 @@ namespace render::d3d
 		srvDesc.Format = bufferDesc.Format;
 		srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
 		srvDesc.Texture2D.MostDetailedMip = 0;
-		srvDesc.Texture2D.MipLevels = -1;
+		srvDesc.Texture2D.MipLevels = bufferDesc.MipLevels;
 
 		auto hr = d3d.device->CreateShaderResourceView(buffer, &srvDesc, targetSrv);
 		::util::throwOnError(hr, "createTexture2dSrv failed!");
@@ -156,6 +156,7 @@ namespace render::d3d
 		buffersToCopy.at(0)->GetDesc(&bufferDesc);
 		bufferDesc.ArraySize = buffersToCopy.size();
 		bufferDesc.Usage = (D3D11_USAGE) usage;
+		bufferDesc.MiscFlags = bufferDesc.MiscFlags;
 
 		auto hr = d3d.device->CreateTexture2D(&bufferDesc, nullptr, target);
 		::util::throwOnError(hr, "createTexture2dArrayBuf failed!");
@@ -171,7 +172,7 @@ namespace render::d3d
 		}
 	}
 
-	void createTexture2dArraySrv(D3d d3d, ID3D11ShaderResourceView** targetSrv, ID3D11Texture2D* buffer)
+	void createTexture2dArraySrv(D3d d3d, ID3D11ShaderResourceView** targetSrv, ID3D11Texture2D* buffer, uint32_t reduceMipLevelBy)
 	{
 		release(*targetSrv);
 		D3D11_TEXTURE2D_DESC bufferDesc;
@@ -182,8 +183,12 @@ namespace render::d3d
 		srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
 		srvDesc.Texture2DArray.ArraySize = bufferDesc.ArraySize;
 		srvDesc.Texture2DArray.FirstArraySlice = 0;
-		srvDesc.Texture2DArray.MostDetailedMip = 0;
-		srvDesc.Texture2DArray.MipLevels = -1;
+
+		// TODO reduceMipLevelBy has only extremly small effect on performance, making it essentially pointless
+		uint32_t mipLevels = bufferDesc.MipLevels;
+		uint32_t reducedBy = std::min(reduceMipLevelBy, mipLevels - 1);
+		srvDesc.Texture2DArray.MostDetailedMip = reducedBy;
+		srvDesc.Texture2DArray.MipLevels = mipLevels - reducedBy;
 
 		auto hr = d3d.device->CreateShaderResourceView(buffer, &srvDesc, targetSrv);
 		::util::throwOnError(hr, "createTexture2dArraySrv failed!");

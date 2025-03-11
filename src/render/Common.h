@@ -35,9 +35,25 @@ namespace render
 		auto operator<=>(const TexInfo&) const = default;
 
 		BufferSize getSize() {
-			return { (uint16_t) width, (uint16_t) height };
+			return { (uint16_t)width, (uint16_t)height };
 		}
+
+		struct Hash
+		{
+			size_t operator()(const TexInfo& key) const
+			{
+				size_t res = 0;
+				::util::hashCombine(res, key.width);
+				::util::hashCombine(res, key.height);
+				::util::hashCombine(res, key.mipLevels);
+				::util::hashCombine(res, key.hasAlpha);
+				::util::hashCombine(res, key.format);
+				::util::hashCombine(res, key.srgb);
+				return res;
+			}
+		};
 	};
+	} namespace std { template <> struct hash<render::TexInfo> : render::TexInfo::Hash {}; } namespace render {
 
 	// TODO make adjustable for reload, implement level selection and changing vdf path with load button
 	// TODO should be based on vertex density by default (make "auto" setting available)
@@ -48,7 +64,19 @@ namespace render
 		int16_t y;
 
 		auto operator<=>(const ChunkIndex&) const = default;
+
+		struct Hash
+		{
+			size_t operator()(const ChunkIndex& key) const
+			{
+				size_t res = 0;
+				::util::hashCombine(res, key.x);
+				::util::hashCombine(res, key.y);
+				return res;
+			}
+		};
 	};
+	} namespace std { template <> struct hash<render::ChunkIndex> : render::ChunkIndex::Hash {}; } namespace render {
 
 	struct ChunkVertCluster {
 		ChunkIndex pos;
@@ -68,6 +96,8 @@ namespace render
 
 	template <VERTEX_FEATURE F>
 	struct Verts {
+		bool useIndices;
+		std::vector<VertexIndex> vecIndex;
 		std::vector<VertexPos> vecPos;
 		std::vector<F> vecOther;
 	};
@@ -77,14 +107,16 @@ namespace render
 
 	
 	// TODO disable depth writing
-	// TODO if face order can result in different outcome, we would need to sort these by distance 
-	// to camera theoretically (see waterfall near G2 start)
+	// TODO if face order can result in different outcome, we would need to sort BLEND_ALPHA and BLEND_FACTOR faces
+	// by distance to camera theoretically (see waterfall near G2 start)
+	// To prevent having to sort all water faces:
+	// While above water, render water before (sorted) alpha/factor blenjd faces, while below last
 	enum class BlendType : uint8_t {
 		NONE = 0,         // normal opaque or alpha-tested, shaded
-		BLEND_ALPHA = 1,  // alpha channel blending, ??
-		BLEND_FACTOR = 2, // fixed factor blending (water), shaded (?)
-		ADD = 3,          // alpha channel additive blending
-		MULTIPLY = 4,     // color multiplication, linear color textures, no shading
+		ADD = 1,          // alpha channel additive blending
+		MULTIPLY = 2,     // color multiplication, linear color textures, no shading
+		BLEND_ALPHA = 3,  // alpha channel blending, ??
+		BLEND_FACTOR = 4, // fixed factor blending (water), shaded (?)
 	};
 	
 	constexpr uint8_t BLEND_TYPE_COUNT = magic_enum::enum_count<BlendType>();
@@ -99,7 +131,20 @@ namespace render
 		ColorSpace colorSpace;
 
 		auto operator<=>(const Material&) const = default;
+
+		struct Hash
+		{
+			size_t operator()(const Material& key) const
+			{
+				size_t res = 0;
+				::util::hashCombine(res, key.texBaseColor);
+				::util::hashCombine(res, key.blendType);
+				::util::hashCombine(res, key.colorSpace);
+				return res;
+			}
+		};
 	};
+	} namespace std { template <> struct hash<render::Material> : render::Material::Hash {}; } namespace render {
 
 	template <VERTEX_FEATURE F>
 	using ChunkToVerts = std::unordered_map<ChunkIndex, Verts<F>>;
@@ -117,100 +162,67 @@ namespace render
 	template <VERTEX_FEATURE F>
 	struct VertsBatch {
 		std::vector<ChunkVertCluster> vertClusters;
+		std::vector<VertexIndex> vecIndex;
 		std::vector<VertexPos> vecPos;
 		std::vector<F> vecOther;
+		// TODO either remove vec prefix everywhere and use plural or not consistently
 		std::vector<TEX_INDEX> texIndices;
 		std::vector<TexId> texIndexedIds;
 	};
 
-    // TODO call with [[msvc::forceinline]] if necessary for performance
-	template <typename FaceData>
-	using GetFace = const FaceData(*) (const Material&, const ChunkIndex&, uint32_t, const VertsBasic&);
 
-	template <typename FaceData, GetFace<FaceData> GetFace>
-	void for_each_face(
-		const MatToChunksToVertsBasic& data,
-		const std::function<void(const FaceData& face)>& func)
+	template <typename VERT_TYPE, VERTEX_FEATURE F>
+	const std::vector<VERT_TYPE>& GetVertVec(const Verts<F>& verts)
 	{
-		for (const auto& [material, chunkData] : data) {
-			for (const auto& [chunkIndex, vertData] : chunkData) {
-				for (uint32_t i = 0; i < vertData.vecPos.size(); i += 3) {
-					const auto faceData = GetFace(material, chunkIndex, i, vertData);
-					func(faceData);
-				}
-			}
+		if constexpr (std::is_same_v<VERT_TYPE, VertexPos>) {
+			return verts.vecPos;
+		}
+		if constexpr (std::is_same_v<VERT_TYPE, F>) {
+			return verts.vecOther;
 		}
 	}
-}
 
-namespace std
-{
-	using namespace render;
-
-	template <>
-	struct hash<TexInfo>
+	template <typename VERT_TYPE, VERTEX_FEATURE F>
+	const std::array<VERT_TYPE, 3> GetFace(const Verts<F>& verts, uint32_t index)
 	{
-		size_t operator()(const TexInfo& key) const
-		{
-			size_t res = 0;
-			::util::hashCombine(res, key.width);
-			::util::hashCombine(res, key.height);
-			::util::hashCombine(res, key.mipLevels);
-			::util::hashCombine(res, key.hasAlpha);
-			::util::hashCombine(res, key.format);
-			return res;
-		}
-	};
+		const std::vector<VERT_TYPE>& vec = GetVertVec<VERT_TYPE, F>(verts);
+		if (verts.useIndices) {
+			return {
+				vec[verts.vecIndex[index]],
+				vec[verts.vecIndex[index + 1]],
+				vec[verts.vecIndex[index + 2]]
+			};
+		} else {
+			return {
+				vec[index],
+				vec[index + 1],
+				vec[index + 2]
+			};
+		};
+	}
 
-	template <>
-	struct hash<Material>
-	{
-		size_t operator()(const Material& key) const
-		{
-			size_t res = 0;
-			::util::hashCombine(res, key.texBaseColor);
-			::util::hashCombine(res, key.blendType);
-			::util::hashCombine(res, key.colorSpace);
-			return res;
-		}
-	};
-
-	template <>
-	struct hash<ChunkIndex>
-	{
-		size_t operator()(const ChunkIndex& key) const
-		{
-			size_t res = 0;
-			::util::hashCombine(res, key.x);
-			::util::hashCombine(res, key.y);
-			return res;
-		}
-	};
-}
-namespace render
-{
 	struct VertKey {
-		// this should be ok because elements in an unordered_map never move
 		const Material mat;
 		const ChunkIndex chunkIndex;
+		const uint32_t vertIndex; // we assume the vert vector is not modified during lifetime of index
 
-		// we assume the vert vector is not modified during lifetime of index
-		const uint32_t vertIndex;
-
-
-		const VertsBasic& get(const MatToChunksToVertsBasic& meshData) const
+		// TODO maybe the whole struct should be templated instead of every single method
+		template <VERTEX_FEATURE F>
+		const VertsBasic& get(const MatToChunksToVerts<F>& meshData) const
 		{
 			return meshData.find(this->mat)->second.find(this->chunkIndex)->second;
 		}
-		const std::array<VertexPos, 3> getPos(const MatToChunksToVertsBasic& meshData) const
+		template <VERTEX_FEATURE F>
+		const std::array<VertexPos, 3> getPos(const MatToChunksToVerts<F>& meshData) const
 		{
-			auto& vertData = get(meshData).vecPos;
-			return { vertData[this->vertIndex], vertData[this->vertIndex + 1], vertData[this->vertIndex + 2] };
+			return GetFace<VertexPos, F>(get(meshData), vertIndex);
 		}
-		const std::array<VertexBasic, 3> getOther(const MatToChunksToVertsBasic& meshData) const
+		template <VERTEX_FEATURE F>
+		const std::array<VertexBasic, 3> getOther(const MatToChunksToVerts<F>& meshData) const
 		{
-			auto& vertData = get(meshData).vecOther;
-			return { vertData[this->vertIndex], vertData[this->vertIndex + 1], vertData[this->vertIndex + 2] };
+			return GetFace<F, F>(get(meshData), vertIndex);
 		}
 	};
+
+	void forEachFace(const MatToChunksToVertsBasic& data, const std::function<void(const VertKey& vertKey)>& func);
 }

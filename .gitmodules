@@ -10,3 +10,6 @@
 [submodule "lib/ZenKit"]
 	path = lib/ZenKit
 	url = https://github.com/Katharsas/ZenKit
+[submodule "lib/meshoptimizer"]
+	path = lib/meshoptimizer
+	url = https://github.com/zeux/meshoptimizer

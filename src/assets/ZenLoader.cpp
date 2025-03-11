@@ -140,7 +140,7 @@ namespace assets
         return statics;
     }
 
-    bool loadInstanceVisual(MatToChunksToVertsBasic& target, const StaticInstance& instance, bool debugChecksEnabled)
+    bool loadInstanceVisual(MatToChunksToVertsBasic& target, const StaticInstance& instance, bool indexed, bool debugChecksEnabled)
     {
         using namespace FormatsSource;
         using namespace FormatsCompiled;
@@ -155,7 +155,7 @@ namespace assets
                 LOG(INFO) << "Failed to find MRM data for visual: " << name;
                 return false;
             }
-            loadInstanceMesh(target, *meshOpt.value(), instance, debugChecksEnabled);
+            loadInstanceMesh(target, *meshOpt.value(), instance, indexed, debugChecksEnabled);
             return true;
         }
         case VisualType::MODEL: {
@@ -174,7 +174,7 @@ namespace assets
                     // try MDH+MDM
                 }
                 else {
-                    loadInstanceModel(target, meshOpt.value()->hierarchy, meshOpt.value()->mesh, instance, debugChecksEnabled);
+                    loadInstanceModel(target, meshOpt.value()->hierarchy, meshOpt.value()->mesh, instance, indexed, debugChecksEnabled);
                     return true;
                 }
             } {
@@ -187,7 +187,7 @@ namespace assets
                     LOG(INFO) << "Failed to find MDH + MDM data for visual: " << name;
                     return false;
                 }
-                loadInstanceModel(target, *mdhOpt.value(), *mdmOpt.value(), instance, debugChecksEnabled);
+                loadInstanceModel(target, *mdhOpt.value(), *mdmOpt.value(), instance, indexed, debugChecksEnabled);
                 return true;
             }
         }
@@ -227,7 +227,7 @@ namespace assets
         bool isOutdoorLevel = world.world_bsp_tree.mode == zenkit::BspTreeType::OUTDOOR;
         sampler.logMillisAndRestart("Loader: World data parsed");
 
-        loadWorldMesh(out.worldMesh, world.world_mesh, true);
+        loadWorldMesh(out.worldMesh, world.world_mesh, !debug.disableVertexIndices, debug.validateMeshData);
 
         for (uint32_t i = 0; i < world.world_mesh.lightmap_textures.size(); i++) {
             auto& lightmap = world.world_mesh.lightmap_textures.at(i);
@@ -249,7 +249,7 @@ namespace assets
         sampler.logMillisAndRestart("Loader: World VOB data loaded");
 
         for (auto& instance : vobs) {
-            loadInstanceVisual(out.staticMeshes, instance, debug.validateMeshData);
+            loadInstanceVisual(out.staticMeshes, instance, !debug.disableVertexIndices, debug.validateMeshData);
         }
 
         sampler.logMillisAndRestart("Loader: VOB visuals loaded");

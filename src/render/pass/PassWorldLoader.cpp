@@ -108,7 +108,14 @@ namespace render::pass::world
 	{
 		MeshBatch<F> batch;
 		batch.vertClusters = batchData.vertClusters;
-		batch.vertexCount = batchData.vecPos.size();
+		batch.useIndices = !batchData.vecIndex.empty();
+		if (batch.useIndices) {
+			batch.vertexCount = batchData.vecIndex.size();
+			d3d::createIndexBuf(d3d, batch.vbIndices, batchData.vecIndex);
+		}
+		else {
+			batch.vertexCount = batchData.vecPos.size();
+		}
 		d3d::createVertexBuf(d3d, batch.vbPos, batchData.vecPos);
 		d3d::createVertexBuf(d3d, batch.vbOther, batchData.vecOther);
 		d3d::createVertexBuf(d3d, batch.vbTexIndices, batchData.texIndices);
@@ -116,8 +123,8 @@ namespace render::pass::world
 		target.push_back(batch);
 	}
 
-	template <VERTEX_FEATURE F>
-	vector<pair<TexInfo, vector<pair<Material, const ChunkToVerts<F> *>>>> groupByTexId(D3d d3d, const unordered_map<Material, const ChunkToVerts<F>* >& meshData, TEX_INDEX maxTexturesPerBatch)
+	template <typename VERT_DATA>
+	vector<pair<TexInfo, vector<pair<Material, const VERT_DATA *>>>> groupByTexId(D3d d3d, const unordered_map<Material, const VERT_DATA *>& meshData, TEX_INDEX maxTexturesPerBatch)
 	{
 		// load and bucket all materials so textures that are texture-array-compatible are grouped in a single bucket
 		unordered_map<TexInfo, vector<Material>> texBuckets;
@@ -128,16 +135,16 @@ namespace render::pass::world
 			vec.push_back(mat);
 		}
 
-		vector<pair<TexInfo, vector<pair<Material, const ChunkToVerts<F> *>>>> result;
+		vector<pair<TexInfo, vector<pair<Material, const VERT_DATA *>>>> result;
 
 		// create batches
 		for (const auto& [texInfo, textures] : texBuckets) {
 
-			pair<TexInfo, vector<pair<Material, const ChunkToVerts<F> *>>> batch = { texInfo, {} };
+			pair<TexInfo, vector<pair<Material, const VERT_DATA *>>> batch = { texInfo, {} };
 			TEX_INDEX currentIndex = 0;
 
 			for (const auto mat : textures) {
-				const ChunkToVerts<F>* currentMatData = meshData.find(mat)->second;
+				const VERT_DATA* currentMatData = meshData.find(mat)->second;
 				batch.second.push_back(pair{ mat, currentMatData });
 
 				// create and start new batch because we reached max texture size per batch
@@ -249,25 +256,39 @@ namespace render::pass::world
 		vector<Material> materials;
 
 		// reserve to avoid over-allocation (because the resulting vert vectors are going to be very big)
+		bool useIndices = !batchData.empty() && batchData.at(0).second.at(0).second.useIndices;
+		uint32_t indexCount = 0;
 		uint32_t vertCount = 0;
 		for (const auto& [chunkIndex, vertDataByMat] : batchData) {
 			for (const auto& [material, vertData] : vertDataByMat) {
+				indexCount += vertData.vecIndex.size();
 				vertCount += vertData.vecPos.size();
 			}
 		}
+		target.vecIndex.reserve(indexCount);
 		target.vecPos.reserve(vertCount);
 		target.vecOther.reserve(vertCount);
 		target.texIndices.reserve(vertCount);
 
+		result.verts = useIndices ? indexCount : vertCount;
+
 		for (const auto& [chunkIndex, vertDataByMat] : batchData) {
 			// set vertex data
-			uint32_t currentVertIndex = target.vecPos.size();
+			uint32_t currentVertIndex = useIndices ? target.vecIndex.size() : target.vecPos.size();
 			target.vertClusters.push_back({ chunkIndex, currentVertIndex });
 
 			for (const auto& [material, vertData] : vertDataByMat) {
+				// rewrite indices
+				uint32_t currentVertCount = target.vecPos.size();
+				for (VertexIndex index : vertData.vecIndex) {
+					target.vecIndex.push_back(currentVertCount + index);
+				}
+
+				// copy vertex data
 				::util::insert(target.vecPos, vertData.vecPos);
 				::util::insert(target.vecOther, vertData.vecOther);
 
+				// set batch-dependent vertex data
 				TEX_INDEX texIndex = ::util::getOrCreate<Material, TEX_INDEX>(materialIndices, material, [&]() -> TEX_INDEX {
 					materials.push_back(material);
 					return (TEX_INDEX) materials.size() - 1;
@@ -280,18 +301,17 @@ namespace render::pass::world
 			target.texIndexedIds.push_back(material.texBaseColor);
 		}
 
-		result.verts = target.vecPos.size();
 		return { target, result };
 	}
 
-	template <VERTEX_FEATURE F>
-	array<unordered_map<Material, const ChunkToVerts<F>* >, BLEND_TYPE_COUNT> splitByPass(const MatToChunksToVerts<F>& meshData)
+	template <typename VERT_DATA>
+	array<unordered_map<Material, const VERT_DATA *>, BLEND_TYPE_COUNT> splitByPass(const std::unordered_map<Material, VERT_DATA>& meshData)
 	{
-		array<unordered_map<Material, const ChunkToVerts<F>* >, BLEND_TYPE_COUNT> result;
-		for (auto& [material, chunkToVerts] : meshData) {
+		array<unordered_map<Material, const VERT_DATA *>, BLEND_TYPE_COUNT> result;
+		for (auto& [material, vertData] : meshData) {
 			uint8_t blendTypeIndex = (uint8_t)material.blendType;
-			auto& matToChunks = result.at(blendTypeIndex);
-			matToChunks.insert({ material, &chunkToVerts });
+			auto& passData = result.at(blendTypeIndex);
+			passData.insert({ material, &vertData });
 		}
 		return result;
 	}
@@ -308,7 +328,7 @@ namespace render::pass::world
 	}
 
 	template <VERTEX_FEATURE F>
-	LoadResult loadVertexDataBatched(
+	LoadResult loadBatchVertexData(
 		D3d d3d, MeshBatches<F>& targetAllPasses, const MatToChunksToVerts<F>& meshDataAllPasses, TEX_INDEX maxTexturesPerBatch)
 	{
 		LoadResult result;
@@ -333,7 +353,7 @@ namespace render::pass::world
 				for (const auto& [vertCount, batchData] : batchDataSplit) {
 					const auto [batchDataFlat, batchLoadResult] = flattenIntoBatch(batchData);
 
-					assert(vertCount == batchLoadResult.verts);
+					//assert(vertCount == batchLoadResult.verts);
 					result += batchLoadResult;
 					loadRenderBatch(d3d, target, texInfo, batchDataFlat);
 				}
@@ -373,6 +393,9 @@ namespace render::pass::world
 		LOG(INFO) << "    Loading data";
 		LOG(INFO) << "    #########################################";
 
+		assets::LoadDebugFlags debugFlags {};
+		debugFlags.disableVertexIndices = false;
+
 		bool levelDataFound = false;
 		RenderData data;
 		string level = ::util::asciiToLower(levelStr);
@@ -381,7 +404,7 @@ namespace render::pass::world
 			auto levelFileOpt = assets::getIfExists(level);
 			if (levelFileOpt.has_value()) {
 				auto levelFile = levelFileOpt.value();
-				assets::loadZen(data, levelFile);
+				assets::loadZen(data, levelFile, debugFlags);
 				levelDataFound = true;
 			}
 			else {
@@ -446,11 +469,11 @@ namespace render::pass::world
 		//LOG(INFO) << "Level: Uploaded depth prepass  - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
 		//sampler.logMillisAndRestart("Level: Uploaded depth prepass");
 
-		loadResult = loadVertexDataBatched(d3d, world.meshBatchesWorld, data.worldMesh, texturesPerBatch);
+		loadResult = loadBatchVertexData(d3d, world.meshBatchesWorld, data.worldMesh, texturesPerBatch);
 		LOG(INFO) << "Level: Uploaded world mesh       - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
 		sampler.logMillisAndRestart("Level: Uploaded world mesh");
 
-		loadResult = loadVertexDataBatched(d3d, world.meshBatchesObjects, data.staticMeshes, texturesPerBatch);
+		loadResult = loadBatchVertexData(d3d, world.meshBatchesObjects, data.staticMeshes, texturesPerBatch);
 		LOG(INFO) << "Level: Uploaded static instances - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
 		sampler.logMillisAndRestart("Level: Uploaded static instances");
 
