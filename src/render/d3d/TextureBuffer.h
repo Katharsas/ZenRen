@@ -43,6 +43,6 @@ namespace render::d3d
 	template<typename T>
 	void readbackTexture2d(D3d d3d, ID3D11Texture2D* buffer, std::function<bool(T* row, uint16_t rowIndex, uint16_t count)> processPixelRow);
 
-	void createTexture2dArrayBufByCopy(D3d d3d, ID3D11Texture2D** target, std::vector<ID3D11Texture2D*> buffersToCopy, BufferUsage usage);
+	void createTexture2dArrayBufByCopy(D3d d3d, ID3D11Texture2D** target, const std::vector<ID3D11Texture2D*>& buffersToCopy, BufferUsage usage);
 	void createTexture2dArraySrv(D3d d3d, ID3D11ShaderResourceView** targetSrv, ID3D11Texture2D* buffer, uint32_t reduceMipLevelBy = 0);
 }

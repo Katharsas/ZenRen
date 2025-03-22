@@ -65,6 +65,9 @@ namespace render::pass::world::chunkgrid
 
 		for (const auto& [material, chunkToVerts] : meshData) {
 			for (const auto& [chunkIndex, verts] : chunkToVerts) {
+				if (verts.vecPos.empty()) {
+					continue;
+				}
 				const BoundingBox vertBbox = createBbox(verts.vecPos);
 				uint32_t flatIndex = getFlatIndex(chunkIndex);
 				auto& [exists, existingBbox] = chunks[flatIndex];

@@ -142,7 +142,7 @@ namespace render::d3d
 		BufferUsage usage, bool writeUnordered, std::vector<InitialData> initialMips); 
 
 
-	void createTexture2dArrayBufByCopy(D3d d3d, ID3D11Texture2D** target, std::vector<ID3D11Texture2D*> buffersToCopy, BufferUsage usage)
+	void createTexture2dArrayBufByCopy(D3d d3d, ID3D11Texture2D** target, const std::vector<ID3D11Texture2D*>& buffersToCopy, BufferUsage usage)
 	{
 		assert(usage != BufferUsage::IMMUTABLE);
 		release(*target);

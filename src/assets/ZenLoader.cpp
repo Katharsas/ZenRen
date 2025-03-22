@@ -56,7 +56,7 @@ namespace assets
             }
         });
 
-        LOG(INFO) << "VOBs: Loaded " << lights.size() << " static lights.";
+        LOG(INFO) << "VOBs: Loaded " << lights.size() << " static lights";
         return lights;
     }
 
@@ -137,6 +137,7 @@ namespace assets
             statics.push_back(instance);
         });
 
+        LOG(INFO) << "VOBs: Loaded " << statics.size() << " instances";
         return statics;
     }
 
@@ -224,7 +225,7 @@ namespace assets
                 util::throwError(ex.what());
             }
         }
-        bool isOutdoorLevel = world.world_bsp_tree.mode == zenkit::BspTreeType::OUTDOOR;
+        out.isOutdoorLevel = world.world_bsp_tree.mode == zenkit::BspTreeType::OUTDOOR;
         sampler.logMillisAndRestart("Loader: World data parsed");
 
         loadWorldMesh(out.worldMesh, world.world_mesh, !debug.disableVertexIndices, debug.validateMeshData);
@@ -236,23 +237,30 @@ namespace assets
         }
         sampler.logMillisAndRestart("Loader: World mesh loaded");
 
-        LOG(INFO);
-        LOG(INFO) << "        #####################################";
-        LOG(INFO) << "        Loading World Objects";
-        LOG(INFO) << "        #####################################";
 
-        vector<Light> lightsStatic = loadLights(world.world_vobs);
+        if (debug.loadVobs) {
+            LOG(INFO);
+            LOG(INFO) << "        #####################################";
+            LOG(INFO) << "        Loading World Objects";
+            LOG(INFO) << "        #####################################";
 
-        // TODO debug lightmap VOB lighting
-        vector<StaticInstance> vobs;
-        vobs = loadVobs(world.world_vobs, out.worldMesh, lightsStatic, isOutdoorLevel, debug);
-        sampler.logMillisAndRestart("Loader: World VOB data loaded");
+            vector<Light> lightsStatic = loadLights(world.world_vobs);
 
-        for (auto& instance : vobs) {
-            loadInstanceVisual(out.staticMeshes, instance, !debug.disableVertexIndices, debug.validateMeshData);
+            vector<StaticInstance> vobs;
+            vobs = loadVobs(world.world_vobs, out.worldMesh, lightsStatic, out.isOutdoorLevel, debug);
+            sampler.logMillisAndRestart("Loader: World VOB data loaded");
+
+            uint32_t instanceCount = 0;
+            for (auto& instance : vobs) {
+                bool success = loadInstanceVisual(out.staticMeshes, instance, !debug.disableVertexIndices, debug.validateMeshData);
+                if (success) {
+                    instanceCount++;
+                }
+            }
+            LOG(INFO) << "VOBs: Loaded " << instanceCount << " instance visuals";
+
+            sampler.logMillisAndRestart("Loader: VOB visuals loaded");
         }
-
-        sampler.logMillisAndRestart("Loader: VOB visuals loaded");
 
         LOG(INFO);
         LOG(INFO) << "        #####################################";
@@ -260,6 +268,5 @@ namespace assets
         LOG(INFO) << "        #####################################";
 
         printAndResetLoadStats(debug.validateMeshData);
-        out.isOutdoorLevel = isOutdoorLevel;
     }
 }

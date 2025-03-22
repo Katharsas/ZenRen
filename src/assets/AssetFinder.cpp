@@ -244,15 +244,16 @@ namespace assets
 			delete vfs.zkit;
 		}
 		vfs.zkit = new zenkit::Vfs();
+		zenkit::VfsOverwriteBehavior overwrite = zenkit::VfsOverwriteBehavior::NONE;
 			
-		walkFilesRecursively(rootDir, [](const fs::path& path, const std::string& filename) -> void {
+		walkFilesRecursively(rootDir, [&](const fs::path& path, const std::string& filename) -> void {
 			try {
 				if (util::endsWith(filename, ".vdf")) {
-					vfs.zkit->mount_disk(path);
+					vfs.zkit->mount_disk(path, overwrite);
 					LOG(DEBUG) << "Loaded VDF: " << filename;
 				}
 				if (util::endsWith(filename, ".mod")) {
-					vfs.zkit->mount_disk(path);
+					vfs.zkit->mount_disk(path, overwrite);
 					LOG(DEBUG) << "Loaded MOD: " << filename;
 				}
 			}
@@ -270,6 +271,15 @@ namespace assets
 				}
 			}
 		});
+	}
+
+	void cleanAssetSources()
+	{
+		if (vfs.zkit != nullptr) {
+			delete vfs.zkit;
+			vfs.zkit = nullptr;
+		}
+		// TODO
 	}
 
 	void printFoundZens()

@@ -57,5 +57,6 @@ namespace assets
 	void initAssetsIntern();
 	void initFileAssetSourceDir(std::filesystem::path& rootDir);
 	void initVdfAssetSourceDir(std::filesystem::path& rootDir);
+	void cleanAssetSources();
 	void printFoundZens();
 }

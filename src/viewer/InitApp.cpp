@@ -6,20 +6,17 @@
 #include "conio.h"
 #include "win_resources/resource.h"
 
-#include "../Util.h"
+#include "Logger.h"
+#include "Util.h"
 #include "Args.h"
 #include "GameLoop.h"
 #include "Input.h"
-#include "g3log/logworker.hpp"
 
 #include "Win.h"
 #include <shellapi.h>
 #include <imgui.h>
-#include <iostream>
-#include <fstream>
 
 
-#define ENABLE_LOGFILE false
 #define MAX_LOADSTRING 100
 
 // Global Variables:
@@ -37,82 +34,15 @@ HWND                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WindowProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
-std::string formatLogEntry(g3::LogMessageMover& logEntry) {
-	const LEVELS level = logEntry.get()._level;
-	const std::string levelPre = level == WARNING ? "! " : "  ";
-	const std::string levelPost = std::string((7 - level.text.length()), ' ');
-	return levelPre + "LOG__" + level.text + levelPost + " " + logEntry.get()._message + "\n";
-}
-
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	_In_opt_ HINSTANCE hPrevInstance,
 	_In_ LPWSTR    lpCmdLine,
 	_In_ int       nCmdShow)
 {
-	// Configure Logger (make sure log dir exists, TODO: create dir if mising)
-
-	struct DebugSink {
-		void ReceiveLogMessage(g3::LogMessageMover logEntry) {
-			const std::string logEntryString = formatLogEntry(logEntry);
-			const std::wstring logEntryW = util::utf8ToWide(logEntryString);
-			OutputDebugStringW(logEntryW.c_str());
-		}
-	};
-	struct BufferUntilReadySink {
-		bool outputReady = false;
-		std::string beforeOutputReadyBuffer = "";
-		std::function<void(const std::string)> write = nullptr;
-
-		void ReceiveLogMessage(g3::LogMessageMover& logEntry) {
-			const std::string logEntryString = formatLogEntry(logEntry);
-			if (outputReady) {
-				if (beforeOutputReadyBuffer != "") {
-					write(beforeOutputReadyBuffer);
-					beforeOutputReadyBuffer = "";
-				}
-				write(logEntryString);
-			}
-			else {
-				beforeOutputReadyBuffer += logEntryString;
-			}
-		}
-	};
-	class FileSink {
-	public:
-		void ReceiveLogMessage(g3::LogMessageMover logEntry) {
-			bufferdSink.ReceiveLogMessage(logEntry);
-		}
-		void onReady(const std::string logfile) {
-			ofs.open(logfile, std::ofstream::out | std::ofstream::trunc);
-			bufferdSink.write = [this](const std::string string) -> void {
-				//std::cout << string;
-				ofs << string;
-				ofs << std::flush;
-			};
-			bufferdSink.outputReady = true;
-		}
-		virtual ~FileSink() {
-			bufferdSink.beforeOutputReadyBuffer = "";
-			ofs << "Logger exiting.";
-			ofs.close();
-		}
-	private:
-		BufferUntilReadySink bufferdSink;
-		std::ofstream ofs;
-	};
-
-	// https://github.com/KjellKod/g3sinks/blob/master/snippets/ColorCoutSink.hpp
-	const auto worker = g3::LogWorker::createLogWorker();
-	if (ENABLE_LOGFILE) {
-		const auto defaultSink = worker->addDefaultLogger("log", "../logs/");
-	}
-	auto debugSinkHandle = worker->addSink(std::make_unique<DebugSink>(), &DebugSink::ReceiveLogMessage);
-	auto fileSinkHandle = worker->addSink(std::make_unique<FileSink>(), &FileSink::ReceiveLogMessage);
-	
-	g3::initializeLogging(worker.get());
-
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
+
+	logger::init();
 
 	// Initialize global strings
 	LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -146,18 +76,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	bool noLog;
 	viewer::getOptionFlag(viewer::ARG_NO_LOG, &noLog, optionsToValues);
 
-	if (noLog) {
-		// remove sink and throw away buffer
-		worker->removeSink(std::move(fileSinkHandle));
-	}
-	else {
-		// allow sink to write its buffer to file
-		auto pSink = fileSinkHandle.get()->sink().lock();
-		if (pSink) {
-			FileSink* filesink = pSink.get()->_real_sink.get();
-			filesink->onReady("ZenRen.log.txt");
-		}
-	}
+	logger::initFileSink(!noLog, "ZenRen.log.txt");
 
 	viewer::Arguments arguments;
 	viewer::getOptionFlag(viewer::ARG_RDP_COMPAT, &(arguments.rdpCompatMode), optionsToValues);

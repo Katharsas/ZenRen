@@ -233,11 +233,11 @@ namespace assets
 		// when resizing we always re-generate all mips since that is easier and probably cleaner.
 		if (rebuild) {
 			if (resize) {
-				LOG(INFO) << "Texture Load: Rebuilding texture for resize: " << name;
+				LOG(DEBUG) << "Texture Load: Rebuilding texture for resize: " << name;
 			} else {
 				static const std::string lightmapPrefix = "lightmap";// lightmaps never have mipmaps, so logging it is noise
 				if (!util::startsWith(name, lightmapPrefix)) {
-					LOG(INFO) << "Texture Load: Rebuilding texture due to missing mipmaps: " << name;
+					LOG(DEBUG) << "Texture Load: Rebuilding texture due to missing mipmaps: " << name;
 				}
 			}
 			
@@ -324,8 +324,8 @@ namespace assets
 
 		const BufferSize& targetSize = getMaxSize(textures);
 
-		LOG(INFO) << "Texture Load: Rebuilding all lightmaps due to missing mipmaps!";
-		LOG(INFO) << "Texture Load: Resizing smaller lightmaps to target size " << targetSize << "!";
+		LOG(DEBUG) << "Texture Load: Rebuilding all lightmaps due to missing mipmaps!";
+		LOG(DEBUG) << "Texture Load: Resizing smaller lightmaps to target size " << targetSize << "!";
 
 		vector<Texture*> result;
 		result.reserve(textures.size());

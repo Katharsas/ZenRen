@@ -65,9 +65,9 @@ target_include_directories("imgui" PUBLIC ${IMGUI_PATH})
 ####### Configure CMake Libraries
 message(STATUS "############## THIRDPARTY LIBRARIES ##############")
 
-option(G3_SHARED_LIB "" OFF)
-option(ADD_FATAL_EXAMPLE "" OFF)
-option(ADD_G3LOG_UNIT_TEST "" OFF)
+set(G3_SHARED_LIB OFF)
+set(ADD_FATAL_EXAMPLE OFF)
+set(ADD_G3LOG_UNIT_TEST OFF)
 add_subdirectory(lib/g3log)
 
 #add_subdirectory(lib/DirectXMath) # TODO this is header only so we don't need this right?
@@ -75,9 +75,9 @@ add_subdirectory(lib/DirectXTex)
 
 add_subdirectory(lib/meshoptimizer)
 
-option(ZK_BUILD_TESTS "" OFF)
-option(ZK_ENABLE_ASAN "" OFF)
-#option(ZK_ENABLE_INSTALL "" OFF)
+#set(ZK_ENABLE_MMAP OFF)
+set(ZK_BUILD_TESTS OFF)
+set(ZK_ENABLE_ASAN OFF)
 add_subdirectory(lib/ZenKit)
 
 ####### ZenRen Executable
@@ -132,7 +132,7 @@ add_executable(${PROJECT_NAME} WIN32 ${PROJECT_SRC})
 target_precompile_headers(${PROJECT_NAME} PRIVATE "src/stdafx.h")
 
 #include header files for target compilation
-target_include_directories(${PROJECT_NAME} PRIVATE "src") 
+target_include_directories(${PROJECT_NAME} PRIVATE "src")
 target_include_directories(${PROJECT_NAME} PRIVATE "lib/g3log/src") 
 target_include_directories(${PROJECT_NAME} PRIVATE "lib/DirectXMath/Inc")
 target_include_directories(${PROJECT_NAME} PRIVATE "lib/DirectXTex/DirectXTex")

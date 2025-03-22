@@ -34,7 +34,7 @@ namespace render
 
 		auto operator<=>(const TexInfo&) const = default;
 
-		BufferSize getSize() {
+		BufferSize getSize() const {
 			return { (uint16_t)width, (uint16_t)height };
 		}
 
@@ -53,6 +53,16 @@ namespace render
 			}
 		};
 	};
+	inline std::ostream& operator <<(std::ostream& os, const TexInfo& that)
+	{
+		std::string width = util::leftPad(std::to_string(that.width), 4, ' ');
+		std::string height = util::leftPad(std::to_string(that.height), 4, ' ');
+		std::string mips = util::leftPad(std::to_string(that.mipLevels), 2, ' ');
+		return os << "[W: " << width << ", H: " << height << ", M: " << mips
+			<< (that.srgb ? ", srgb  " : ", linear")
+			<< (that.hasAlpha ? ", alpha" : "")
+			<< ", F: " << that.format << "]";
+	}
 	} namespace std { template <> struct hash<render::TexInfo> : render::TexInfo::Hash {}; } namespace render {
 
 	// TODO make adjustable for reload, implement level selection and changing vdf path with load button

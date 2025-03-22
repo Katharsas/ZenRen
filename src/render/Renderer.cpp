@@ -146,6 +146,8 @@ namespace render
 
 		render::gui::addInfo("", {
 			[]() -> void {
+				const std::string memory = "MEM: " + render::util::getMemUsage();
+				ImGui::Text(memory.c_str());
 				const std::string vram = "VRAM: " + render::util::getVramUsage(dx12.adapter);
 				ImGui::Text(vram.c_str());
 			}

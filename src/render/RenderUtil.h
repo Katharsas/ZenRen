@@ -9,5 +9,6 @@ namespace render::util
 
 	void dumpVerts(const std::string& matName, const std::vector<VertexPos>& vertPos, const std::vector<NORMAL_UV_LUV>& vertOther);
 	std::string getVramUsage(IDXGIAdapter3* adapter);
+	std::string getMemUsage();
 }
 

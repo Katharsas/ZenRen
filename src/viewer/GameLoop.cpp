@@ -116,6 +116,8 @@ namespace viewer
 		sampler.logMillisAndRestart("ZenRen initialized total");
 		LOG(INFO) << "#############################################";
 
+		assets::cleanAssetSources();
+
 		frameTimes.full.start();
 	}
 

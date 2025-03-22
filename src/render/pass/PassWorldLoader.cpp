@@ -10,9 +10,9 @@
 #include "assets/AssetCache.h"
 #include "assets/AssetFinder.h"
 #include "assets/ZenLoader.h"
-//#include "assets/ObjLoader.h"
 #include "assets/TexLoader.h"
 
+#include "Logger.h"
 #include "Util.h"
 #include "Win.h"
 #include "render/d3d/Buffer.h"
@@ -49,7 +49,6 @@ namespace render::pass::world
 	// BaseColor textures are owned by textureCache
 	// Lightmap textures are owned by world
 	//   - debugTextures -> single textures used by ImGUI
-	//   - lightmapTexArray -> array used by forward renderer
 
 	unordered_map<TexId, Texture*> textureCache;
 
@@ -60,6 +59,7 @@ namespace render::pass::world
 			ref = assets::createTextureOrDefault(d3d, texName, srgb);
 		});
 	}
+	//   - lightmapTexArray -> array used by forward renderer
 
 	LoadResult loadPrepassData(D3d d3d, vector<PrepassMeshes>& target, const MatToVertsBasic& meshData)
 	{
@@ -106,6 +106,7 @@ namespace render::pass::world
 	template <VERTEX_FEATURE F>
 	void loadRenderBatch(D3d d3d, vector<MeshBatch<F>>& target, TexInfo batchInfo, const VertsBatch<F>& batchData)
 	{
+		
 		MeshBatch<F> batch;
 		batch.vertClusters = batchData.vertClusters;
 		batch.useIndices = !batchData.vecIndex.empty();
@@ -121,6 +122,12 @@ namespace render::pass::world
 		d3d::createVertexBuf(d3d, batch.vbTexIndices, batchData.texIndices);
 		createTexArray(d3d, &batch.texColorArray, batchInfo, batchData.texIndexedIds);
 		target.push_back(batch);
+
+		if (logger::isEnabled(DEBUG)) {
+			auto texCountStr = util::leftPad(std::to_string(batchData.texIndexedIds.size()), 3, ' ');
+			auto vertCountStr = util::leftPad(std::to_string(batchData.vecPos.size()), 7, ' ');
+			LOG(DEBUG) << "Added batch - Verts: " << vertCountStr << ", TexCount: " << texCountStr << ", TexInfo: " << batchInfo;
+		}
 	}
 
 	template <typename VERT_DATA>
@@ -338,27 +345,28 @@ namespace render::pass::world
 			const auto& meshData = perPassMeshData.at(passIndex);
 			auto& target = targetAllPasses.passes.at(passIndex);
 
+			
 			vector<pair<TexInfo, vector<pair<Material, const ChunkToVerts<F>*>>>> batchedMeshData = groupByTexId(d3d, meshData, maxTexturesPerBatch);
-
+			
 			for (const auto& [texInfo, batchData] : batchedMeshData) {
-
+				
 				vector<pair<ChunkIndex, vector<pair<Material, Verts<F>>>>> batchDataByChunk = groupAndSortByChunkIndex(batchData);
-
+				
 				// split current batch into multiple smaller batches along chunk boundaries if it contains too many verts to prevent OOM crashes
 				vector<pair<uint32_t, vector<pair<ChunkIndex, vector<pair<Material, Verts<F>>>>>>> batchDataSplit =
 					splitByVertCount(batchDataByChunk, vertCountPerBatch);
-
+				
 				batchDataByChunk.clear();// lots of memory that are no longer needed
 
 				for (const auto& [vertCount, batchData] : batchDataSplit) {
 					const auto [batchDataFlat, batchLoadResult] = flattenIntoBatch(batchData);
-
+					
 					//assert(vertCount == batchLoadResult.verts);
 					result += batchLoadResult;
 					loadRenderBatch(d3d, target, texInfo, batchDataFlat);
 				}
 			}
-
+			
 			sortByVertCount(target);// improves performance
 		}
 
@@ -394,7 +402,6 @@ namespace render::pass::world
 		LOG(INFO) << "    #########################################";
 
 		assets::LoadDebugFlags debugFlags {};
-		debugFlags.disableVertexIndices = false;
 
 		bool levelDataFound = false;
 		RenderData data;
