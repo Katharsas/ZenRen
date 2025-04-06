@@ -24,11 +24,11 @@ namespace render::pass::sky
     using DirectX::XMVECTOR;
 
     struct LAYER_UVS {
-        UV uvBase;
-        UV uvOverlay;
+        Uv uvBase;
+        Uv uvOverlay;
     };
 
-    typedef VEC3 VertexPos;
+    typedef Vec3 VertexPos;
     struct VEC_VERTEX_DATA {
         std::vector<VertexPos> vecPos;
         std::vector<LAYER_UVS> vecOther;
@@ -36,7 +36,7 @@ namespace render::pass::sky
 
     __declspec(align(16))
     struct CbSkyLayer {
-        COLOR light;// original only uses values other than 1 on overlay
+        Color light;// original only uses values other than 1 on overlay
         float alpha;
         uint32_t blurDisabled;
     };
@@ -44,15 +44,15 @@ namespace render::pass::sky
     __declspec(align(16))
     struct CbSkyLayerSettings {
         // Note: smallest type for constant buffer values is 32 bit; cannot use bool or uint_16 without packing
-        COLOR colBackground;
+        Color colBackground;
         CbSkyLayer texLayers[2];
     };
 
     float lastTimeOfDay = defaultTime;
     array<Texture*, 2> layerTextures;
     bool lastWasSwapped = true;
-    array<UV, 2> lastUvMin = { UV { 0, 0 }, UV { 0, 0 } };
-    array<UV, 2> lastUvMax = { UV { 0, 0 }, UV { 0, 0 } };
+    array<Uv, 2> lastUvMin = { Uv { 0, 0 }, Uv { 0, 0 } };
+    array<Uv, 2> lastUvMax = { Uv { 0, 0 }, Uv { 0, 0 } };
 
     struct SkyMesh
     {
@@ -79,10 +79,10 @@ namespace render::pass::sky
     vector<array<XMVECTOR, 3>> createSkyVerts()
     {
         float height = 10; // 10
-        auto a = toXM4Pos(VEC3 { -500, height, -500 });
-        auto b = toXM4Pos(VEC3 { 500, height, -500 });
-        auto c = toXM4Pos(VEC3 { 500, height, 500 });
-        auto d = toXM4Pos(VEC3 { -500, height, 500 });
+        auto a = toXM4Pos(Vec3 { -500, height, -500 });
+        auto b = toXM4Pos(Vec3 { 500, height, -500 });
+        auto c = toXM4Pos(Vec3 { 500, height, 500 });
+        auto d = toXM4Pos(Vec3 { -500, height, 500 });
 
         vector result = {
             array { a, b, c },
@@ -91,11 +91,11 @@ namespace render::pass::sky
         return result;
     }
 
-    vector<array<UV, 3>> createSkyUvs(UV min, UV max) {
-        auto a = UV{ min.u, min.v };
-        auto b = UV{ max.u, min.v };
-        auto c = UV{ max.u, max.v };
-        auto d = UV{ min.u, max.v };
+    vector<array<Uv, 3>> createSkyUvs(Uv min, Uv max) {
+        auto a = Uv{ min.u, min.v };
+        auto b = Uv{ max.u, min.v };
+        auto c = Uv{ max.u, max.v };
+        auto d = Uv{ min.u, max.v };
         return {
             array { a, b, c },
             array { a, c, d },
@@ -161,7 +161,7 @@ namespace render::pass::sky
         }
     }
 
-    void updateSkyLayers(D3d d3d, const array<SkyTexState, 2>& layerStates, const COLOR& skyBackground, float timeOfDay, bool swapLayers)
+    void updateSkyLayers(D3d d3d, const array<SkyTexState, 2>& layerStates, const Color& skyBackground, float timeOfDay, bool swapLayers)
     {
         float delta1 = timeOfDay - lastTimeOfDay;
         float delta2 = timeOfDay + 1 - lastTimeOfDay;
@@ -178,7 +178,7 @@ namespace render::pass::sky
         for (int32_t i = 0; i < 2; i++) {
             SkyTexState state = layerStates[layerIndex[i]];
             lastUvMin[i] = add(lastUvMin[i], mul(state.uvSpeed, timeDeltaUv));
-            lastUvMax[i] = add(lastUvMin[i], mul(UV { 1, 1 }, state.tex.uvScale));
+            lastUvMax[i] = add(lastUvMin[i], mul(Uv { 1, 1 }, state.tex.uvScale));
             for (auto tex : skyTextures) {
                 if (state.tex.name == tex.name) {
                     layerTextures[i] = tex.tex;

@@ -29,8 +29,8 @@ namespace assets
 	};
 
 	VertLookupTree createVertLookup(const render::MatToChunksToVertsBasic& meshData);
-	std::vector<render::VertKey> rayDownIntersected(const VertLookupTree& lookup, const VEC3& pos, float searchSizeY);
-	std::vector<render::VertKey> rayDownIntersectedNaive(const render::MatToChunksToVertsBasic& meshData, const VEC3& pos, float searchSizeY);
+	std::vector<render::VertKey> rayDownIntersected(const VertLookupTree& lookup, const Vec3& pos, float searchSizeY);
+	std::vector<render::VertKey> rayDownIntersectedNaive(const render::MatToChunksToVertsBasic& meshData, const Vec3& pos, float searchSizeY);
 	std::vector<render::VertKey> rayIntersected(const VertLookupTree& lookup, const DirectX::XMVECTOR& rayPosStart, const DirectX::XMVECTOR& rayPosEnd);
 
 	struct LightLookupTree {

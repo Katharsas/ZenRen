@@ -192,12 +192,12 @@ namespace render::pass::world
 		sky::initConstantBuffers(d3d);
 	}
 
-	COLOR getBackgroundColor() {
+	Color getBackgroundColor() {
 		if (world.isOutdoorLevel) {
 			return getSkyColor(worldSettings.timeOfDay);
 		}
 		else {
-			return COLOR(0.0f, 0.2f, 0.4f, 1.0f);// deep blue
+			return Color(0.0f, 0.2f, 0.4f, 1.0f);// deep blue
 		}
 	}
 

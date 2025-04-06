@@ -8,12 +8,12 @@
 
 namespace assets
 {
-	template <typename L> concept HasLoad =
+	template <typename L> concept HAS_LOAD =
 		requires(L loadable) {
 			{ loadable.load((zenkit::Read*)nullptr) } -> std::same_as<void>;
 	};
 
-	template<HasLoad T>
+	template<HAS_LOAD T>
 	std::optional<const T*> getOrParse(const std::string& assetName);
 
 	render::TexId getTexId(const std::string& texName);

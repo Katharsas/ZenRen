@@ -18,7 +18,7 @@ namespace assets
     using std::vector;
     using ::util::FileExt;
 
-    COLOR interpolateColorFromFaceXZ(const VEC3& pos, const MatToChunksToVertsBasic& meshData, const VertKey& vertKey)
+    Color interpolateColorFromFaceXZ(const Vec3& pos, const MatToChunksToVertsBasic& meshData, const VertKey& vertKey)
     {
         auto facePos = vertKey.getPos(meshData);
         float v0Distance = std::sqrt(std::pow(facePos[0].x - pos.x, 2.f) + std::pow(facePos[0].z - pos.z, 2.f));
@@ -30,7 +30,7 @@ namespace assets
         float v2Contrib = 1 - (v2Distance / totalDistance);
 
         auto faceOther = vertKey.getOther(meshData);
-        COLOR colorAverage = mul(
+        Color colorAverage = mul(
             add(add(
                 mul(faceOther[0].colLight, v0Contrib),
                 mul(faceOther[1].colLight, v1Contrib)),
@@ -77,9 +77,9 @@ namespace assets
                 result.direction = optLight.value().dirInverted;
             }
             else {
-                result.color = COLOR(0, 0, 0, 1);// no lights reached this vob, so its black
+                result.color = Color(0, 0, 0, 1);// no lights reached this vob, so its black
                 if (debug.staticLightTintUnreached) {
-                    result.color = COLOR(0, 1, 0, 1);
+                    result.color = Color(0, 1, 0, 1);
                 }
             }
             result.color.a = 0;// indicates that this VOB receives no sky light
@@ -102,7 +102,7 @@ namespace assets
             }
             else {
                 if (debug.vobsTintUnlit) {
-                    result.color = COLOR{ 0.5, 0.f, 0.f, 1.f };
+                    result.color = Color{ 0.5, 0.f, 0.f, 1.f };
                 }
                 else {
                     result.color = fromSRGB(greyscale(0.63f));// fallback lightness of (160, 160, 160)

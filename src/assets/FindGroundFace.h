@@ -5,7 +5,7 @@
 
 namespace assets
 {
-	COLOR interpolateColor(const VEC3& pos, const render::MatToChunksToVertsBasic& meshData, const render::VertKey& vertKey);
+	Color interpolateColor(const Vec3& pos, const render::MatToChunksToVertsBasic& meshData, const render::VertKey& vertKey);
 	std::optional<render::VertKey> getGroundFaceAtPos(const DirectX::XMVECTOR pos, const render::MatToChunksToVertsBasic& meshData, const VertLookupTree& vertLookup);
 }
 

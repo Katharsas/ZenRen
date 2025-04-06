@@ -40,7 +40,7 @@ namespace render::pass::world
 		};
 	};
 
-	const TEX_INDEX texturesPerBatch = 512;
+	const TexIndex texturesPerBatch = 512;
 	const uint32_t vertCountPerBatch = (20 * 1024 * 1024) / sizeof(VertexBasic);// 20 MB divided by biggest buffer element size
 
 	World world;
@@ -131,7 +131,7 @@ namespace render::pass::world
 	}
 
 	template <typename VERT_DATA>
-	vector<pair<TexInfo, vector<pair<Material, const VERT_DATA *>>>> groupByTexId(D3d d3d, const unordered_map<Material, const VERT_DATA *>& meshData, TEX_INDEX maxTexturesPerBatch)
+	vector<pair<TexInfo, vector<pair<Material, const VERT_DATA *>>>> groupByTexId(D3d d3d, const unordered_map<Material, const VERT_DATA *>& meshData, TexIndex maxTexturesPerBatch)
 	{
 		// load and bucket all materials so textures that are texture-array-compatible are grouped in a single bucket
 		unordered_map<TexInfo, vector<Material>> texBuckets;
@@ -148,7 +148,7 @@ namespace render::pass::world
 		for (const auto& [texInfo, textures] : texBuckets) {
 
 			pair<TexInfo, vector<pair<Material, const VERT_DATA *>>> batch = { texInfo, {} };
-			TEX_INDEX currentIndex = 0;
+			TexIndex currentIndex = 0;
 
 			for (const auto mat : textures) {
 				const VERT_DATA* currentMatData = meshData.find(mat)->second;
@@ -259,7 +259,7 @@ namespace render::pass::world
 		result.draws = clusterCount;
 		target.vertClusters.reserve(clusterCount);
 
-		unordered_map<Material, TEX_INDEX> materialIndices;
+		unordered_map<Material, TexIndex> materialIndices;
 		vector<Material> materials;
 
 		// reserve to avoid over-allocation (because the resulting vert vectors are going to be very big)
@@ -296,9 +296,9 @@ namespace render::pass::world
 				::util::insert(target.vecOther, vertData.vecOther);
 
 				// set batch-dependent vertex data
-				TEX_INDEX texIndex = ::util::getOrCreate<Material, TEX_INDEX>(materialIndices, material, [&]() -> TEX_INDEX {
+				TexIndex texIndex = ::util::getOrCreate<Material, TexIndex>(materialIndices, material, [&]() -> TexIndex {
 					materials.push_back(material);
-					return (TEX_INDEX) materials.size() - 1;
+					return (TexIndex) materials.size() - 1;
 				});
 				target.texIndices.insert(target.texIndices.end(), vertData.vecPos.size(), texIndex);
 			}
@@ -336,7 +336,7 @@ namespace render::pass::world
 
 	template <VERTEX_FEATURE F>
 	LoadResult loadBatchVertexData(
-		D3d d3d, MeshBatches<F>& targetAllPasses, const MatToChunksToVerts<F>& meshDataAllPasses, TEX_INDEX maxTexturesPerBatch)
+		D3d d3d, MeshBatches<F>& targetAllPasses, const MatToChunksToVerts<F>& meshDataAllPasses, TexIndex maxTexturesPerBatch)
 	{
 		LoadResult result;
 		array<unordered_map<Material, const ChunkToVerts<F>* >, BLEND_TYPE_COUNT> perPassMeshData = splitByPass(meshDataAllPasses);

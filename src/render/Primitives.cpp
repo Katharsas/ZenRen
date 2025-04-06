@@ -1,14 +1,14 @@
 #include "stdafx.h"
 #include "Primitives.h"
 
-COLOR::COLOR(uint32_t argb) {
+Color::Color(uint32_t argb) {
 	const float f = 1.0f / 255.0f;
 	r = f * (float)(uint8_t)(argb >> 16);
 	g = f * (float)(uint8_t)(argb >> 8);
 	b = f * (float)(uint8_t)(argb >> 0);
 	a = f * (float)(uint8_t)(argb >> 24);
 }
-COLOR::COLOR(float r, float g, float b, float a) : r(r), g(g), b(b), a(a) {}
+Color::Color(float r, float g, float b, float a) : r(r), g(g), b(b), a(a) {}
 
 
 namespace render {
@@ -17,27 +17,27 @@ namespace render {
 		return (channel <= 0.04045f) ? (channel / 12.92f) : pow((channel + 0.055f) / 1.055f, 2.4f);
 	}
 
-	COLOR fromSRGB(const COLOR color)
+	Color fromSRGB(const Color color)
 	{
-		return COLOR(
+		return Color(
 			fromSRGB(color.r),
 			fromSRGB(color.g),
 			fromSRGB(color.b),
 			color.a);
 	}
 
-	COLOR from4xUint8(uint8_t const * const rgba)
+	Color from4xUint8(uint8_t const * const rgba)
 	{
 		const float f = 1.0f / 255.0f;
-		return COLOR(rgba[0] * f, rgba[1] * f, rgba[2] * f, rgba[3] * f);
+		return Color(rgba[0] * f, rgba[1] * f, rgba[2] * f, rgba[3] * f);
 	}
 
-	COLOR greyscale(const float channel) {
-		return COLOR(channel, channel, channel, 1);
+	Color greyscale(const float channel) {
+		return Color(channel, channel, channel, 1);
 	}
 
-	COLOR multiplyColor(COLOR color, const float factor) {
-		return COLOR(
+	Color multiplyColor(Color color, const float factor) {
+		return Color(
 			color.r * factor,
 			color.g * factor,
 			color.b * factor,
@@ -77,10 +77,10 @@ namespace render {
 	}
 
 	// instantiate template functions for the types we want to support (needed because templates are not in header)
-	template COLOR add(const COLOR& vec1, const COLOR& vec2);
-	template COLOR sub(const COLOR& vec1, const COLOR& vec2);
-	template COLOR mul(const COLOR& vec, float scalar);
+	template Color add(const Color& vec1, const Color& vec2);
+	template Color sub(const Color& vec1, const Color& vec2);
+	template Color mul(const Color& vec, float scalar);
 
-	template UV add(const UV& vec1, const UV& vec2);
-	template UV mul(const UV& vec, float scalar);
+	template Uv add(const Uv& vec1, const Uv& vec2);
+	template Uv mul(const Uv& vec, float scalar);
 }

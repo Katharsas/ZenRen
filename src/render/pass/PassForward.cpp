@@ -19,8 +19,8 @@ namespace render::pass::forward
 
 	__declspec(align(16))
 	struct CbGlobalSettings {
-		COLOR skyLight;
-		COLOR skyColor;
+		Color skyLight;
+		Color skyColor;
 		float viewDistance;
 		int32_t distanceFog;
 		float distanceFogStart;
@@ -216,7 +216,7 @@ namespace render::pass::forward
 
 		// transparent / (alpha) blend passes
 		if (settings.passesBlend) {
-			COLOR blendFactorCol = greyscale(.920f);// used by BlendType::BLEND_FACTOR pass
+			Color blendFactorCol = greyscale(.920f);// used by BlendType::BLEND_FACTOR pass
 
 			while (blendTypeIndex < BLEND_TYPE_COUNT) {
 				d3d.annotation->BeginEvent(toWString("Pass Blend: ", blendType).c_str());

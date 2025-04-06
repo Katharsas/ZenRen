@@ -33,7 +33,7 @@ namespace render::pass::world
 	WorldSettings& getWorldSettings();
 	void initLinearSampler(D3d d3d, RenderSettings& settings);
 	void init(D3d d3d);
-	COLOR getBackgroundColor();
+	Color getBackgroundColor();
 	void drawSky(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs);
 	void drawPrepass(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs);
 	void drawWorld(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs, BlendType pass);

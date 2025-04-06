@@ -59,7 +59,7 @@ namespace assets
         return result;
 	}
 
-    vector<VertKey> rayDownIntersected(const VertLookupTree& lookup, const VEC3& pos, float searchSizeY)
+    vector<VertKey> rayDownIntersected(const VertLookupTree& lookup, const Vec3& pos, float searchSizeY)
     {
         auto intersectedBoxes = lookup.tree.RayIntersectedAll({ pos.x, pos.y, pos.z }, { 0, -1, 0 }, rayIntersectTolerance, searchSizeY);
         return lookup.bboxIdsToVertIds(intersectedBoxes);
@@ -78,7 +78,7 @@ namespace assets
     // Naive implementation does quadratic looping over all world faces each time, no spatial structure used. For debugging purposes.
     // ##############################################################################################################################
 
-    inline bool rayDownIntersectsFaceBB(const VEC3& pos, const array<VertexPos, 3>& verts, const float searchSizeY)
+    inline bool rayDownIntersectsFaceBB(const Vec3& pos, const array<VertexPos, 3>& verts, const float searchSizeY)
     {
         float minX =  FLT_MAX, minY =  FLT_MAX, minZ =  FLT_MAX;
         float maxX = -FLT_MAX, maxY = -FLT_MAX, maxZ = -FLT_MAX;
@@ -105,7 +105,7 @@ namespace assets
         return !(pos.y >= (maxY + rayIntersectTolerance + searchSizeY) || pos.y >= (minY - rayIntersectTolerance));
     }
 
-    std::vector<VertKey> rayDownIntersectedNaive(const MatToChunksToVertsBasic& meshData, const VEC3& pos, float searchSizeY)
+    std::vector<VertKey> rayDownIntersectedNaive(const MatToChunksToVertsBasic& meshData, const Vec3& pos, float searchSizeY)
     {
         vector<VertKey> result;
         forEachFace(meshData, [&](const VertKey& vertKey) -> void {

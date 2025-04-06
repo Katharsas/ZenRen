@@ -15,7 +15,7 @@ namespace assets
     const bool useNaiveSlowGroundFaceSearch = false;
     const bool tintVobStaticLight = false;// make it possible to distinguish vobs from level
 
-    __inline bool triangleXZContainsPointXZ(const VEC3& point, const VEC3& a, const VEC3& b, const VEC3& c) {
+    __inline bool triangleXZContainsPointXZ(const Vec3& point, const Vec3& a, const Vec3& b, const Vec3& c) {
         // From https://math.stackexchange.com/a/4624564
         // Conceptually, we create new triangles of P with each side of given triangle (barycentric approach).
         // If those new triangles have identical winding orders with original triangle, point is inside triangle.
@@ -45,7 +45,7 @@ namespace assets
         return true;
     }
 
-    void logPosAndGroundPolyCandidatesJson(const VEC3& pos, const vector<VertexPos>& verts) {
+    void logPosAndGroundPolyCandidatesJson(const Vec3& pos, const vector<VertexPos>& verts) {
         // https://jsfiddle.net/fzdb6j17/53/
         LOG(INFO) << "";
         LOG(INFO) << "POINT    { x: " + std::to_string(pos.x) + ", y: " + std::to_string(pos.z) + " }";
@@ -65,7 +65,7 @@ namespace assets
         LOG(INFO) << "";
     }
 
-    __inline int closestGroundFace(const VEC3& pos, const vector<VertexPos>& verts) {
+    __inline int closestGroundFace(const Vec3& pos, const vector<VertexPos>& verts) {
         //logPosAndGroundPolyCandidatesJson(pos, verts);
 
         // TODO there must still be a bug here because VOBs that have multiple faces below & above them are not lit correctly
@@ -124,7 +124,7 @@ namespace assets
 
     std::optional<VertKey> getGroundFaceAtPos(const XMVECTOR pos, const MatToChunksToVertsBasic& meshData, const VertLookupTree& vertLookup)
     {
-        VEC3 pos3 = toVec3(pos);
+        Vec3 pos3 = toVec3(pos);
         vector<VertKey> vertKeys;
         if (useNaiveSlowGroundFaceSearch) {
             vertKeys = rayDownIntersectedNaive(meshData, pos3, 100);

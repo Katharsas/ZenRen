@@ -12,7 +12,7 @@ namespace assets
     using std::unordered_map;
     using DirectX::XMVECTOR;
 
-    array<XMVECTOR, 3> posToXM4(const array<VEC3, 3>& face) {
+    array<XMVECTOR, 3> posToXM4(const array<Vec3, 3>& face) {
         array<XMVECTOR, 3> result;
         for (int32_t i = 0; i < 3; i++) {
             const auto& vert = face[i];
@@ -24,19 +24,19 @@ namespace assets
     /**
      * Create bottom and top quad face (double-sided) of AABB for debug rendering.
      */
-    vector<array<XMVECTOR, 3>> createBboxVerts(const VEC3& posMin, const VEC3& posMax, const DirectX::XMMATRIX& transform)
+    vector<array<XMVECTOR, 3>> createBboxVerts(const Vec3& posMin, const Vec3& posMax, const DirectX::XMMATRIX& transform)
     {
         // clockwise from below
-        VEC3 quadA1 = { posMin.x, posMin.y, posMin.z };
-        VEC3 quadB1 = { posMax.x, posMin.y, posMin.z };
-        VEC3 quadC1 = { posMax.x, posMin.y, posMax.z };
-        VEC3 quadD1 = { posMin.x, posMin.y, posMax.z };
+        Vec3 quadA1 = { posMin.x, posMin.y, posMin.z };
+        Vec3 quadB1 = { posMax.x, posMin.y, posMin.z };
+        Vec3 quadC1 = { posMax.x, posMin.y, posMax.z };
+        Vec3 quadD1 = { posMin.x, posMin.y, posMax.z };
 
         // clockwise from below
-        VEC3 quadA2 = { posMin.x, posMax.y, posMin.z };
-        VEC3 quadB2 = { posMax.x, posMax.y, posMin.z };
-        VEC3 quadC2 = { posMax.x, posMax.y, posMax.z };
-        VEC3 quadD2 = { posMin.x, posMax.y, posMax.z };
+        Vec3 quadA2 = { posMin.x, posMax.y, posMin.z };
+        Vec3 quadB2 = { posMax.x, posMax.y, posMin.z };
+        Vec3 quadC2 = { posMax.x, posMax.y, posMax.z };
+        Vec3 quadD2 = { posMin.x, posMax.y, posMax.z };
 
         vector result = {
             // top and bottom quad
@@ -64,9 +64,9 @@ namespace assets
                 facesPos.push_back(toVec3(posXm[i]));
                 facesOther.push_back({
                     faceNormal,
-                    UV { 0, 0 },
-                    ARRAY_UV { 0, 0, -1 },
-                    COLOR(1, 0, 0, 1)
+                    Uv { 0, 0 },
+                    Uvi { 0, 0, -1 },
+                    Color(1, 0, 0, 1)
                     });
             }
         }
@@ -74,14 +74,14 @@ namespace assets
         insert(target, defaultMat, facesPos, facesOther);
     }
 
-    vector<array<XMVECTOR, 3>> createDebugPointVerts(const VEC3& pos, const VEC3& scale)
+    vector<array<XMVECTOR, 3>> createDebugPointVerts(const Vec3& pos, const Vec3& scale)
     {
         float quadSize = 0.15f * scale.z;
         float minSize = 0.6f;
-        VEC3 topA = { pos.x - quadSize, pos.y + std::max(minSize, scale.y), pos.z - quadSize };
-        VEC3 topB = { pos.x - quadSize, pos.y + std::max(minSize, scale.y), pos.z + quadSize };
-        VEC3 topC = { pos.x + quadSize, pos.y + std::max(minSize, scale.y), pos.z + quadSize };
-        VEC3 topD = { pos.x + quadSize, pos.y + std::max(minSize, scale.y), pos.z - quadSize };
+        Vec3 topA = { pos.x - quadSize, pos.y + std::max(minSize, scale.y), pos.z - quadSize };
+        Vec3 topB = { pos.x - quadSize, pos.y + std::max(minSize, scale.y), pos.z + quadSize };
+        Vec3 topC = { pos.x + quadSize, pos.y + std::max(minSize, scale.y), pos.z + quadSize };
+        Vec3 topD = { pos.x + quadSize, pos.y + std::max(minSize, scale.y), pos.z - quadSize };
 
         vector result = {
             // top
@@ -96,7 +96,7 @@ namespace assets
         return result;
     }
 
-    void loadPointDebugVisual(MatToChunksToVertsBasic& target, const VEC3& pos, const VEC3& scale, const COLOR& color)
+    void loadPointDebugVisual(MatToChunksToVertsBasic& target, const Vec3& pos, const Vec3& scale, const Color& color)
     {
         vector<VertexPos> facesPos;
         vector<VertexBasic> facesOther;
@@ -107,8 +107,8 @@ namespace assets
                 facesPos.push_back(toVec3(posXm[i]));
                 facesOther.push_back({
                     faceNormal,
-                    UV { 0, 0 },
-                    ARRAY_UV { 0, 0, -1 },
+                    Uv { 0, 0 },
+                    Uvi { 0, 0, -1 },
                     color
                     });
             }
@@ -117,12 +117,12 @@ namespace assets
         insert(target, defaultMat, facesPos, facesOther);
     }
 
-    vector<array<XMVECTOR, 3>> createDebugLineVerts(const VEC3& posStart, const VEC3& posEnd, const float width)
+    vector<array<XMVECTOR, 3>> createDebugLineVerts(const Vec3& posStart, const Vec3& posEnd, const float width)
     {
         float minWidth = 0.01f;
         float actualWidth = std::max(minWidth, width);
-        VEC3 posStartTop = { posStart.x, posStart.y + actualWidth, posStart.z };
-        VEC3 posEndTop = { posEnd.x, posEnd.y + actualWidth, posEnd.z };
+        Vec3 posStartTop = { posStart.x, posStart.y + actualWidth, posStart.z };
+        Vec3 posEndTop = { posEnd.x, posEnd.y + actualWidth, posEnd.z };
 
         vector result = {
             posToXM4({ posStart, posEnd, posEndTop }),
@@ -134,7 +134,7 @@ namespace assets
         return result;
     }
 
-    void loadLineDebugVisual(MatToChunksToVertsBasic& target, const VEC3& posStart, VEC3& posEnd, const COLOR& color)
+    void loadLineDebugVisual(MatToChunksToVertsBasic& target, const Vec3& posStart, Vec3& posEnd, const Color& color)
     {
         vector<VertexPos> facesPos;
         vector<VertexBasic> facesOther;
@@ -145,8 +145,8 @@ namespace assets
                 facesPos.push_back(toVec3(posXm[i]));
                 facesOther.push_back({
                     faceNormal,
-                    UV { 0, 0 },
-                    ARRAY_UV { 0, 0, -1 },
+                    Uv { 0, 0 },
+                    Uvi { 0, 0, -1 },
                     color
                     });
             }

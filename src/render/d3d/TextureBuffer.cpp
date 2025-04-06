@@ -134,7 +134,7 @@ namespace render::d3d
 	}
 
 	template void readbackTexture2d<float>(D3d d3d, ID3D11Texture2D* buffer, std::function<bool(float* row, uint16_t rowIndex, uint16_t count)> processPixelRow);
-	template void readbackTexture2d<COLOR>(D3d d3d, ID3D11Texture2D* buffer, std::function<bool(COLOR* row, uint16_t rowIndex, uint16_t count)> processPixelRow);
+	template void readbackTexture2d<Color>(D3d d3d, ID3D11Texture2D* buffer, std::function<bool(Color* row, uint16_t rowIndex, uint16_t count)> processPixelRow);
 
 
 	void createTexture2dBuf(

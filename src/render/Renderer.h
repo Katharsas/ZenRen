@@ -49,7 +49,7 @@ namespace render
 
 		VertexBuffer vbPos = { sizeof(VertexPos) };
 		VertexBuffer vbOther = { sizeof(F) };
-		VertexBuffer vbTexIndices = { sizeof(TEX_INDEX) };// indices into texture array (base color textures)
+		VertexBuffer vbTexIndices = { sizeof(TexIndex) };// indices into texture array (base color textures)
 
 		void release()
 		{

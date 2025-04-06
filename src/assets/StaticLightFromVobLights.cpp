@@ -54,7 +54,7 @@ namespace assets
         auto intersectedBoxes = lightLookup.tree.RangeSearch<shouldFullyContain>(searchBox);
 
         int32_t contributingLightCount = 0;
-        COLOR color = COLOR(0.f, 0.f, 0.f, 1.f);
+        Color color = Color(0.f, 0.f, 0.f, 1.f);
         XMVECTOR candidateLightDir = XMVectorSet(0, 0, 0, 0);// TODO this is actually not necessary, but fixes warnings
         float candidateScore = 0;
 
@@ -81,7 +81,7 @@ namespace assets
                     }
                 }
                 if (dist < debugStaticLightRaysMaxDist) {
-                    debugLightToVobRays.push_back({ light.pos, pos, intersectedWorld ? COLOR(0.f, 0.f, 1.f, 0.5f) : COLOR(1.f, 0.f, 0.f, 0.5f) });
+                    debugLightToVobRays.push_back({ light.pos, pos, intersectedWorld ? Color(0.f, 0.f, 1.f, 0.5f) : Color(1.f, 0.f, 0.f, 0.5f) });
                 }
             }
         }

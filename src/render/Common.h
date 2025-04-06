@@ -18,7 +18,7 @@ namespace render
 
 	typedef uint16_t TexId;
 
-	typedef VEC3 VertexPos;
+	typedef Vec3 VertexPos;
 
 	struct TexInfo {
 		// TODO make width/height of type BufferSize?
@@ -176,7 +176,7 @@ namespace render
 		std::vector<VertexPos> vecPos;
 		std::vector<F> vecOther;
 		// TODO either remove vec prefix everywhere and use plural or not consistently
-		std::vector<TEX_INDEX> texIndices;
+		std::vector<TexIndex> texIndices;
 		std::vector<TexId> texIndexedIds;
 	};
 

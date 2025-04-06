@@ -8,7 +8,7 @@
 namespace assets
 {
     // TODO rename to VobLighting
-    COLOR interpolateColorFromFaceXZ(const VEC3& pos, const render::MatToChunksToVertsBasic& meshData, const render::VertKey& vertKey);
+    Color interpolateColorFromFaceXZ(const Vec3& pos, const render::MatToChunksToVertsBasic& meshData, const render::VertKey& vertKey);
     render::VobLighting calculateStaticVobLighting(
         std::array<DirectX::XMVECTOR, 2> bbox, const FaceLookupContext& worldMesh, const LightLookupContext& lightsStatic, bool isOutdoorLevel,
         LoadDebugFlags debug);

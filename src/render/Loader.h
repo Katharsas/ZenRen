@@ -71,13 +71,13 @@ namespace render
 	struct VobLighting
 	{
 		DirectX::XMVECTOR direction;// pre-inverted
-		COLOR color;
+		Color color;
 		bool receiveLightSun;
 	};
 
 	struct Decal {
-		VEC2 quad_size;
-		UV uv_offset;
+		Vec2 quad_size;
+		Uv uv_offset;
 		bool two_sided;
 
 		zenkit::AlphaFunction alpha;
@@ -96,9 +96,9 @@ namespace render
 
 	struct Light {
 		// TODO falloff and type surely play a role
-		VEC3 pos;
+		Vec3 pos;
 		bool isStatic;
-		COLOR color;
+		Color color;
 		float range;
 	};
 

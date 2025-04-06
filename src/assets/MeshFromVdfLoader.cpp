@@ -60,8 +60,8 @@ namespace assets
     template<bool TEST, typename T>
     using OPT_PARAM = std::conditional<TEST, T, Unused>::type;
 
-    static_assert(Vec3<glm::vec3>);
-    static_assert(Vec2<glm::vec2>);
+    static_assert(XYZ<glm::vec3>);
+    static_assert(XY<glm::vec2>);
 
     template<typename MESH, typename SUBMESH>
     concept IS_WORLD_MESH = std::is_same_v<MESH, zenkit::Mesh>;
@@ -129,8 +129,8 @@ namespace assets
     
     // NORMALS - VECTOR ACCESSORS
 
-    template <typename Mesh, typename Submesh>
-    using GetNormal = XMVECTOR (*) (const Mesh& mesh, const Submesh& submesh, uint32_t vertIndex);
+    template <typename MESH, typename SUBMESH>
+    using GetNormal = XMVECTOR (*) (const MESH& mesh, const SUBMESH& submesh, uint32_t vertIndex);
 
     inline XMVECTOR getNormalZkit(const zenkit::Mesh& mesh, const Unused& _, uint32_t vertIndex)
     {
@@ -171,10 +171,10 @@ namespace assets
     // NORMALS - GET FACE NORMALS
 
     // requires transform to only have position and/or rotation components, position is ignored
-    template<typename Mesh, typename Submesh, GetNormal<Mesh, Submesh> getNormal, bool transform, bool debugChecksEnabled>
+    template<typename MESH, typename SUBMESH, GetNormal<MESH, SUBMESH> getNormal, bool transform, bool debugChecksEnabled>
     std::pair<NormalsStats, array<XMVECTOR, 3>> faceNormalsToXm(
-        const Mesh& mesh,
-        const Submesh& submesh,
+        const MESH& mesh,
+        const SUBMESH& submesh,
         uint32_t indexStart,
         const array<XMVECTOR, 3>& facePosXm,
         const XMMATRIX& normalTransform = identity)
@@ -221,7 +221,7 @@ namespace assets
     // UVs, LIGHT-COLOR
     // ###########################################################################
 
-    inline UV getUvModelZkit(const Unused& _, const zenkit::SubMesh& submesh, uint32_t vertIndex)
+    inline Uv getUvModelZkit(const Unused& _, const zenkit::SubMesh& submesh, uint32_t vertIndex)
     {
         uint32_t faceIndex = vertIndex / 3;
         uint32_t faceVertIndex = vertIndex % 3;
@@ -233,20 +233,20 @@ namespace assets
     // LIGHTMAP UVs
     // ###########################################################################
 
-    template <typename Mesh>
-    using GetLightmapUvs = ARRAY_UV (*) (const Mesh&, uint32_t index);
+    template <typename MESH>
+    using GetLightmapUvs = Uvi (*) (const MESH&, uint32_t index);
 
-    template <Vec3 Vec>
-    UV calculateLightmapUvs(Vec lmOrigin, Vec lmNormalUp, Vec lmNormalRight, XMVECTOR posXm)
+    template <XYZ V3>
+    Uv calculateLightmapUvs(V3 lmOrigin, V3 lmNormalUp, V3 lmNormalRight, XMVECTOR posXm)
     {
-        XMVECTOR rescale = toXM4Pos(VEC3{ 100, 100, 100 });
+        XMVECTOR rescale = toXM4Pos(Vec3{ 100, 100, 100 });
         XMVECTOR lmDir = XMVectorMultiply(posXm, rescale) - toXM4Pos(lmOrigin);
         float u = XMVectorGetX(XMVector3Dot(lmDir, toXM4Dir(lmNormalRight)));
         float v = XMVectorGetX(XMVector3Dot(lmDir, toXM4Dir(lmNormalUp)));
         return { u, v };
     }
 
-    ARRAY_UV getLightmapUvsZkit(const zenkit::Mesh& mesh, uint32_t faceIndex, XMVECTOR posXm)
+    Uvi getLightmapUvsZkit(const zenkit::Mesh& mesh, uint32_t faceIndex, XMVECTOR posXm)
     {
         int16_t lightmapIndex = mesh.polygons.lightmap_indices.at(faceIndex);
         if (lightmapIndex != -1) {
@@ -302,10 +302,10 @@ namespace assets
         target.vecOther.push_back(faceOther[2]);
     }
 
-    array<VEC3, 2> createVertlistBbox(const vector<VertexPos>& verts)
+    array<Vec3, 2> createVertlistBbox(const vector<VertexPos>& verts)
     {
         BoundingBox bbox;
-        BoundingBox::CreateFromPoints(bbox, verts.size(), (XMFLOAT3*) verts.data(), sizeof(VEC3));
+        BoundingBox::CreateFromPoints(bbox, verts.size(), (XMFLOAT3*) verts.data(), sizeof(Vec3));
         array<XMFLOAT3, 8> corners;
         bbox.GetCorners(corners.data());
         XMFLOAT3 min = corners[2];
@@ -528,7 +528,7 @@ namespace assets
             other.normal = toVec3(faceNormalsXm[i]);
             const auto& glmUvDiffuse = featureZkit.texture;
             other.uvDiffuse = toUv(glmUvDiffuse);
-            other.colLight = fromSRGB(COLOR(featureZkit.light));
+            other.colLight = fromSRGB(Color(featureZkit.light));
             other.dirLight = { -100.f, -100.f, -100.f };// value that is easy to check as not normalized in shader
             other.lightSun = 1.0f;
             other.uvLightmap = getLightmapUvsZkit(mesh, faceIndex, facePosXm[i]);
@@ -877,17 +877,17 @@ namespace assets
     /**
      * Create quad.
      */
-    vector<std::array<std::pair<XMVECTOR, UV>, 3>> createQuadPositions(const Decal& decal)
+    vector<std::array<std::pair<XMVECTOR, Uv>, 3>> createQuadPositions(const Decal& decal)
     {
         auto& size = decal.quad_size;
         auto& offset = decal.uv_offset;
         float base = 1.f;
-        std::pair quadA = { toXM4Pos(VEC3{ -base * size.x,  base * size.y, 0 }), UV{ 0 + offset.u, 0 + offset.v } };
-        std::pair quadB = { toXM4Pos(VEC3{  base * size.x,  base * size.y, 0 }), UV{ 1 + offset.u, 0 + offset.v } };
-        std::pair quadC = { toXM4Pos(VEC3{  base * size.x, -base * size.y, 0 }), UV{ 1 + offset.u, 1 + offset.v } };
-        std::pair quadD = { toXM4Pos(VEC3{ -base * size.x, -base * size.y, 0 }), UV{ 0 + offset.u, 1 + offset.v } };
+        std::pair quadA = { toXM4Pos(Vec3{ -base * size.x,  base * size.y, 0 }), Uv{ 0 + offset.u, 0 + offset.v } };
+        std::pair quadB = { toXM4Pos(Vec3{  base * size.x,  base * size.y, 0 }), Uv{ 1 + offset.u, 0 + offset.v } };
+        std::pair quadC = { toXM4Pos(Vec3{  base * size.x, -base * size.y, 0 }), Uv{ 1 + offset.u, 1 + offset.v } };
+        std::pair quadD = { toXM4Pos(Vec3{ -base * size.x, -base * size.y, 0 }), Uv{ 0 + offset.u, 1 + offset.v } };
 
-        vector<std::array<std::pair<XMVECTOR, UV>, 3>> result;
+        vector<std::array<std::pair<XMVECTOR, Uv>, 3>> result;
         result.reserve(decal.two_sided ? 4 : 2);
 
         // vertex order reversed per tri to be consistent with other Gothic asset (counter-clockwise winding)

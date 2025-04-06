@@ -26,12 +26,12 @@ namespace render
 
 	struct SkyState {
 		float timeKey;
-		COLOR lightColor;// same as polyColor
-		COLOR skyColor;// same as fogColor
+		Color lightColor;// same as polyColor
+		Color skyColor;// same as fogColor
 	};
 
-	COLOR fromSRGB(uint8_t r, uint8_t g, uint8_t b) {
-		return COLOR(
+	Color fromSRGB(uint8_t r, uint8_t g, uint8_t b) {
+		return Color(
 			fromSRGB(r / 255.f),
 			fromSRGB(g / 255.f),
 			fromSRGB(b / 255.f),
@@ -45,7 +45,7 @@ namespace render
 	// G1 defines an additional texture brightness color (domeColor1) in SkyState, however it is hardcoded to not be used by base night layer (star texture)
 	// and it is effectively set to 255 for any time other than night time, which means it only ever affects the night overlay (night clouds texture).
 	// G1 hardcodes re-scaling of domeColor1 to range 128 - 255.
-	const COLOR nightCloudColor = fromSRGB((255 + 55) / 2, (255 + 55) / 2, (255 + 155) / 2);
+	const Color nightCloudColor = fromSRGB((255 + 55) / 2, (255 + 55) / 2, (255 + 155) / 2);
 
 	// We assume that all state arrays have same length and use same timeKeys in same order as defined here.
 	// In theory, we don't need to put time keys into every state struct, but this makes state definitions more readable.
@@ -60,7 +60,7 @@ namespace render
 		timekey::day_start,
 	};
 
-	const COLOR daySkyColor = fromSRGB(116, 89, 75);// G1 defines 4 different variants of this inside INI, use first for now
+	const Color daySkyColor = fromSRGB(116, 89, 75);// G1 defines 4 different variants of this inside INI, use first for now
 
 	const array skyStates = {
 		SkyState { timekey::day,         fromSRGB(255, 250, 235), daySkyColor },
@@ -78,8 +78,8 @@ namespace render
 	const SkyTex over_DAY =   { "SKYDAY_LAYER0" };
 	const SkyTex over_NIGHT = { "SKYNIGHT_LAYER1" };
 
-	const UV speedNormal = { 0.9f, 1.1f };
-	const UV speedSlow = { speedNormal.u * 0.2f, speedNormal.v * 0.2f };
+	const Uv speedNormal = { 0.9f, 1.1f };
+	const Uv speedSlow = { speedNormal.u * 0.2f, speedNormal.v * 0.2f };
 
 	// each previous SkyTexType is defined to last until next timekey
 	const array skyLayerBase = {
@@ -116,12 +116,12 @@ namespace render
 	}
 
 	// TODO all vector structs should have component mapping function so we don't need to do this (same for add/mul in PipelineSky.cpp)
-	UV interpolate(UV last, UV next, float delta) {
+	Uv interpolate(Uv last, Uv next, float delta) {
 		
 		return { interpolate(last.u, next.u, delta), interpolate(last.v, next.v, delta) };
 	}
 
-	COLOR interpolate(COLOR last, COLOR next, float delta) {
+	Color interpolate(Color last, Color next, float delta) {
 		return add(last, mul(sub(next, last), delta));
 	}
 
@@ -220,13 +220,13 @@ namespace render
 		return timeOfDay >= timekey::day_start || timeOfDay <= timekey::day_end;
 	}
 
-	COLOR getSkyLightFromIntensity(float intensity, float currentTime)
+	Color getSkyLightFromIntensity(float intensity, float currentTime)
 	{
 		SkyState sky = getSkyState(currentTime);
 		return multiplyColor(sky.lightColor, intensity);
 	}
 
-	COLOR getSkyColor(float currentTime)
+	Color getSkyColor(float currentTime)
 	{
 		return getSkyState(currentTime).skyColor;
 	}

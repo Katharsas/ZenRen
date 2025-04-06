@@ -15,21 +15,21 @@ namespace render
         return XMMATRIX(matrix);
     }
 
-    VEC3 toVec3(const XMFLOAT3& xmf3)
+    Vec3 toVec3(const XMFLOAT3& xmf3)
     {
-        return VEC3{ xmf3.x, xmf3.y, xmf3.z };
+        return Vec3{ xmf3.x, xmf3.y, xmf3.z };
     }
-    VEC3 toVec3(const XMVECTOR& xm4)
+    Vec3 toVec3(const XMVECTOR& xm4)
     {
         XMFLOAT4 result;
         XMStoreFloat4(&result, xm4);
-        return VEC3{ result.x, result.y, result.z };
+        return Vec3{ result.x, result.y, result.z };
     }
-    VEC4 toVec4(const XMVECTOR& xm4)
+    Vec4 toVec4(const XMVECTOR& xm4)
     {
         XMFLOAT4 result;
         XMStoreFloat4(&result, xm4);
-        return VEC4{ result.x, result.y, result.z, result.w };
+        return Vec4{ result.x, result.y, result.z, result.w };
     }
 
     bool isZero(const XMVECTOR& vec, float threshold)
@@ -59,7 +59,7 @@ namespace render
 
     ChunkIndex toChunkIndex(XMVECTOR posXm)
     {
-        const static XMVECTOR chunkSize = toXM4Pos(VEC3{ chunkSizePerDim, chunkSizePerDim, chunkSizePerDim });
+        const static XMVECTOR chunkSize = toXM4Pos(Vec3{ chunkSizePerDim, chunkSizePerDim, chunkSizePerDim });
         XMVECTOR indexXm = XMVectorFloor(XMVectorDivide(posXm, chunkSize));
 
         XMFLOAT4 result;
@@ -73,7 +73,7 @@ namespace render
         XMVECTOR normalized = XMVector3Normalize(source);
         XMVECTOR nearEqualMask = XMVectorNearEqual(source, normalized, XMVectorReplicate(.0001f));
         XMVECTOR nearEqualXm = XMVectorSelect(XMVectorReplicate(1.f), XMVectorReplicate(.0f), nearEqualMask);
-        VEC4 nearEqual = toVec4(nearEqualXm);
+        Vec4 nearEqual = toVec4(nearEqualXm);
         if (nearEqual.x != 0 || nearEqual.y != 0 || nearEqual.z != 0 || nearEqual.w != 0) {
             LOG(INFO) << "Vector was not normalized! " << source << "  |  " << normalized << "  |  " << nearEqualXm;
         }

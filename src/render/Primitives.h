@@ -10,127 +10,113 @@ template <typename C> concept RGBA = requires(C color) {
 	{ color.b } -> std::convertible_to<uint32_t>;
 	{ color.a } -> std::convertible_to<uint32_t>;
 };
-template <typename V> concept Vec3 = requires(V vec) {
+template <typename V> concept XYZ = requires(V vec) {
 	{ vec.x } -> std::convertible_to<float>;
 	{ vec.y } -> std::convertible_to<float>;
 	{ vec.z } -> std::convertible_to<float>;
 };
-template <typename V> concept Vec2 = !Vec3<V> && requires(V vec) {
+template <typename V> concept XY = !XYZ<V> && requires(V vec) {
 	{ vec.x } -> std::convertible_to<float>;
 	{ vec.y } -> std::convertible_to<float>;
 };
 
-struct COLOR {
+struct Color {
 	union {
 		struct { float r, g, b, a; };
 		float vec[4];
 	};
-	COLOR() {};
-	COLOR(uint32_t argb);
-	COLOR(float r, float g, float b, float a);
+	Color() {};
+	Color(uint32_t argb);
+	Color(float r, float g, float b, float a);
 
-	template<RGBA Color>
-	COLOR(Color rgba) {
+	template<RGBA COLOR>
+	Color(COLOR rgba) {
 		r = rgba.r;
 		g = rgba.g;
 		b = rgba.b;
 		a = rgba.a;
 	}
 };
-inline std::ostream& operator <<(std::ostream& os, const COLOR& that)
+inline std::ostream& operator <<(std::ostream& os, const Color& that)
 {
 	return os << "[R:" << that.r << " G:" << that.g << " B:" << that.b << " A:" << that.a << "]";
 }
-static_assert(RGBA<COLOR>);
+static_assert(RGBA<Color>);
 
-struct UV {
+struct Uv {
 	union {
 		struct { float u, v; };
 		float vec[2];
 	};
 };
-inline std::ostream& operator <<(std::ostream& os, const UV& that)
+inline std::ostream& operator <<(std::ostream& os, const Uv& that)
 {
 	return os << "[U=" << that.u << " V=" << that.v << "]";
 }
 
-struct VEC2 {
+struct Vec2 {
 	union {
 		struct { float x, y; };
 		float vec[2];
 	};
 };
-inline std::ostream& operator <<(std::ostream& os, const VEC2& that)
+inline std::ostream& operator <<(std::ostream& os, const Vec2& that)
 {
 	return os << "[X=" << that.x << " Y=" << that.y << "]";
 }
-static_assert(Vec2<VEC2>);
+static_assert(XY<Vec2>);
 
-struct VEC3 {
+struct Vec3 {
 	union {
 		struct { float x, y, z; };
 		float vec[3];
 	};
 };
-inline std::ostream& operator <<(std::ostream& os, const VEC3& that)
+inline std::ostream& operator <<(std::ostream& os, const Vec3& that)
 {
 	return os << "[X=" << that.x << " Y=" << that.y << " Z=" << that.z << "]";
 }
-static_assert(Vec3<VEC3>);
+static_assert(XYZ<Vec3>);
 
-struct VEC4 {
+struct Vec4 {
 	union {
 		struct { float x, y, z, w; };
 		float vec[4];
 	};
 };
-inline std::ostream& operator <<(std::ostream& os, const VEC4& that)
+inline std::ostream& operator <<(std::ostream& os, const Vec4& that)
 {
 	return os << "[X=" << that.x << " Y=" << that.y << " Z=" << that.z << " W=" << that.w << "]";
 }
 
-struct ARRAY_UV {
+struct Uvi {
 	float u, v;
 	float i;
 };
-inline std::ostream& operator <<(std::ostream& os, const ARRAY_UV& that)
+inline std::ostream& operator <<(std::ostream& os, const Uvi& that)
 {
 	return os << "[U=" << that.u << " V=" << that.v << " I=" << that.i << "]";
 }
 
-struct POS_COLOR {
-	VEC3 position;
-	COLOR color;
+struct PosUv {
+	Vec3 pos;
+	Uv uv;
 };
-
-struct POS_UV {
-	VEC3 pos;
-	UV uv;
-};
-inline std::ostream& operator <<(std::ostream& os, const POS_UV& that)
+inline std::ostream& operator <<(std::ostream& os, const PosUv& that)
 {
 	return os << "[POS: " << that.pos << " UV:" << that.uv << "]";
 }
 
-struct NORMAL_UV_LUV {
-	VEC3 normal;
-	UV uvDiffuse;
-	ARRAY_UV uvLightmap;
-};
-inline std::ostream& operator <<(std::ostream& os, const NORMAL_UV_LUV& that)
-{
-	return os << "[NOR:" << that.normal << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
-}
 
 // TODO create union of uvLightmap + colLight with single bit flag ti differentiate
-// TODO move uvDiffuse into TEX_INDEX
+// TODO move uvDiffuse into TexIndex
 // TODO define input layout in structs
 struct VertexBasic {
-	VEC3 normal;
-	UV uvDiffuse;
-	ARRAY_UV uvLightmap;
-	COLOR colLight;
-	VEC3 dirLight;
+	Vec3 normal;
+	Uv uvDiffuse;
+	Uvi uvLightmap;
+	Color colLight;
+	Vec3 dirLight;
 	float lightSun;
 };
 inline std::ostream& operator <<(std::ostream& os, const VertexBasic& that)
@@ -139,11 +125,11 @@ inline std::ostream& operator <<(std::ostream& os, const VertexBasic& that)
 }
 
 //struct VertexBlend {
-//	VEC3 normal;
-//	UV uvDiffuse;
-//	ARRAY_UV uvLightmap;
-//	COLOR colLight;
-//	VEC3 dirLight;
+//	Vec3 normal;
+//	Uv uvDiffuse;
+//	Uvi uvLightmap;
+//	Color colLight;
+//	Vec3 dirLight;
 //	float lightSun;
 //	BlendType blendType;
 //};
@@ -154,7 +140,7 @@ inline std::ostream& operator <<(std::ostream& os, const VertexBasic& that)
 
 using VertexIndex = uint32_t;
 
-using TEX_INDEX = uint32_t;
+using TexIndex = uint32_t;
 
 namespace render {
 
@@ -181,10 +167,10 @@ namespace render {
 	}
 
 	float fromSRGB(const float channel);
-	COLOR fromSRGB(const COLOR color);
-	COLOR from4xUint8(uint8_t const* const rgba);
-	COLOR greyscale(const float channel);
-	COLOR multiplyColor(COLOR color, const float factor);
+	Color fromSRGB(const Color color);
+	Color from4xUint8(uint8_t const* const rgba);
+	Color greyscale(const float channel);
+	Color multiplyColor(Color color, const float factor);
 
 	template<typename T> T add(const T& vec1, const T& vec2);
 	template<typename T> T sub(const T& vec1, const T& vec2);

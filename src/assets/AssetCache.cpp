@@ -25,7 +25,7 @@ namespace assets
 	unordered_map<int32_t, TexId> cacheTexNameHashToIds;
 
 
-	template<HasLoad T>
+	template<HAS_LOAD T>
 	unordered_map<string, T>& getCache() {
 		if constexpr (std::is_same_v<T, MultiResolutionMesh>) {
 			return cacheMrm;
@@ -41,7 +41,7 @@ namespace assets
 		}
 	}
 
-	template<HasLoad T>
+	template<HAS_LOAD T>
 	std::optional<const T*> getOrParse(const string& assetName)
 	{
 		auto& cache = getCache<T>();

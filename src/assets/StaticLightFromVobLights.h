@@ -6,7 +6,7 @@
 namespace assets
 {
     struct DirectionalLight {
-        COLOR color;
+        Color color;
         DirectX::XMVECTOR dirInverted;
     };
 
@@ -22,9 +22,9 @@ namespace assets
     extern uint32_t vobLightWorldIntersectChecks;
 
     struct DebugLine {
-        VEC3 posStart;
-        VEC3 posEnd;
-        COLOR color;
+        Vec3 posStart;
+        Vec3 posEnd;
+        Color color;
     };
     extern std::vector<DebugLine> debugLightToVobRays;
 }

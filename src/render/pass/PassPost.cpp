@@ -80,7 +80,7 @@ namespace render::pass::post
 		d3d.deviceContext->PSSetShaderResources(0, 1, &srv);
 		d3d.deviceContext->PSSetSamplers(0, 1, &samplerState);
 
-		UINT stride = sizeof(POS_UV);
+		UINT stride = sizeof(PosUv);
 		UINT offset = 0;
 		d3d.deviceContext->IASetVertexBuffers(0, 1, &(toneMappingQuad.vertexBuffer), &stride, &offset);
 		d3d.deviceContext->Draw(toneMappingQuad.vertexCount, 0);
@@ -276,7 +276,7 @@ namespace render::pass::post
 
 		const float zNear = reverseZ ? 1.0f : 0.0f;
 
-		std::array<POS_UV, 6> fullscreenQuadData = { {
+		std::array<PosUv, 6> fullscreenQuadData = { {
 			{ { -1.0f, 1.0f, zNear }, { 0.0f, 0.0f } },
 			{ { 1.0f, 1.0, zNear }, { 1.0f, 0.0f } },
 			{ { 1.0, -1.0, zNear }, { 1.0f, 1.0f } },
@@ -292,7 +292,7 @@ namespace render::pass::post
 
 			bufferDesc.Usage = D3D11_USAGE_DEFAULT;
 			bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-			bufferDesc.ByteWidth = sizeof(POS_UV) * fullscreenQuadData.size();
+			bufferDesc.ByteWidth = sizeof(PosUv) * fullscreenQuadData.size();
 
 			D3D11_SUBRESOURCE_DATA initialData;
 			initialData.pSysMem = fullscreenQuadData.data();

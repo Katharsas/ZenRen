@@ -7,51 +7,51 @@
 
 namespace render
 {
-    template <Vec3 Vec>
-    bool isZero(const Vec& vec, float threshold)
+    template <XYZ V3>
+    bool isZero(const V3& vec, float threshold)
     {
         return std::abs(vec.x) <= threshold
             && std::abs(vec.y) <= threshold
             && std::abs(vec.z) <= threshold;
     }
 
-    template <Vec3 Vec>
-    DirectX::XMVECTOR toXM4Pos(const Vec& vec)
+    template <XYZ V3>
+    DirectX::XMVECTOR toXM4Pos(const V3& vec)
     {
         return DirectX::XMVectorSet(vec.x, vec.y, vec.z, 1);
     }
-    template <Vec3 Vec>
-    DirectX::XMVECTOR toXM4Dir(const Vec& vec)
+    template <XYZ V3>
+    DirectX::XMVECTOR toXM4Dir(const V3& vec)
     {
         return DirectX::XMVectorSet(vec.x, vec.y, vec.z, 0);
     }
 
     DirectX::XMMATRIX toXMMatrix(const float * matrix);
 
-    template <Vec2 Vec>
-    UV toUv(const Vec& vec)
+    template <XY V2>
+    Uv toUv(const V2& vec)
     {
         return { vec.x, vec.y };
     }
-    template <Vec2 Vec>
-    VEC2 toVec2(const Vec& vec)
+    template <XY V2>
+    Vec2 toVec2(const V2& vec)
     {
         return { vec.x, vec.y };
     }
-    template <Vec3 Vec> 
-    VEC3 toVec3(const Vec& vec)
+    template <XYZ V3>
+    Vec3 toVec3(const V3& vec)
     {
         return { vec.x, vec.y, vec.z };
     }
-    template <Vec3 Vec>
-    VEC3 toVec3(const Vec& vec, float scale)
+    template <XYZ V3>
+    Vec3 toVec3(const V3& vec, float scale)
     {
         return { vec.x * scale, vec.y * scale, vec.z * scale };
     }
 
-    VEC3 toVec3(const DirectX::XMFLOAT3& xmf3);
-    VEC3 toVec3(const DirectX::XMVECTOR& xm4);
-    VEC4 toVec4(const DirectX::XMVECTOR& xm4);
+    Vec3 toVec3(const DirectX::XMFLOAT3& xmf3);
+    Vec3 toVec3(const DirectX::XMVECTOR& xm4);
+    Vec4 toVec4(const DirectX::XMVECTOR& xm4);
 
     bool isZero(const DirectX::XMVECTOR& vec, float threshold);
     DirectX::XMVECTOR bboxCenter(const std::array<DirectX::XMVECTOR, 2>& bbox);

@@ -17,8 +17,8 @@ namespace render
 		float timeKey;
 		SkyTex tex;
 		float alpha;
-		UV uvSpeed = { 0, 0 };
-		COLOR texlightColor = greyscale(1);
+		Uv uvSpeed = { 0, 0 };
+		Color texlightColor = greyscale(1);
 	};
 	inline std::ostream& operator <<(std::ostream& os, const SkyTexState& that)
 	{
@@ -27,7 +27,7 @@ namespace render
 
 	std::array<SkyTexState, 2> getSkyLayers(float timeOfDay);
 	bool getSwapLayers(float timeOfDay);
-	COLOR getSkyLightFromIntensity(float intensity, float currentTime = defaultTime);
-	COLOR getSkyColor(float currentTime = defaultTime);
+	Color getSkyLightFromIntensity(float intensity, float currentTime = defaultTime);
+	Color getSkyColor(float currentTime = defaultTime);
 }
 

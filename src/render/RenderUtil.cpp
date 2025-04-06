@@ -17,16 +17,6 @@ namespace render::util {
 		viewport->MaxDepth = 1.f;
 	}
 
-	void dumpVerts(const std::string& matName, const std::vector<VertexPos>& vertPos, const std::vector<NORMAL_UV_LUV>& vertOther)
-	{
-		std::ostringstream buffer;
-		buffer << matName << '\n';
-		for (uint32_t i = 0; i < vertPos.size(); i++) {
-			buffer << "    " << vertPos[i] << "  " << vertOther[i] << '\n';
-		}
-		LOG(INFO) << buffer.str();
-	}
-
 	DXGI_QUERY_VIDEO_MEMORY_INFO getVramInfo(IDXGIAdapter3* adapter)
 	{
 		DXGI_QUERY_VIDEO_MEMORY_INFO videoMemoryInfo;
