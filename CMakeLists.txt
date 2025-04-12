@@ -58,16 +58,16 @@ endif()
 set(IMGUI_PATH  "lib/imgui")
     
 # Compile as static library 
-file(GLOB IMGUI_SOURCES ${IMGUI_PATH}/*.cpp) 
+file(GLOB IMGUI_SOURCES ${IMGUI_PATH}/*.cpp)
 add_library("imgui" STATIC ${IMGUI_SOURCES})
 target_include_directories("imgui" PUBLIC ${IMGUI_PATH})
 
 ####### Configure CMake Libraries
 message(STATUS "############## THIRDPARTY LIBRARIES ##############")
 
-set(G3_SHARED_LIB OFF)
-set(ADD_FATAL_EXAMPLE OFF)
-set(ADD_G3LOG_UNIT_TEST OFF)
+option(G3_SHARED_LIB "" OFF)
+option(ADD_FATAL_EXAMPLE "" OFF)
+option(ADD_G3LOG_UNIT_TEST "" OFF)
 add_subdirectory(lib/g3log)
 
 #add_subdirectory(lib/DirectXMath) # TODO this is header only so we don't need this right?
