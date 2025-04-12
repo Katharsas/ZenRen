@@ -10,6 +10,7 @@ namespace assets
 {
 	struct LoadDebugFlags {
 		bool loadVobs = true;
+		bool disableVobToLightVisibilityRayChecks = true;
 		bool disableVertexIndices = false;
 		bool validateMeshData = true;
 

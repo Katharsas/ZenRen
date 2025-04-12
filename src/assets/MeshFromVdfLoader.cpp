@@ -664,6 +664,80 @@ namespace assets
         return XMMatrixInverse(nullptr, transposed);
     }
 
+    // TODO
+    // - split worldmesh and VOB vertex feature types
+    // - split worldmesh and VOB shaders using includes for common functionality
+    // - There should be 2 different types:
+    //   - FullVert/Vert (Unpacked or Packed)
+    //   - Vert/SmallVert/CompVert (Compressed)
+    // 
+    // function: precompute(zenkit:MRMesh) -> map<Material, UnpackedVerts>
+    // - create material-keyed hashmap
+    // - per submesh:
+    //   - create material
+    // - per submesh, per face:
+    //   - face positions (non-transformed)
+    //     - convert to XMFLOAT4
+    //     - scaling
+    //   - face normals (non-transformed), requires face positions
+    //     - convert to XMFLOAT4
+    //     - debugChecks
+    //   - set texColor UVs, compress (separate vertex buffers for UVs?)
+    //   - get buffer for current material, reserve for additional size and insert
+    // - return hashmap
+    // 
+    // function: indexAndOptimize(vector<UnpackedVerts>) -> (vector<PackedVerts>, vector<Indices>)
+    //   - create indices
+    //   - optimize indices and vertex buffers
+    //   - Optional: Also return a lodded Version of the result
+    // 
+    // function: compress(UnpackedVert/PackedVert) -> CompressedVert
+    //   - compress position (XMFLOAT4 to Vec3)
+    //   - compress normal (XMFLOAT4 to Vec3)
+    //   - TODO compress other vertex features
+    //   - TODO compress by quantizing to necessary bits
+    // 
+    // CPU-Batching (per instance), mostly inside chunk:
+    // - populate cache (first time only):
+    //   - run "precompute"
+    //   - per material, run "indexAndOptimize"
+    //   - cache result
+    // - load cached visual
+    // - per material, allocate pre-reserved temp CompressedVerts buffer
+    // - per material, per vertex:
+    //   - transform position
+    //   - transform normal
+    //   - add per-instance vertex featurs (TODO: move into per-instance structured buffer)
+    //   - run "compress"
+    //   - insert into temp buffer
+    // - get target buffer for chunkIndex of instance
+    // - pre-reserve (TODO: test speed) and insert temp buffer into target buffer
+    //
+    // Optional:
+    // CPU-Batching (per instance), crossing chunk boundaries substantially:
+    // - run "precompute" to get per-material hashmap with unpacked faces
+    // - allocate temp per-material, per-chunk UnpackedVerts buffers
+    // - per material, per face:
+    //   - transform face positions
+    //   - transform face normals
+    //   - add per-instance vertex features (TODO: move into per-instance structured buffer)
+    //   - calculate centroid to get per-face chunk index
+    //   - insert into temp UnpackedVerts buffer
+    // - allocate pre-reserved temp CompressedVerts buffer (per chunk)
+    // - per material, per chunk:
+    //   - run "indexAndOptimize"
+    //   - run "compress" per vertex
+    //   - insert into temp CompressedVerts buffer
+    // - get targetbuffer (per chunk)
+    // - pre-reserve (TODO: test speed) and insert temp PackedVerts buffer into target buffer (per-chunk)
+    //
+    // - create namespace assets::mesh
+    // - create files:
+    //   - LoadMesh.h
+    //   - LoadMeshCommon.h/cpp: functions shared between worldmesh and objects
+    //   - LoadMeshWorld.cpp: world mesh loading
+    //   - LoadMeshVob.cpp: instance mesh loading
+
     Face loadVobFace(
         const zenkit::MultiResolutionMesh& mesh,
         const zenkit::SubMesh& submesh,
@@ -716,6 +790,170 @@ namespace assets
 
         const ChunkIndex chunkIndex = toChunkIndex(centroidPos(facePosXm));
         return { facePos, faceOther, chunkIndex };
+    }
+
+    struct VertexPrecomp {
+        XMFLOAT4 pos;
+        XMFLOAT4 normal;
+        Uv uvColor;
+    };
+
+    array<VertexPrecomp, 3> precomputeFace(
+        const zenkit::MultiResolutionMesh& mesh,
+        const zenkit::SubMesh& submesh,
+        const uint32_t faceIndex,
+        const uint32_t vertIndex,
+        bool debugChecksEnabled,
+        NormalsStats& normalStats
+    ) {
+        using Mesh = zenkit::MultiResolutionMesh;
+        using Submesh = zenkit::SubMesh;
+
+        // positions
+        array<XMVECTOR, 3> facePosXm = facePosToXm<Mesh, Submesh, true, false>(mesh, submesh, faceIndex, vertIndex, {});
+
+        // normals
+        array<XMVECTOR, 3> faceNormalsXm;
+        NormalsStats faceNormalStats;
+        if (debugChecksEnabled) {
+            std::tie(faceNormalStats, faceNormalsXm) = faceNormalsToXm<Unused, Submesh, getNormalModelZkit, false, true>(
+                {}, submesh, vertIndex, facePosXm, {});
+        }
+        else {
+            std::tie(faceNormalStats, faceNormalsXm) = faceNormalsToXm<Unused, Submesh, getNormalModelZkit, false, false>(
+                {}, submesh, vertIndex, facePosXm, {});
+        }
+        normalStats += faceNormalStats;
+
+        // UVs, convert, flip
+        array<VertexPrecomp, 3> face;
+        for (uint32_t i = 0; i < 3; i++) {
+            // flip faces (seems like zEngine uses counter-clockwise winding, while we use clockwise winding)
+            // TODO use D3D11_RASTERIZER_DESC FrontCounterClockwise instead?
+            VertexPrecomp& vert = face.at(2 - i);
+
+            XMStoreFloat4(&vert.pos, facePosXm[i]);
+            XMStoreFloat4(&vert.normal, faceNormalsXm[i]);
+            vert.uvColor = getUvModelZkit({}, submesh, vertIndex + i);
+        }
+
+        return face;
+    }
+
+    struct VertsPrecomp {
+        vector<VertexPrecomp> verts;
+    };
+
+    optional<unordered_map<Material, VertsPrecomp>> precompute(
+        const zenkit::MultiResolutionMesh& mesh, const string& visualName, bool debugChecksEnabled)
+    {
+        if (mesh.sub_meshes.size() == 0) {
+            LOG(WARNING) << "Model contained no geometry! " << visualName;
+            return std::nullopt;
+        }
+
+        NormalsStats normalStats;
+        bool createNormalStats = debugChecksEnabled && !util::hasKey(loadStats.normalsInstances, visualName);
+
+        unordered_map<Material, VertsPrecomp> result;
+
+        for (const auto& submesh : mesh.sub_meshes) {
+            zenkit::Material meshMat = submesh.mat;
+            if (meshMat.texture.empty() && !util::hasKey(loadStats.skippedNoTexSubmeshInstances, visualName)) {
+                loadStats.skippedNoTexSubmeshInstances[visualName] = true;
+                continue;
+            }
+            const optional<Material> materialOpt = createMaterial(meshMat, debugChecksEnabled);
+            if (!materialOpt.has_value()) {
+                continue;
+            }
+
+            uint32_t faceCountMat = submesh.triangles.size();
+            uint32_t vertexCountMat = faceCountMat * 3;
+
+            auto [it, wasInserted] = result.try_emplace(materialOpt.value());
+            auto& verts = it->second;
+            if (wasInserted) {
+                verts.verts.reserve(verts.verts.size() + vertexCountMat);
+            }
+
+            for (uint32_t currentFace = 0, currentVert = 0;
+                currentFace < faceCountMat;
+                currentFace++, currentVert += 3) {
+
+                const auto face = precomputeFace(mesh, submesh, currentFace, currentVert, debugChecksEnabled, normalStats);
+                verts.verts.push_back(face[0]);
+                verts.verts.push_back(face[1]);
+                verts.verts.push_back(face[2]);
+            }
+        }
+
+        return result;
+    }
+
+    // TODO maybe debug stats should be part of value
+    unordered_map<string, unordered_map<Material, VertsPrecomp>> cachePrecomputedMeshes;
+    // TODO precomputeorget
+
+    // function: indexAndOptimize(vector<UnpackedVerts>) -> (vector<PackedVerts>, vector<Indices>)
+    //   - create indices
+    //   - optimize indices and vertex buffers
+    //   - Optional: Also return a lodded Version of the result
+
+    struct IndexingResult {
+        VertsPrecomp vertsPacked;
+        vector<VertexIndex> indices;
+        vector<VertexIndex> indicesLod1;
+    };
+
+    template<typename T>
+    void meshopt_remapVertexBuffer(vector<T>& target, const vector<T>& source, const vector<uint32_t>& remap)
+    {
+
+    }
+
+    void meshoptApplyRemap(VertsPrecomp& verts, vector<VertexIndex> indices, const vector<unsigned int>& remap, uint32_t newIndexCount, uint32_t previousVertCount, uint32_t newVertCount)
+    {
+        const unsigned int* indicesDataOrNullPtr = indices.empty() ? nullptr : indices.data();
+        if (indices.empty()) {
+            indices.resize(newIndexCount);
+        }
+        meshopt_remapIndexBuffer(indices.data(), indicesDataOrNullPtr, newIndexCount, remap.data());
+        meshopt_remapVertexBuffer(verts.verts.data(), verts.verts.data(), previousVertCount, sizeof(VertexPrecomp), remap.data());
+        if (newVertCount != previousVertCount) {
+            assert(newVertCount < previousVertCount);
+            verts.verts.resize(newVertCount);
+        }
+    }
+
+    std::pair<vector<VertexIndex>, uint32_t> createIndicesAndRemap(VertsPrecomp& verts, uint32_t indexCount)
+    {
+        // assert that we are dealing with entirely unindex vertex data
+        //assert(verts.vecIndex.empty());
+        assert(verts.verts.size() == indexCount);
+
+        array streams = {
+            meshopt_Stream {verts.verts.data(), sizeof(VertexPrecomp), sizeof(VertexPrecomp)},
+        };
+        std::vector<unsigned int> remap(indexCount); // temporary remap table
+        uint32_t vertexCount = meshopt_generateVertexRemapMulti(remap.data(), nullptr, indexCount, indexCount, streams.data(), streams.size());
+        meshoptApplyRemap(verts, remap, indexCount, indexCount, vertexCount);
+
+        return vertexCount;
+    }
+
+    // takes ownership of vertsUnpacked to move it
+    IndexingResult indexAndOptimize(VertsPrecomp& vertsUnpacked, uint32_t indicesOffset = 0)
+    {
+        IndexingResult result;
+        result.vertsPacked = std::move(vertsUnpacked);
+
+        uint32_t vertexCount = vertsUnpacked.verts.size();
+        uint32_t indexCount = vertexCount;
+        std::tie(result.indices, vertexCount) = createIndicesAndRemap(vertsUnpacked, indexCount);
+        if (meshoptOptimize) {
+            optimizeIndicesAndVerts(vertsUnpacked, indexCount, vertexCount);
+        }
     }
 
     void loadInstanceMesh(

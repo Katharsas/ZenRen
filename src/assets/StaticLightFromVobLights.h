@@ -15,7 +15,8 @@ namespace assets
             const std::vector<render::Light>& lights,
             const LightLookupTree& lightLookup,
             const render::MatToChunksToVertsBasic& worldMeshData,
-            const VertLookupTree& worldFaceLookup);
+            const VertLookupTree& worldFaceLookup,
+            bool disableVisibilityRayChecks);
 
     // debug stuff
 

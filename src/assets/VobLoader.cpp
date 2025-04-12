@@ -69,7 +69,7 @@ namespace assets
             // The final weight (0.71f) in Vanilla Gothic might be there to counteract this error, but should lead to objects
             // hit by less lights to be overly dark. Maybe adjust weight to lower value? Check low hit objects.
 
-            auto optLight = getLightAtPos(center, lightsStatic.data, lightsStatic.spatialTree, worldMesh.data, worldMesh.spatialTree);
+            auto optLight = getLightAtPos(center, lightsStatic.data, lightsStatic.spatialTree, worldMesh.data, worldMesh.spatialTree, debug.disableVobToLightVisibilityRayChecks);
             if (optLight.has_value()) {
                 result.color = optLight.value().color;
                 result.color = multiplyColor(result.color, fromSRGB(0.85f));

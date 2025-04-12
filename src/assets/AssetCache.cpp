@@ -47,6 +47,8 @@ namespace assets
 		auto& cache = getCache<T>();
 		auto it = cache.find(assetName);
 		if (it == cache.end()) {
+			cacheMrm.clear();// right now we only cache at most one model per type
+
 			const auto& assetFileOpt = assets::getIfExists(assetName);
 			if (assetFileOpt.has_value()) {
 				auto [itNew, wasInserted] = cache.try_emplace(assetName);
