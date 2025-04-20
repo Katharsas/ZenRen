@@ -10,9 +10,6 @@ namespace assets
     using ::std::vector;
     using ::std::unordered_map;
 
-    // debug option for faster loading
-    bool disableIntersectChecks = false;
-
     uint32_t vobLightWorldIntersectChecks = 0;
 
     float debugStaticLightRaysMaxDist = 50;
@@ -41,7 +38,8 @@ namespace assets
             const vector<Light>& lights,
             const LightLookupTree& lightLookup,
             const MatToChunksToVertsBasic& worldMeshData,
-            const VertLookupTree& worldFaceLookup)
+            const VertLookupTree& worldFaceLookup,
+            bool disableVisibilityRayChecks)
     {
         auto pos = toVec3(posXm);
         float rayIntersectTolerance = 0.1f;
@@ -64,7 +62,7 @@ namespace assets
             float dist = XMVectorGetX(XMVector3Length(lightPos - posXm));
             if (dist < (light.range * 1.0f)) {
                 bool intersectedWorld = false;
-                if (!disableIntersectChecks) {
+                if (!disableVisibilityRayChecks) {
                     vobLightWorldIntersectChecks++;
                     intersectedWorld = rayIntersectsWorldFaces(lightPos, posXm, dist * 0.85f, worldMeshData, worldFaceLookup);
                 }
