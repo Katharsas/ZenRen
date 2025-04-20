@@ -250,6 +250,10 @@ namespace assets
             vobs = loadVobs(world.world_vobs, out.worldMesh, lightsStatic, out.isOutdoorLevel, debug);
             sampler.logMillisAndRestart("Loader: World VOB data loaded");
 
+            std::sort(vobs.begin(), vobs.end(), [](const StaticInstance& left, const StaticInstance& right) -> bool {
+                return left.visual_name < right.visual_name;
+            });
+
             uint32_t instanceCount = 0;
             for (auto& instance : vobs) {
                 bool success = loadInstanceVisual(out.staticMeshes, instance, !debug.disableVertexIndices, debug.validateMeshData);

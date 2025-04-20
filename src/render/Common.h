@@ -16,9 +16,8 @@ namespace render
 	// TODO move to MeshUtil
 	constexpr float G_ASSET_RESCALE = 0.01f;
 
-	typedef uint16_t TexId;
-
-	typedef Vec3 VertexPos;
+	using TexId = uint16_t;
+	using VertexPos = Vec3;
 
 	struct TexInfo {
 		// TODO make width/height of type BufferSize?
@@ -131,6 +130,7 @@ namespace render
 	
 	constexpr uint8_t BLEND_TYPE_COUNT = magic_enum::enum_count<BlendType>();
 
+	// TODO rename to Encoding / Compression or something, since color is always SRGB, even if linear
 	enum class ColorSpace {
 		LINEAR, SRGB
 	};
