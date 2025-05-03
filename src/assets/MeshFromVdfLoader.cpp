@@ -12,6 +12,8 @@
 #include "render/MeshUtil.h"
 #include "../Util.h"
 
+#include "../lib/meshoptimizer/src/meshoptimizer.h"// TODO remove
+
 #include "magic_enum.hpp"
 #include "glm/gtc/type_ptr.hpp"
 
@@ -630,6 +632,79 @@ namespace assets
         }
     }
 
+    // TODO
+    // - split worldmesh and VOB vertex feature types
+    // - split worldmesh and VOB shaders using includes for common functionality
+    // - There should be 2 different types:
+    //   - FullVert/Vert (Unpacked or Packed)
+    //   - Vert/SmallVert/CompVert (Compressed)
+    // 
+    // function: precompute(zenkit:MRMesh) -> map<Material, UnpackedVerts>
+    // - create material-keyed hashmap
+    // - per submesh:
+    //   - create material
+    // - per submesh, per face:
+    //   - face positions (non-transformed)
+    //     - convert to XMFLOAT4
+    //     - scaling
+    //   - face normals (non-transformed), requires face positions
+    //     - convert to XMFLOAT4
+    //     - debugChecks
+    //   - set texColor UVs, compress (separate vertex buffers for UVs?)
+    //   - get buffer for current material, reserve for additional size and insert
+    // - return hashmap
+    // 
+    // function: indexAndOptimize(vector<UnpackedVerts>) -> (vector<PackedVerts>, vector<Indices>)
+    //   - create indices
+    //   - optimize indices and vertex buffers
+    //   - Optional: Also return a lodded Version of the result
+    // 
+    // function: compress(UnpackedVert/PackedVert) -> CompressedVert
+    //   - compress position (XMFLOAT4 to Vec3)
+    //   - compress normal (XMFLOAT4 to Vec3)
+    //   - TODO compress other vertex features
+    //   - TODO compress by quantizing to necessary bits
+    // 
+    // CPU-Batching (per instance), mostly inside chunk:
+    // - populate cache (first time only):
+    //   - run "precompute"
+    //   - per material, run "indexAndOptimize"
+    //   - cache result
+    // - load cached visual
+    // - per material, allocate pre-reserved temp CompressedVerts buffer
+    // - per material, per vertex:
+    //   - transform position
+    //   - transform normal
+    //   - add per-instance vertex featurs (TODO: move into per-instance structured buffer)
+    //   - run "compress"
+    //   - insert into temp buffer
+    // - get target buffer for chunkIndex of instance
+    // - pre-reserve (TODO: test speed) and insert temp buffer into target buffer
+    //
+    // Optional:
+    // CPU-Batching (per instance), crossing chunk boundaries substantially:
+    // - run "precompute" to get per-material hashmap with unpacked faces
+    // - allocate temp per-material, per-chunk UnpackedVerts buffers
+    // - per material, per face:
+    //   - transform face positions
+    //   - transform face normals
+    //   - add per-instance vertex features (TODO: move into per-instance structured buffer)
+    //   - calculate centroid to get per-face chunk index
+    //   - insert into temp UnpackedVerts buffer
+    // - allocate pre-reserved temp CompressedVerts buffer (per chunk)
+    // - per material, per chunk:
+    //   - run "indexAndOptimize"
+    //   - run "compress" per vertex
+    //   - insert into temp CompressedVerts buffer
+    // - get targetbuffer (per chunk)
+    // - pre-reserve (TODO: test speed) and insert temp PackedVerts buffer into target buffer (per-chunk)
+    //
+    // - create namespace assets::mesh
+    // - create files:
+    //   - LoadMesh.h
+    //   - LoadMeshCommon.h/cpp: functions shared between worldmesh and objects
+    //   - LoadMeshWorld.cpp: world mesh loading
+    //   - LoadMeshVob.cpp: instance mesh loading
 
     // ###########################################################################
     // VOB PRECOMPUTE
@@ -763,6 +838,23 @@ namespace assets
         meshopt::remapVertexBuffer(verts, remap);
     }
 
+    vector<VertexIndex> createIndicesLod(VertsPrecomp& verts, vector<VertexIndex>& indices)
+    {
+        uint32_t indexCount = indices.size();
+
+        //float threshold = 0.2f;
+        //uint32_t target_index_count = uint32_t(indexCount * threshold);
+        uint32_t target_index_count = 0;
+        float target_error = 0.01f;
+
+        std::vector<uint32_t> lod(indexCount);
+        float lod_error = 0.f;
+        uint32_t indexCountLod = meshopt_simplify(&lod.data()[0], indices.data(), indexCount, &verts[0].pos.x, verts.size(), sizeof(VertexPrecomp),
+            target_index_count, target_error, /* options= */ 0, &lod_error);
+        lod.resize(indexCountLod);
+        return lod;
+    }
+
     // takes ownership of vertsUnpacked to move it
     VertsPacked indexAndOptimize(VertsPrecomp& vertsUnpacked)
     {
@@ -773,6 +865,8 @@ namespace assets
         if (meshoptOptimize) {
             optimizeIndicesAndVerts(result.vertsPacked, result.indices);
         }
+        result.indicesLod1 = createIndicesLod(result.vertsPacked, result.indices);
+        //result.indices = result.indicesLod1;
         return result;
     }
 
@@ -835,9 +929,7 @@ namespace assets
         bool createNormalStats = debugChecksEnabled && !util::hasKey(loadStats.normalsInstances, instance.visual_name);
 
         // calculate chunkIndex for this vob
-        // TODO use bbox to get center instead of just using zero vec
-        XMVECTOR vobCenter = XMVector4Transform(vecZero, instance.transform);
-        auto chunkIndex = toChunkIndex(vobCenter);
+        ChunkIndex chunkIndex = toChunkIndex(bboxCenter(instance.bbox));
 
         // get cached vertex attributes and index buffers, or init cache
         size_t hash = 0;

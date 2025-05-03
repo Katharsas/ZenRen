@@ -30,6 +30,18 @@ namespace viewer
 	frameTimes;
 
 
+	bool validateIsDir(const std::filesystem::path& path, bool isFatal = false)
+	{
+		if (std::filesystem::is_directory(path)) {
+			return true;
+		}
+		else {
+			auto& level = isFatal ? FATAL : WARNING;
+			LOG(level) << "Path is not a valid directory: " << path;
+			return false;
+		}
+	}
+
 	void init(HWND hWnd, Arguments args, uint16_t width, uint16_t height)
 	{
 		LOG(INFO);
@@ -92,10 +104,16 @@ namespace viewer
 
 		assets::initAssetsIntern();
 		if (args.vdfFilesRoot.has_value()) {
-			assets::initVdfAssetSourceDir(args.vdfFilesRoot.value());
+			auto& vdfFilesRoot = args.vdfFilesRoot.value();
+			if (validateIsDir(vdfFilesRoot, true)) {
+				assets::initVdfAssetSourceDir(vdfFilesRoot);
+			}
 		}
 		if (args.assetFilesRoot.has_value()) {
-			assets::initFileAssetSourceDir(args.assetFilesRoot.value());
+			auto& assetFilesRoot = args.assetFilesRoot.value();
+			if (validateIsDir(assetFilesRoot, true)) {
+				assets::initFileAssetSourceDir(assetFilesRoot);
+			}
 		}
 		
 		render::initD3D(hWnd, { width, height });

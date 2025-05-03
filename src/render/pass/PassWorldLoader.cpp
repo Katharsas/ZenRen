@@ -106,7 +106,6 @@ namespace render::pass::world
 	template <VERTEX_FEATURE F>
 	void loadRenderBatch(D3d d3d, vector<MeshBatch<F>>& target, TexInfo batchInfo, const VertsBatch<F>& batchData)
 	{
-		
 		MeshBatch<F> batch;
 		batch.vertClusters = batchData.vertClusters;
 		batch.useIndices = !batchData.vecIndex.empty();

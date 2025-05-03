@@ -120,6 +120,28 @@ namespace render::pass::world
 			}
 		});
 
+		render::gui::addSettings("World Draw Filter", {
+			[&]() -> void {
+				ImGui::PushItemWidth(gui::constants().elementWidth);
+				ImGui::PushStyleColorDebugText();
+
+				ImGui::Checkbox("Filter Chunks X", &worldSettings.chunkFilterXEnabled);
+				ImGui::Checkbox("Filter Chunks Y", &worldSettings.chunkFilterYEnabled);
+
+				auto [min, max] = chunkgrid::getIndexMinMax();
+
+				ImGui::BeginDisabled(!worldSettings.chunkFilterXEnabled);
+				ImGui::SliderScalar("ChunkIndex X", ImGuiDataType_S16, &worldSettings.chunkFilterX, &min.x, &max.x);
+				ImGui::EndDisabled();
+				ImGui::BeginDisabled(!worldSettings.chunkFilterYEnabled);
+				ImGui::SliderScalar("ChunkIndex Y", ImGuiDataType_S16, &worldSettings.chunkFilterY, &min.y, &max.y);
+				ImGui::EndDisabled();
+
+				ImGui::PopStyleColor();
+				ImGui::PopItemWidth();
+			}
+			});
+
 		// TODO move to RenderDebugGui
 		render::gui::addWindow("Lightmaps", {
 			[&]() -> void {
@@ -303,6 +325,13 @@ namespace render::pass::world
 				for (uint32_t i = 0; i < vertClusters.size(); i++) {
 					const ChunkIndex& chunkIndex = vertClusters[i].pos;
 					bool currentChunkActive = chunkgrid::intersectsCamera(chunkIndex);
+
+					if (worldSettings.chunkFilterXEnabled) {
+						currentChunkActive = currentChunkActive && chunkIndex.x == worldSettings.chunkFilterX;
+					}
+					if (worldSettings.chunkFilterYEnabled) {
+						currentChunkActive = currentChunkActive && chunkIndex.y == worldSettings.chunkFilterY;
+					}
 
 					if (!rangeActive && currentChunkActive) {
 						// range start

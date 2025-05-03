@@ -25,6 +25,11 @@ namespace render::pass::world
 
 		bool debugSingleDrawEnabled = false;
 		int32_t debugSingleDrawIndex = 0;
+
+		bool chunkFilterXEnabled = false;
+		bool chunkFilterYEnabled = false;
+		int16_t chunkFilterX = 0;
+		int16_t chunkFilterY = 0;
 	};
 
 	LoadWorldResult loadWorld(D3d d3d, const std::string& level);

@@ -132,4 +132,9 @@ namespace render::pass::world::chunkgrid
 
 		return chunksIntersectCamera[getFlatIndex(index)];
 	}
+
+	std::pair<ChunkIndex, ChunkIndex> getIndexMinMax()
+	{
+		return { { minX, minY }, {maxX, maxY} };
+	}
 }
