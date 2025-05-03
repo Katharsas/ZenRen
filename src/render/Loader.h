@@ -91,7 +91,7 @@ namespace render
 		VisualType type;
 		std::string visual_name;
 		DirectX::XMMATRIX transform;
-		std::array<DirectX::XMVECTOR, 2> bbox;// pos_min, pos_max
+		std::array<DirectX::XMVECTOR, 2> bbox;// pos_min, pos_max, TODO rename to bboxGlobal to make clear it is already transformed to world space
 		VobLighting lighting;
 		std::optional<Decal> decal = std::nullopt;
 	};

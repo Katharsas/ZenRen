@@ -12,6 +12,8 @@
 #include "render/MeshUtil.h"
 #include "../Util.h"
 
+#include "../lib/meshoptimizer/src/meshoptimizer.h"// TODO remove
+
 #include "magic_enum.hpp"
 #include "glm/gtc/type_ptr.hpp"
 
@@ -763,8 +765,25 @@ namespace assets
         meshopt::remapVertexBuffer(verts, remap);
     }
 
+    vector<VertexIndex> createIndicesLod(VertsPrecomp& verts, vector<VertexIndex>& indices)
+    {
+        uint32_t indexCount = indices.size();
+
+        //float threshold = 0.2f;
+        //uint32_t target_index_count = uint32_t(indexCount * threshold);
+        uint32_t target_index_count = 0;
+        float target_error = 0.01f;
+
+        std::vector<uint32_t> lod(indexCount);
+        float lod_error = 0.f;
+        uint32_t indexCountLod = meshopt_simplify(&lod.data()[0], indices.data(), indexCount, &verts[0].pos.x, verts.size(), sizeof(VertexPrecomp),
+            target_index_count, target_error, /* options= */ 0, &lod_error);
+        lod.resize(indexCountLod);
+        return lod;
+    }
+
     // takes ownership of vertsUnpacked to move it
-    VertsPacked indexAndOptimize(VertsPrecomp& vertsUnpacked)
+    VertsPacked indexAndOptimize(VertsPrecomp& vertsUnpacked, bool generateLod)
     {
         // TODO create LOD
         VertsPacked result;
@@ -773,7 +792,36 @@ namespace assets
         if (meshoptOptimize) {
             optimizeIndicesAndVerts(result.vertsPacked, result.indices);
         }
+        if (generateLod) {
+            result.indicesLod1 = createIndicesLod(result.vertsPacked, result.indices);
+            //result.indices = result.indicesLod1;
+        }
         return result;
+    }
+
+    // TODO maybe debug stats should be part of value
+    unordered_map<uint32_t, unordered_map<Material, VertsPacked>> cacheMeshes;
+
+    unordered_map<Material, VertsPacked>& getOrPrecompute(
+        uint32_t meshId, bool indexed, bool generateLod, std::function<optional<unordered_map<Material, VertsPrecomp>>()> precompute)
+    {
+        // get cached vertex attributes and index buffers, or init cache
+        auto [it, wasInserted] = cacheMeshes.try_emplace(meshId);
+        unordered_map<Material, VertsPacked>& cachedVerts = it->second;
+        if (wasInserted) {
+            optional<unordered_map<Material, VertsPrecomp>> preVertsOpt = precompute();
+            if (preVertsOpt.has_value()) {
+                for (auto& [material, verts] : preVertsOpt.value()) {
+                    if (indexed) {
+                        cachedVerts.emplace(material, std::move(indexAndOptimize(verts, generateLod)));
+                    }
+                    else {
+                        cachedVerts.emplace(material, VertsPacked{ .vertsPacked = std::move(verts) });
+                    }
+                }
+            }
+        }
+        return cachedVerts;
     }
 
     // ###########################################################################
@@ -784,6 +832,7 @@ namespace assets
     pair<VertexPos, VertexBasic> finalizeCompressVertex(
         const VertexPrecomp& vert,
         const StaticInstance& instance,
+        bool isDecal,
         OPT_PARAM<transform, const XMMATRIX&> posTransform,
         OPT_PARAM<transform, const XMMATRIX&> normalTransform)
     {
@@ -808,17 +857,54 @@ namespace assets
             .uvDiffuse = vert.uvColor,
             .uvLightmap = { -1, -1, -1 },
             .colLight = instance.lighting.color,
-            .dirLight = toVec3(XMVector3Normalize(instance.lighting.direction)),
             .lightSun = instance.lighting.receiveLightSun ? 1.f : 0.f,
         };
+        if (!isDecal) {
+            result.second.dirLight = toVec3(XMVector3Normalize(instance.lighting.direction));
+        } else {
+            result.second.dirLight = result.second.normal;// TODO does the original game do this??
+        }
         return result;
     }
 
-    // TODO maybe debug stats should be part of value
-    unordered_map<uint32_t, unordered_map<Material, VertsPacked>> cacheMeshes;
-    // TODO precomputeorget
+    void instantiateAndInsert(
+        MatToChunksToVertsBasic& target,
+        const ChunkIndex& chunkIndex,
+        const unordered_map<Material, VertsPacked>& verts,
+        const StaticInstance& instance,
+        bool isDecal)
+    {
+        // transform pos/normal, compress and copy into target buffer
+        for (auto& [material, packed] : verts) {
+            bool indexed = !packed.indices.empty();
+            auto& chunks = util::getOrCreateDefault(target, material);
+            auto [it, wasInserted] = chunks.try_emplace(chunkIndex);
+            VertsBasic& targetVerts = it->second;
+            if (wasInserted) {
+                targetVerts.useIndices = indexed;
+                if (indexed) {
+                    targetVerts.vecIndex.reserve(300);
+                }
+                targetVerts.vecPos.reserve(300);
+                targetVerts.vecOther.reserve(300);
+            }
+            assert(targetVerts.useIndices == indexed);
 
-    typedef uint32_t MeshId;
+            if (indexed) {
+                uint32_t vertOffset = targetVerts.vecPos.size();
+                for (uint32_t index : packed.indices) {
+                    targetVerts.vecIndex.push_back(vertOffset + index);
+                }
+            }
+
+            uint32_t vertCount = packed.vertsPacked.size();
+            for (const VertexPrecomp& vert : packed.vertsPacked) {
+                auto [pos, other] = finalizeCompressVertex<true>(vert, instance, isDecal, instance.transform, instance.transform);
+                targetVerts.vecPos.push_back(pos);
+                targetVerts.vecOther.push_back(other);
+            }
+        }
+    }
 
     void loadInstanceMesh(
         MatToChunksToVertsBasic& target,
@@ -834,65 +920,20 @@ namespace assets
         NormalsStats normalStats;
         bool createNormalStats = debugChecksEnabled && !util::hasKey(loadStats.normalsInstances, instance.visual_name);
 
-        // calculate chunkIndex for this vob
-        // TODO use bbox to get center instead of just using zero vec
-        XMVECTOR vobCenter = XMVector4Transform(vecZero, instance.transform);
-        auto chunkIndex = toChunkIndex(vobCenter);
-
-        // get cached vertex attributes and index buffers, or init cache
         size_t hash = 0;
         util::hashCombine(hash, instance.visual_name);
         util::hashCombine(hash, submeshId);
 
-        auto [it, wasInserted] = cacheMeshes.try_emplace((uint32_t) hash);
-        unordered_map<Material, VertsPacked>& cachedVerts = it->second;
-        if (wasInserted) {
-            optional<unordered_map<Material, VertsPrecomp>> preVertsOpt = precompute(mesh, instance.visual_name, debugChecksEnabled);
-            if (preVertsOpt.has_value()) {
-                for (auto& [material, verts] : preVertsOpt.value()) {
-                    if (indexed) {
-                        cachedVerts.emplace(material, std::move(indexAndOptimize(verts)));
-                    }
-                    else {
-                        cachedVerts.emplace(material, VertsPacked { .vertsPacked = std::move(verts) });
-                    }
-                }
-            }
-        }
+        unordered_map<Material, VertsPacked>& cachedVerts = getOrPrecompute((uint32_t)hash, indexed, true, [&]() {
+            return precompute(mesh, instance.visual_name, debugChecksEnabled);
+        });
         
         if (cachedVerts.empty()) {
             return;
         }
-        
-        // transform pos/normal, compress and copy into target buffer
-        for (auto& [material, packed] : cachedVerts) {
-            auto& chunks = util::getOrCreateDefault(target, material);
-            auto [it, wasInserted] = chunks.try_emplace(chunkIndex);
-            VertsBasic& targetVerts = it->second;
-            if (wasInserted) {
-                targetVerts.useIndices = indexed;
-                if (indexed) {
-                    targetVerts.vecIndex.reserve(300);
-                }
-                targetVerts.vecPos.reserve(300);
-                targetVerts.vecOther.reserve(300);
-            }
-            assert(targetVerts.useIndices == indexed);
-            
-            if (indexed) {
-                uint32_t vertOffset = targetVerts.vecPos.size();
-                for (uint32_t index : packed.indices) {
-                    targetVerts.vecIndex.push_back(vertOffset + index);
-                }
-            }
 
-            uint32_t vertCount = packed.vertsPacked.size();
-            for (VertexPrecomp& vert : packed.vertsPacked) {
-                auto [pos, other] = finalizeCompressVertex<true>(vert, instance, instance.transform, instance.transform);
-                targetVerts.vecPos.push_back(pos);
-                targetVerts.vecOther.push_back(other);
-            }
-        }
+        ChunkIndex chunkIndex = toChunkIndex(bboxCenter(instance.bbox));
+        instantiateAndInsert(target, chunkIndex, cachedVerts, instance, false);
     }
 
     void loadInstanceMesh(
@@ -964,25 +1005,59 @@ namespace assets
     /**
      * Create quad.
      */
-    vector<std::array<std::pair<XMVECTOR, Uv>, 3>> createQuadPositions(const Decal& decal)
+    vector<array<pair<XMVECTOR, Uv>, 3>> createQuadPositions(const Decal& decal)
     {
         auto& size = decal.quad_size;
         auto& offset = decal.uv_offset;
         float base = 1.f;
-        std::pair quadA = { toXM4Pos(Vec3{ -base * size.x,  base * size.y, 0 }), Uv{ 0 + offset.u, 0 + offset.v } };
-        std::pair quadB = { toXM4Pos(Vec3{  base * size.x,  base * size.y, 0 }), Uv{ 1 + offset.u, 0 + offset.v } };
-        std::pair quadC = { toXM4Pos(Vec3{  base * size.x, -base * size.y, 0 }), Uv{ 1 + offset.u, 1 + offset.v } };
-        std::pair quadD = { toXM4Pos(Vec3{ -base * size.x, -base * size.y, 0 }), Uv{ 0 + offset.u, 1 + offset.v } };
+        pair A = { toXM4Pos(Vec3{ -base * size.x,  base * size.y, 0 }), Uv{ 0 + offset.u, 0 + offset.v } };
+        pair B = { toXM4Pos(Vec3{  base * size.x,  base * size.y, 0 }), Uv{ 1 + offset.u, 0 + offset.v } };
+        pair C = { toXM4Pos(Vec3{  base * size.x, -base * size.y, 0 }), Uv{ 1 + offset.u, 1 + offset.v } };
+        pair D = { toXM4Pos(Vec3{ -base * size.x, -base * size.y, 0 }), Uv{ 0 + offset.u, 1 + offset.v } };
 
-        vector<std::array<std::pair<XMVECTOR, Uv>, 3>> result;
+        vector<array<pair<XMVECTOR, Uv>, 3>> result;
         result.reserve(decal.two_sided ? 4 : 2);
 
-        // vertex order reversed per tri to be consistent with other Gothic asset (counter-clockwise winding)
-        result.push_back({ quadA, quadB, quadC });
-        result.push_back({ quadA, quadC, quadD });
+        // counter-clockwise winding to be consistent with other Gothic assets
+        // for indexing to work, vertices that can de decuplicated (A, C) must be adjacent to each other across faces
+        result.push_back({ D, C, A });
+        result.push_back({ A, C, B });
         if (decal.two_sided) {
-            result.push_back({ quadA, quadD, quadC });
-            result.push_back({ quadA, quadC, quadB });
+            result.push_back({ B, C, A });
+            result.push_back({ A, C, D });
+        }
+
+        return result;
+    }
+
+    VertsPrecomp precomputeDecal(const Decal& decal)
+    {
+        auto quadFacesXm = createQuadPositions(decal);
+
+        VertsPrecomp result;
+        result.reserve(quadFacesXm.size() * 3);
+
+        for (auto& quadFaceXm : quadFacesXm) {
+            // positions
+            array<XMVECTOR, 3> facePosXm;
+            for (uint32_t i = 0; i < 3; i++) {
+                facePosXm[i] = quadFaceXm.at(i).first;
+                facePosXm[i] = XMVectorMultiply(facePosXm[i], XMVectorSet(G_ASSET_RESCALE, G_ASSET_RESCALE, G_ASSET_RESCALE, 1.f));
+            }
+
+            //normal
+            XMFLOAT4 faceNormal;
+            XMStoreFloat4(&faceNormal, calcFlatFaceNormal(facePosXm));
+
+            // flip faces (seems like zEngine uses counter-clockwise winding, while we use clockwise winding)
+            // TODO use D3D11_RASTERIZER_DESC FrontCounterClockwise instead?
+            for (int32_t i = 2; i >= 0; i--) {
+                 VertexPrecomp vert;
+                 XMStoreFloat4(&vert.pos, facePosXm[i]);
+                 vert.normal = faceNormal;
+                 vert.uvColor = quadFaceXm[i].second;
+                 result.push_back(vert);
+            }
         }
         return result;
     }
@@ -990,6 +1065,7 @@ namespace assets
     void loadInstanceDecal(
         MatToChunksToVertsBasic& target,
         const StaticInstance& instance,
+        bool indexed,
         bool debugChecksEnabled
     )
     {
@@ -1000,43 +1076,20 @@ namespace assets
         if (!materialOpt.has_value()) {
             return;
         }
-;       unordered_map<ChunkIndex, VertsBasic>& materialData = ::util::getOrCreateDefault(target, materialOpt.value());
+        const Material& material = materialOpt.value();
+        
+        VertsPrecomp vertsPre = precomputeDecal(decal);
 
-        auto quadFacesXm = createQuadPositions(decal);
-
-        for (auto& quadFaceXm : quadFacesXm) {
-            // positions
-            array<XMVECTOR, 3> facePosXm;
-            for (uint32_t i = 0; i < 3; i++) {
-                facePosXm[i] = quadFaceXm.at(i).first;
-                facePosXm[i] = XMVectorMultiply(facePosXm[i], XMVectorSet(G_ASSET_RESCALE, G_ASSET_RESCALE, G_ASSET_RESCALE, 1.f));
-                facePosXm[i] = XMVector4Transform(facePosXm[i], instance.transform);
-            }
-
-            //normals
-            const auto faceNormal = toVec3(calcFlatFaceNormal(facePosXm));
-
-            //other
-            array<VertexPos, 3> facePos;
-            array<VertexBasic, 3> faceOther;
-
-            for (int32_t i = 2; i >= 0; i--) {
-                facePos[i] = toVec3(facePosXm.at(i));
-
-                VertexBasic other;
-                other.normal = faceNormal;
-                other.uvDiffuse = quadFaceXm.at(i).second;
-                other.uvLightmap = { 0, 0, -1 };
-                other.colLight = instance.lighting.color;
-                other.dirLight = faceNormal;// TODO does the original game do this??
-                other.lightSun = instance.lighting.receiveLightSun ? 1.f : 0.f;
-                faceOther[i] = other;
-            }
-
-            const ChunkIndex chunkIndex = toChunkIndex(centroidPos(facePosXm));
-            VertsBasic& chunkData = ::util::getOrCreateDefault(materialData, chunkIndex);
-            insertFace(chunkData, facePos, faceOther);
+        unordered_map<Material, VertsPacked> vertsPacked;
+        if (indexed) {
+            vertsPacked.emplace(material, std::move(indexAndOptimize(vertsPre, false)));
         }
+        else {
+            vertsPacked.emplace(material, VertsPacked{ .vertsPacked = std::move(vertsPre) });
+        }
+
+        ChunkIndex chunkIndex = toChunkIndex(bboxCenter(instance.bbox));
+        instantiateAndInsert(target, chunkIndex, vertsPacked, instance, true);
     }
 
     void printAndResetLoadStats(bool debugChecksEnabled)

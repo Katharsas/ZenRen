@@ -369,12 +369,16 @@ namespace render::pass::forward
 		release(rasterizer);
 		release(rasterizerWf);
 		{
+			// default
 			D3D11_RASTERIZER_DESC rasterizerDesc = CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT{});
+			// TODO, also in post for fullscreen quad to keep things consistent
+			//rasterizerDesc.FrontCounterClockwise = TRUE;
 			if (multisampleCount > 1) {
 				rasterizerDesc.MultisampleEnable = TRUE;
 			}
 			d3d.device->CreateRasterizerState(&rasterizerDesc, &rasterizer);
 		} {
+			// wireframe
 			D3D11_RASTERIZER_DESC rasterizerDesc = CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT{});
 			if (multisampleCount > 1) {
 				rasterizerDesc.MultisampleEnable = TRUE;

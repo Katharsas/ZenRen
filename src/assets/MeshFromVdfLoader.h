@@ -34,6 +34,7 @@ namespace assets
     void loadInstanceDecal(
         render::MatToChunksToVertsBasic& target,
         const render::StaticInstance& instance,
+        bool indexed,
         bool debugChecksEnabled
     );
 

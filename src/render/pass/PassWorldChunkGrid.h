@@ -13,4 +13,5 @@ namespace render::pass::world::chunkgrid
 	void updateMesh(const MatToChunksToVerts<F>& meshDataVariants);
 	void updateCamera(const DirectX::BoundingFrustum& cameraFrustum);
 	bool intersectsCamera(const ChunkIndex& index);
+	std::pair<ChunkIndex, ChunkIndex> getIndexMinMax();
 }

@@ -86,6 +86,11 @@ namespace render
 		};
 	};
 	} namespace std { template <> struct hash<render::ChunkIndex> : render::ChunkIndex::Hash {}; } namespace render {
+	
+	inline std::ostream& operator <<(std::ostream& os, const ChunkIndex& that)
+	{
+		return os << "[X=" << that.x << " Y=" << that.y << "]";
+	}
 
 	struct ChunkVertCluster {
 		ChunkIndex pos;

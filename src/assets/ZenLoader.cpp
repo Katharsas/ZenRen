@@ -194,7 +194,7 @@ namespace assets
         }
         case VisualType::DECAL: {
             assert(TGA.isExtOf(name));
-            loadInstanceDecal(target, instance, debugChecksEnabled);
+            loadInstanceDecal(target, instance, indexed, debugChecksEnabled);
             return true;
         }
         default: {

@@ -22,7 +22,7 @@ namespace render::gui::settings {
 	void init(RenderSettings& settings)
 	{
 		addSettings("Renderer", {
-			[&]()  -> void {
+			[&]() -> void {
 				ImGui::PushItemWidth(constants().elementWidth);
 				ImGui::SliderFloat("##ViewDistance", &settings.viewDistance, 1, 2000, "%.0f View Distance");
 
@@ -74,7 +74,7 @@ namespace render::gui::settings {
 		});
 
 		addSettings("Resolution", {
-			[&]()  -> void {
+			[&]() -> void {
 				ImGui::PushItemWidth(constants().inputFloatWidth);
 				ImGui::InputFloat("Resolution Scaling", &settings.resolutionScaling, 0, 0, "%.2f");
 				ImGui::PopItemWidth();
