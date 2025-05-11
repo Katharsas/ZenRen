@@ -31,12 +31,14 @@ namespace render::pass::world
 		uint32_t states = 0;
 		uint32_t draws = 0;
 		uint32_t verts = 0;
+		uint32_t vertsLod = 0;
 
 		auto operator+=(const LoadResult& rhs)
 		{
 			states += rhs.states;
 			draws += rhs.draws;
 			verts += rhs.verts;
+			vertsLod += rhs.vertsLod;
 		};
 	};
 
@@ -49,6 +51,7 @@ namespace render::pass::world
 	// BaseColor textures are owned by textureCache
 	// Lightmap textures are owned by world
 	//   - debugTextures -> single textures used by ImGUI
+	//   - lightmapTexArray -> array used by forward renderer
 
 	unordered_map<TexId, Texture*> textureCache;
 
@@ -58,30 +61,6 @@ namespace render::pass::world
 			std::string texName(::assets::getTexName(texId));
 			ref = assets::createTextureOrDefault(d3d, texName, srgb);
 		});
-	}
-	//   - lightmapTexArray -> array used by forward renderer
-
-	LoadResult loadPrepassData(D3d d3d, vector<PrepassMeshes>& target, const MatToVertsBasic& meshData)
-	{
-		uint32_t vertCount = 0;
-		vector<VertexPos> allVerts;
-
-		for (const auto& pair : meshData) {
-			auto& vecPos = pair.second.vecPos;
-			if (!vecPos.empty()) {
-				Texture* texture = getOrCreateTexture(d3d, pair.first.texBaseColor, true);
-				if (!texture->getInfo().hasAlpha) {
-					::util::insert(allVerts, vecPos);
-					vertCount += vecPos.size();
-				}
-			}
-		}
-		PrepassMeshes mesh;
-		mesh.vertexCount = allVerts.size();
-		d3d::createVertexBuf(d3d, mesh.vbPos, allVerts);
-		target.push_back(mesh);
-
-		return { 1, vertCount };
 	}
 
 	void createTexArray(D3d d3d, ID3D11ShaderResourceView** targetSrv, const TexInfo& info, const vector<TexId>& texIds)
@@ -107,14 +86,16 @@ namespace render::pass::world
 	void loadRenderBatch(D3d d3d, vector<MeshBatch<F>>& target, TexInfo batchInfo, const VertsBatch<F>& batchData)
 	{
 		MeshBatch<F> batch;
-		batch.vertClusters = batchData.vertClusters;
+		batch.vertClusters = std::move(batchData.vertClusters);
+		batch.vertClustersLod = std::move(batchData.vertClustersLod);
 		batch.useIndices = !batchData.vecIndex.empty();
 		if (batch.useIndices) {
-			batch.vertexCount = batchData.vecIndex.size();
+			batch.drawCount = batchData.lodStart;
+			batch.drawLodCount = batchData.vecIndex.size() - batchData.lodStart;
 			d3d::createIndexBuf(d3d, batch.vbIndices, batchData.vecIndex);
 		}
 		else {
-			batch.vertexCount = batchData.vecPos.size();
+			batch.drawCount = batchData.vecPos.size();
 		}
 		d3d::createVertexBuf(d3d, batch.vbPos, batchData.vecPos);
 		d3d::createVertexBuf(d3d, batch.vbOther, batchData.vecOther);
@@ -258,36 +239,49 @@ namespace render::pass::world
 		result.draws = clusterCount;
 		target.vertClusters.reserve(clusterCount);
 
+		vector<VertexIndex> lodIndices;
 		unordered_map<Material, TexIndex> materialIndices;
 		vector<Material> materials;
 
 		// reserve to avoid over-allocation (because the resulting vert vectors are going to be very big)
 		bool useIndices = !batchData.empty() && batchData.at(0).second.at(0).second.useIndices;
 		uint32_t indexCount = 0;
+		uint32_t indexLodCount = 0;
 		uint32_t vertCount = 0;
 		for (const auto& [chunkIndex, vertDataByMat] : batchData) {
 			for (const auto& [material, vertData] : vertDataByMat) {
 				indexCount += vertData.vecIndex.size();
+				indexLodCount += vertData.vecIndexLod.size();
 				vertCount += vertData.vecPos.size();
 			}
 		}
-		target.vecIndex.reserve(indexCount);
+		target.vecIndex.reserve(indexCount + indexLodCount);
+		target.lodStart = indexCount;
+		lodIndices.reserve(indexLodCount);
+
 		target.vecPos.reserve(vertCount);
 		target.vecOther.reserve(vertCount);
 		target.texIndices.reserve(vertCount);
 
 		result.verts = useIndices ? indexCount : vertCount;
+		result.vertsLod = useIndices ? indexLodCount : vertCount;
 
 		for (const auto& [chunkIndex, vertDataByMat] : batchData) {
 			// set vertex data
 			uint32_t currentVertIndex = useIndices ? target.vecIndex.size() : target.vecPos.size();
+			uint32_t currentVertIndexLod = useIndices ? lodIndices.size() : 0;
 			target.vertClusters.push_back({ chunkIndex, currentVertIndex });
+			target.vertClustersLod.push_back({ chunkIndex, indexCount + currentVertIndexLod });
 
 			for (const auto& [material, vertData] : vertDataByMat) {
 				// rewrite indices
 				uint32_t currentVertCount = target.vecPos.size();
 				for (VertexIndex index : vertData.vecIndex) {
 					target.vecIndex.push_back(currentVertCount + index);
+				}
+				// rewrite LOD indices
+				for (VertexIndex index : vertData.vecIndexLod) {
+					lodIndices.push_back(currentVertCount + index);
 				}
 
 				// copy vertex data
@@ -301,6 +295,10 @@ namespace render::pass::world
 				});
 				target.texIndices.insert(target.texIndices.end(), vertData.vecPos.size(), texIndex);
 			}
+		}
+		// append LOD indices to indices
+		if (useIndices) {
+			util::insert(target.vecIndex, lodIndices);
 		}
 
 		for (const Material& material : materials) {
@@ -324,7 +322,7 @@ namespace render::pass::world
 
 	template <VERTEX_FEATURE F>
 	bool compareByVertCount(MeshBatch<F> const& lhs, MeshBatch<F> const& rhs) {
-		return lhs.vertexCount > rhs.vertexCount;
+		return lhs.drawCount > rhs.drawCount;
 	}
 
 	template <VERTEX_FEATURE F>
@@ -386,6 +384,21 @@ namespace render::pass::world
 		world.debugTextures.clear();
 
 		release(world.lightmapTexArray);
+	}
+
+	void printLoadResult(const LoadResult& loadResult)
+	{
+		uint32_t kiloVerts = loadResult.verts / 1000;
+		uint32_t lodPercentage = (uint32_t)(loadResult.vertsLod / (float)loadResult.verts * 100);
+		bool hasLod = loadResult.vertsLod > 0;
+
+		LOG(INFO) << "    States/Draws: " << loadResult.states << " / " << loadResult.draws;
+		if (hasLod) {
+			LOG(INFO) << "    Verts/LowLOD: " << kiloVerts << "k / " << lodPercentage << "%";
+		}
+		else {
+			LOG(INFO) << "    Verts (no LOD): " << kiloVerts << "k";
+		}
 	}
 
 	LoadWorldResult loadZenLevel(D3d d3d, const string& levelStr)
@@ -461,27 +474,21 @@ namespace render::pass::world
 		// chunk grid
 		chunkgrid::updateSize(data.worldMesh);
 		chunkgrid::updateSize(data.staticMeshes);
-		//chunkgrid::updateSize(data.staticMeshesBlend);
 		uint32_t cellCount = chunkgrid::finalizeSize();
 		chunkgrid::updateMesh(data.worldMesh);
 		chunkgrid::updateMesh(data.staticMeshes);
-		//chunkgrid::updateMesh(data.staticMeshesBlend);
-		LOG(INFO) << "Level: Computed Chunk Grid       - Cells: " << cellCount;
+		LOG(INFO) << "Level: Computed Chunk Grid - Cells: " << cellCount;
 		sampler.logMillisAndRestart("Level: Computed chunk grid");
 
 		LoadResult loadResult;
-		// TODO fix prepass
-		//loadResult = loadPrepassData(d3d, world.prepassMeshes, data.worldMesh);
-		//LOG(INFO) << "Level: Uploaded depth prepass  - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
-		//sampler.logMillisAndRestart("Level: Uploaded depth prepass");
 
 		loadResult = loadBatchVertexData(d3d, world.meshBatchesWorld, data.worldMesh, texturesPerBatch);
-		LOG(INFO) << "Level: Uploaded world mesh       - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
 		sampler.logMillisAndRestart("Level: Uploaded world mesh");
+		printLoadResult(loadResult);
 
 		loadResult = loadBatchVertexData(d3d, world.meshBatchesObjects, data.staticMeshes, texturesPerBatch);
-		LOG(INFO) << "Level: Uploaded static instances - States: " << loadResult.states << " Draws: " << loadResult.draws << " Verts: " << loadResult.verts;
 		sampler.logMillisAndRestart("Level: Uploaded static instances");
+		printLoadResult(loadResult);
 
 		// since single textures have been copied to texture arrays, we can release them
 		for (auto& tex : textureCache) {

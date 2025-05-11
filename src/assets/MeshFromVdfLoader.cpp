@@ -33,6 +33,15 @@ namespace assets
     constexpr bool meshoptOptimize = true;
     constexpr bool manualReservation = false;
 
+    // 0.20f preserves most objects
+    // 0.42f preserves single barrels slightly (addon beach)
+    // 0.78f preserves trees and most bushes (newworld hills)
+    // 1.25f preservers most trees
+    constexpr float objectLodError = 0.78f;
+    // 1.7f preserves house windows (newworld)
+    // 1.0f preserves single barrels (addon beach)
+    constexpr float objectLodMinSize = 1.7f;
+
     const float zeroThreshold = 0.000001f;
     const XMMATRIX identity = XMMatrixIdentity();
     const XMVECTOR vecZero = XMVectorZero();
@@ -608,6 +617,7 @@ namespace assets
                 if (indexed) {
                     verts.useIndices = true;
                     verts.vecIndex = std::move(vertsTemp.vecIndex);
+                    verts.vecIndexLod = std::move(vertsTemp.vecIndexLod);
                 }
                 // we copy vertex data so we don't have to shrink_to_fit (since initial capacity was just a guess)
                 verts.vecPos = vertsTemp.vecPos;
@@ -743,7 +753,7 @@ namespace assets
     struct VertsPacked {
         VertsPrecomp vertsPacked;
         vector<VertexIndex> indices;
-        vector<VertexIndex> indicesLod1;
+        vector<VertexIndex> indicesLod;
     };
 
     vector<VertexIndex> createIndicesAndRemap(VertsPrecomp& verts)
@@ -765,25 +775,8 @@ namespace assets
         meshopt::remapVertexBuffer(verts, remap);
     }
 
-    vector<VertexIndex> createIndicesLod(VertsPrecomp& verts, vector<VertexIndex>& indices)
-    {
-        uint32_t indexCount = indices.size();
-
-        //float threshold = 0.2f;
-        //uint32_t target_index_count = uint32_t(indexCount * threshold);
-        uint32_t target_index_count = 0;
-        float target_error = 0.01f;
-
-        std::vector<uint32_t> lod(indexCount);
-        float lod_error = 0.f;
-        uint32_t indexCountLod = meshopt_simplify(&lod.data()[0], indices.data(), indexCount, &verts[0].pos.x, verts.size(), sizeof(VertexPrecomp),
-            target_index_count, target_error, /* options= */ 0, &lod_error);
-        lod.resize(indexCountLod);
-        return lod;
-    }
-
     // takes ownership of vertsUnpacked to move it
-    VertsPacked indexAndOptimize(VertsPrecomp& vertsUnpacked, bool generateLod)
+    VertsPacked indexAndOptimize(VertsPrecomp& vertsUnpacked, bool generateLod, float bboxMaxDim)
     {
         // TODO create LOD
         VertsPacked result;
@@ -793,8 +786,9 @@ namespace assets
             optimizeIndicesAndVerts(result.vertsPacked, result.indices);
         }
         if (generateLod) {
-            result.indicesLod1 = createIndicesLod(result.vertsPacked, result.indices);
-            //result.indices = result.indicesLod1;
+            if (bboxMaxDim > objectLodMinSize) {
+                result.indicesLod = meshopt::generateIndicesLod(result.indices, result.vertsPacked, objectLodError);
+            }
         }
         return result;
     }
@@ -803,7 +797,7 @@ namespace assets
     unordered_map<uint32_t, unordered_map<Material, VertsPacked>> cacheMeshes;
 
     unordered_map<Material, VertsPacked>& getOrPrecompute(
-        uint32_t meshId, bool indexed, bool generateLod, std::function<optional<unordered_map<Material, VertsPrecomp>>()> precompute)
+        uint32_t meshId, bool indexed, bool generateLod, float bboxMaxDim, std::function<optional<unordered_map<Material, VertsPrecomp>>()> precompute)
     {
         // get cached vertex attributes and index buffers, or init cache
         auto [it, wasInserted] = cacheMeshes.try_emplace(meshId);
@@ -813,7 +807,7 @@ namespace assets
             if (preVertsOpt.has_value()) {
                 for (auto& [material, verts] : preVertsOpt.value()) {
                     if (indexed) {
-                        cachedVerts.emplace(material, std::move(indexAndOptimize(verts, generateLod)));
+                        cachedVerts.emplace(material, std::move(indexAndOptimize(verts, generateLod, bboxMaxDim)));
                     }
                     else {
                         cachedVerts.emplace(material, VertsPacked{ .vertsPacked = std::move(verts) });
@@ -874,6 +868,8 @@ namespace assets
         const StaticInstance& instance,
         bool isDecal)
     {
+        uint32_t minReserve = 300;// TODO print stats about how much index buffer an LOD reduce vert count
+
         // transform pos/normal, compress and copy into target buffer
         for (auto& [material, packed] : verts) {
             bool indexed = !packed.indices.empty();
@@ -883,10 +879,11 @@ namespace assets
             if (wasInserted) {
                 targetVerts.useIndices = indexed;
                 if (indexed) {
-                    targetVerts.vecIndex.reserve(300);
+                    targetVerts.vecIndex.reserve(minReserve);
+                    targetVerts.vecIndexLod.reserve(minReserve * 0.8f);
                 }
-                targetVerts.vecPos.reserve(300);
-                targetVerts.vecOther.reserve(300);
+                targetVerts.vecPos.reserve(minReserve * 0.7f);
+                targetVerts.vecOther.reserve(minReserve * 0.7f);
             }
             assert(targetVerts.useIndices == indexed);
 
@@ -894,6 +891,9 @@ namespace assets
                 uint32_t vertOffset = targetVerts.vecPos.size();
                 for (uint32_t index : packed.indices) {
                     targetVerts.vecIndex.push_back(vertOffset + index);
+                }
+                for (uint32_t index : packed.indicesLod) {
+                    targetVerts.vecIndexLod.push_back(vertOffset + index);
                 }
             }
 
@@ -924,7 +924,10 @@ namespace assets
         util::hashCombine(hash, instance.visual_name);
         util::hashCombine(hash, submeshId);
 
-        unordered_map<Material, VertsPacked>& cachedVerts = getOrPrecompute((uint32_t)hash, indexed, true, [&]() {
+        Vec3 halfWidth = toVec3(mesh.obbox.half_width);
+        float bboxMaxDim = std::max(std::max(halfWidth.x, halfWidth.y), halfWidth.z) * 2 * G_ASSET_RESCALE;
+
+        unordered_map<Material, VertsPacked>& cachedVerts = getOrPrecompute((uint32_t)hash, indexed, true, bboxMaxDim, [&]() {
             return precompute(mesh, instance.visual_name, debugChecksEnabled);
         });
         
@@ -1079,10 +1082,11 @@ namespace assets
         const Material& material = materialOpt.value();
         
         VertsPrecomp vertsPre = precomputeDecal(decal);
+        float bboxMaxDim = std::max(decal.quad_size.x, decal.quad_size.y) * 2 * G_ASSET_RESCALE;
 
         unordered_map<Material, VertsPacked> vertsPacked;
         if (indexed) {
-            vertsPacked.emplace(material, std::move(indexAndOptimize(vertsPre, false)));
+            vertsPacked.emplace(material, std::move(indexAndOptimize(vertsPre, true, bboxMaxDim)));
         }
         else {
             vertsPacked.emplace(material, VertsPacked{ .vertsPacked = std::move(vertsPre) });

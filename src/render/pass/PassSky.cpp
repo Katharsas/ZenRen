@@ -223,7 +223,7 @@ namespace render::pass::sky
         }
         
         // vertex buffer
-        d3d::setVertexBuffers(d3d, array { mesh.vbPos , mesh.vbUvs });
+        d3d::setVertexBuffers(d3d, { mesh.vbPos , mesh.vbUvs });
         d3d.deviceContext->Draw(mesh.vertexCount, 0);
 
         d3d.annotation->EndEvent();

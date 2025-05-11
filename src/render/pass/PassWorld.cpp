@@ -70,7 +70,7 @@ namespace render::pass::world
 		};
 
 		render::gui::addInfo("World", {
-			[]() -> void {
+			[&]() -> void {
 				float hourTime = (worldSettings.timeOfDay * 24);
 				uint8_t hour = hourTime + 12;
 				if (hour >= 24) {
@@ -107,6 +107,10 @@ namespace render::pass::world
 				ImGui::Checkbox("Draw World", &worldSettings.drawWorld);
 				ImGui::Checkbox("Draw VOBs/MOBs", &worldSettings.drawStaticObjects);
 				ImGui::Checkbox("Draw Sky", &worldSettings.drawSky);
+				ImGui::VerticalSpacing();
+				ImGui::Checkbox("LOD Enabled", &worldSettings.enableLod);
+				ImGui::Checkbox("LOD Low Only", &worldSettings.lowLodOnly);
+				ImGui::SliderFloat("##LodCrossover", &worldSettings.lodRadius, 0, 3000, "%.0f LOD Crossover");
 				ImGui::VerticalSpacing();
 				ImGui::Checkbox("Enable Frustum Culling", &worldSettings.enableFrustumCulling);
 				ImGui::Checkbox("Update Frustum Culling", &worldSettings.updateFrustumCulling);
@@ -233,21 +237,12 @@ namespace render::pass::world
 		}
 	}
 
-	// Let the template madness begin!
-	// Note: What should really happen here is that i accept that it is ok to have dynamic number of VertexBuffers per mesh at runtime.
-	
-	template <typename Mesh>
-	using GetTexSrv = ID3D11ShaderResourceView* (*) (const Mesh&);
+	template <VERTEX_FEATURE F>
+	using GetVertexBuffers = vector<VertexBuffer> (*) (const MeshBatch<F>&);
 
-	template <typename Mesh, int VbCount>
-	using GetVertexBuffers = array<VertexBuffer, VbCount> (*) (const Mesh&);
-
-	template <VERTEX_FEATURE F> ID3D11ShaderResourceView* batchGetTex(const MeshBatch<F>& mesh) { return mesh.texColorArray; }
-
-	array<VertexBuffer, 1> prepassGetVbPos(const PrepassMeshes& mesh) { return { mesh.vbPos }; }
-	template <VERTEX_FEATURE F> array<VertexBuffer, 1> batchGetVbPos   (const MeshBatch<F>& mesh) { return { mesh.vbPos }; }
-	template <VERTEX_FEATURE F> array<VertexBuffer, 2> batchGetVbPosTex(const MeshBatch<F>& mesh) { return { mesh.vbPos, mesh.vbTexIndices }; }
-	template <VERTEX_FEATURE F> array<VertexBuffer, 3> batchGetVbAll   (const MeshBatch<F>& mesh) { return { mesh.vbPos, mesh.vbOther, mesh.vbTexIndices }; }
+	template <VERTEX_FEATURE F> vector<VertexBuffer> batchGetVbPos   (const MeshBatch<F>& mesh) { return { mesh.vbPos }; }
+	template <VERTEX_FEATURE F> vector<VertexBuffer> batchGetVbPosTex(const MeshBatch<F>& mesh) { return { mesh.vbPos, mesh.vbTexIndices }; }
+	template <VERTEX_FEATURE F> vector<VertexBuffer> batchGetVbAll   (const MeshBatch<F>& mesh) { return { mesh.vbPos, mesh.vbOther, mesh.vbTexIndices }; }
 
 	DrawStats draw(D3d d3d, uint32_t count, uint32_t start, bool indexed)
 	{
@@ -268,144 +263,143 @@ namespace render::pass::world
 		return stats;
 	}
 
-	// TODO this usage of template stuff sucks big time. We don't even have many draw calls per frame, simplify this stuff!
-
-	// Mesh - the type of the mesh, usually MeshBatch
-	// VbCount - how many vertex buffer slots are used by a mesh
-	// GetVbs - function that returns each of those vertex buffers per mesh
-	// GetTex - function that returns texture per mesh
-	// clusteredMesh - true if meshes should be frustum culled based on grid cell index (requires "vertClusters" member)
-	template<
-		typename Mesh, int VbCount,
-		GetVertexBuffers<Mesh, VbCount> GetVbs,
-		GetTexSrv<Mesh> GetTex,
-		bool clusteredMesh
-	>
-	DrawStats drawVertexBuffers(D3d d3d, const vector<Mesh>& meshes)
+	DrawStats drawMeshCluster(D3d d3d, const vector<ChunkVertCluster>& vertClusters, uint32_t drawCount, bool indexed, bool isLowLod, bool ignoreLodRadius)
 	{
-		// TODO separate draw distance / camera frustum for worldmesh vs vobs (smaller for vobs)
 		// TODO select closest chunks (any that overlap a "min render box" around camera) and render them first for early-z discards
 		// TODO fix view-coordinate normal lighting and move to pixel shader so lighting can profit from early-z
-		// TODO check if uploading and using textures with lower res/mip improves performance
-		//   - if yes, load textures arrays twice, once with reduced resolution (256 or lower?) and use low-res textures for non-near chunks (-> GRM)
-
 		DrawStats stats;
 
-		for (auto& mesh : meshes) {
-			if (GetTex != nullptr) {
-				ID3D11ShaderResourceView* srv = GetTex(mesh);
-				d3d.deviceContext->PSSetShaderResources(0, 1, &srv);
+		uint32_t drawOffset = vertClusters.at(0).vertStartIndex;
+
+		// TODO cutoff should be adjustable in GUI
+		uint32_t ignoreAllChunksVertThreshold = 1000;
+		if (!worldSettings.enableFrustumCulling || drawCount <= ignoreAllChunksVertThreshold) {
+			// for small number of verts per batch we ignore the clusters to save draw calls
+			stats += draw(d3d, drawCount, drawOffset, indexed);
+		}
+		else {
+			// TODO LOD Rendering:
+			// enableLod - enable reduced LOD drawing
+			// lodRadius - camera-to-chunkcenter distance where full LOD crosses over to reduced LOD
+			// enablePerVertexLod - instead of just rendering each chunk with either LOD (resulting in per-chunk LOD switches),
+			//     render all chunks that touch lodRadiusWidth with both LODs and let shader select or dither LOD
+			// enableLodDither - requires enablePerVertexLod, select dither pattern instead of just switching LOD at radius
+			// lodRadiusWidth - requires enableLodDither, splits lodRadius into lodRadiusStart and lodRadiusEnd, dithering is interpolated over this range
+			// reducedLodOnly - debug option to only render all chunks with reduced LOD, ignored all other options
+			// 
+			// Split draws into per-LOD draws since we need to potentially bind constant buffers to tell shader which LOD it is drawing
+			// so it can select dither pattern, also should make code more straightforward
+
+			float lodRadiusSq = std::pow(worldSettings.lodRadius, 2);
+
+			uint32_t ignoreChunkVertThreshold = 500;// TODO
+
+			// TODO since max number of cells is known, we could probably re-use a single static vector for all meshes
+			vector<std::pair<uint32_t, uint32_t>> vertRanges;
+			vertRanges.reserve(vertClusters.size());
+
+			bool rangeActive = false;
+			uint32_t rangeStart = drawOffset;
+
+			// TODO chunks with very few verts should be allowed to be enabled if range is active currently, if that helps joining ranges (test!)
+
+			for (uint32_t i = 0; i < vertClusters.size(); i++) {
+				const ChunkIndex& chunkIndex = vertClusters[i].pos;
+				uint32_t vertStartIndex = vertClusters[i].vertStartIndex;
+
+				auto camera = chunkgrid::getCameraInfo(chunkIndex);
+				bool isInsideLodRadius = ignoreLodRadius || (isLowLod == camera.distanceToCenterSq > lodRadiusSq);
+
+				bool currentChunkActive = camera.intersectsFrustum && isInsideLodRadius;
+
+				if (worldSettings.chunkFilterXEnabled) {
+					currentChunkActive = currentChunkActive && chunkIndex.x == worldSettings.chunkFilterX;
+				}
+				if (worldSettings.chunkFilterYEnabled) {
+					currentChunkActive = currentChunkActive && chunkIndex.y == worldSettings.chunkFilterY;
+				}
+
+				if (!rangeActive && currentChunkActive) {
+					// range start
+					rangeStart = vertStartIndex;
+					rangeActive = true;
+				}
+				if (rangeActive && !currentChunkActive) {
+					// range end
+					rangeActive = false;
+					vertRanges.push_back({ rangeStart, vertStartIndex });
+				}
 			}
-			
+			// end last range
+			if (rangeActive) {
+				rangeActive = false;
+				vertRanges.push_back({ rangeStart, drawOffset + drawCount });
+			}
+
+			for (const auto [startIncl, endExcl] : vertRanges) {
+				uint32_t vertCount = endExcl - startIncl;
+
+				vertCount = (uint32_t)(vertCount * worldSettings.debugDrawVertAmount);
+				vertCount -= (vertCount % 3);
+
+				stats += draw(d3d, vertCount, startIncl, indexed);
+			}
+		}
+		return stats;
+	}
+
+	template<VERTEX_FEATURE F>
+	DrawStats drawMeshBatches(D3d d3d, const vector<MeshBatch<F>>& meshes, bool bindTexColor, bool hasLod, GetVertexBuffers<F> getVertexBuffers)
+	{
+		DrawStats stats;
+		for (auto& mesh : meshes) {
 			bool indexed = mesh.useIndices;
 			if (indexed) {
 				d3d::setIndexBuffer(d3d, mesh.vbIndices);
 			}
-			d3d::setVertexBuffers(d3d, GetVbs(mesh));
 
-			// TODO cutoff should be adjustable in GUI
-			uint32_t ignoreAllChunksVertThreshold = 1000;
-			if (!clusteredMesh || !worldSettings.enableFrustumCulling || mesh.vertexCount <= ignoreAllChunksVertThreshold) {
-				// for small number of verts per batch we ignore the clusters to save draw calls
-				stats += draw(d3d, mesh.vertexCount, 0, indexed);
-			}
-			else {
-				uint32_t ignoreChunkVertThreshold = 500;// TODO
-				const vector<ChunkVertCluster>& vertClusters = mesh.vertClusters;
-
-				// TODO since max number of cells is known, we could probably re-use a single static vector for all meshes
-				vector<std::pair<uint32_t, uint32_t>> vertRanges;
-				vertRanges.reserve(vertClusters.size());
-				
-				bool rangeActive = false;
-				uint32_t rangeStart = 0;
-
-				// TODO chunks with very few verts should be allowed to be enabled if range is active currently, if that helps joining ranges (test!)
-
-				for (uint32_t i = 0; i < vertClusters.size(); i++) {
-					const ChunkIndex& chunkIndex = vertClusters[i].pos;
-					bool currentChunkActive = chunkgrid::intersectsCamera(chunkIndex);
-
-					if (worldSettings.chunkFilterXEnabled) {
-						currentChunkActive = currentChunkActive && chunkIndex.x == worldSettings.chunkFilterX;
-					}
-					if (worldSettings.chunkFilterYEnabled) {
-						currentChunkActive = currentChunkActive && chunkIndex.y == worldSettings.chunkFilterY;
-					}
-
-					if (!rangeActive && currentChunkActive) {
-						// range start
-						rangeStart = vertClusters[i].vertStartIndex;
-						rangeActive = true;
-					}
-					if (rangeActive && !currentChunkActive) {
-						// range end
-						rangeActive = false;
-						vertRanges.push_back({ rangeStart, vertClusters[i].vertStartIndex });
-					}
-				}
-				// end last range
-				if (rangeActive) {
-					rangeActive = false;
-					vertRanges.push_back({ rangeStart, mesh.vertexCount });
-				}
-
-				for (const auto [startIncl, endExcl] : vertRanges) {
-					uint32_t vertCount = endExcl - startIncl;
-
-					vertCount = (uint32_t)(vertCount * worldSettings.debugDrawVertAmount);
-					vertCount -= (vertCount % 3);
-
-					stats += draw(d3d, vertCount, startIncl, indexed);
-				}
+			d3d::setVertexBuffers(d3d, getVertexBuffers(mesh));
+			if (bindTexColor) {
+				d3d.deviceContext->PSSetShaderResources(0, 1, &mesh.texColorArray);
 			}
 
 			stats.stateChanges++;
+
+			if (!indexed || (!worldSettings.lowLodOnly || !hasLod)) {
+				d3d.annotation->BeginEvent(L"LOD High");
+				// TODO set constant buffer for LOD if shader LOD is enabled
+				bool ignoreLodRadius = !indexed || !hasLod || !worldSettings.enableLod;
+				stats += drawMeshCluster(d3d, mesh.vertClusters, mesh.drawCount, indexed, false, ignoreLodRadius);
+				d3d.annotation->EndEvent();
+			}
+			if (indexed && (worldSettings.lowLodOnly || (hasLod && worldSettings.enableLod))) {
+				d3d.annotation->BeginEvent(L"LOD Low");
+				// TODO set constant buffer for LOD if shader LOD is enabled
+				//stats.stateChanges++;
+				stats += drawMeshCluster(d3d, mesh.vertClustersLod, mesh.drawLodCount, indexed, true, worldSettings.lowLodOnly);
+				d3d.annotation->EndEvent();
+			}
 		}
-
 		return stats;
-	};
+	}
 
-	template<int VbCount, VERTEX_FEATURE F, GetVertexBuffers<MeshBatch<F>, VbCount> GetVbs>
-	DrawStats drawVertexBuffersWorld(D3d d3d, bool bindTex, BlendType pass)
+	DrawStats drawVertexBuffersWorld(D3d d3d, bool bindTexColor, BlendType pass, GetVertexBuffers<VertexBasic> getVbsWorld, GetVertexBuffers<VertexBasic> getVbsObject)
 	{
 		DrawStats stats;
 		if (worldSettings.drawWorld) {
-			d3d.annotation->BeginEvent(L"World");
+			d3d.annotation->BeginEvent(L"Worldmesh");
 			auto& batches = world.meshBatchesWorld.getBatches(pass);
-			if (bindTex) {
-				stats += drawVertexBuffers<MeshBatch<F>, VbCount, GetVbs, batchGetTex, true>(d3d, batches);
-			}
-			else {
-				stats += drawVertexBuffers<MeshBatch<F>, VbCount, GetVbs, nullptr, true>(d3d, batches);
-			}
+			stats += drawMeshBatches(d3d, batches, bindTexColor, false, getVbsWorld);
 			d3d.annotation->EndEvent();
 		}
 		if (worldSettings.drawStaticObjects) {
 			d3d.annotation->BeginEvent(L"Objects");
 			auto& batches = world.meshBatchesObjects.getBatches(pass);
-			if (bindTex) {
-				stats += drawVertexBuffers<MeshBatch<F>, VbCount, GetVbs, batchGetTex, true>(d3d, batches);
-			}
-			else {
-				stats += drawVertexBuffers<MeshBatch<F>, VbCount, GetVbs, nullptr, true>(d3d, batches);
-			}
+			stats += drawMeshBatches(d3d, batches, bindTexColor, true, getVbsObject);
 			d3d.annotation->EndEvent();
 		}
 		return stats;
 	};
-
-	void drawPrepass(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs)
-	{
-		d3d.annotation->BeginEvent(L"Prepass");
-		Shader* shader = shaders->getShader("forward/depthPrepass");
-		d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
-		d3d.deviceContext->VSSetShader(shader->getVertexShader(), 0, 0);
-		d3d.deviceContext->PSSetShader(nullptr, 0, 0);
-
-		drawVertexBuffers<PrepassMeshes, 1, prepassGetVbPos, nullptr, true>(d3d, world.prepassMeshes);
-		d3d.annotation->EndEvent();
-	}
 
 	void drawWireframe(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs, BlendType pass)
 	{
@@ -414,14 +408,12 @@ namespace render::pass::world
 		d3d.deviceContext->VSSetShader(shader->getVertexShader(), 0, 0);
 		d3d.deviceContext->PSSetShader(shader->getPixelShader(), 0, 0);
 
-		drawVertexBuffersWorld<1, VertexBasic, batchGetVbPos>(d3d, false, pass);
+		drawVertexBuffersWorld(d3d, false, pass, batchGetVbPos<VertexBasic>, batchGetVbPos<VertexBasic>);
 	}
 
 	void drawWorld(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs, BlendType pass)
 	{
 		d3d.annotation->BeginEvent(L"Main");
-
-		// TODO set blend shader based on pass
 
 		// set the shader objects avtive
 		Shader* shader;
@@ -444,7 +436,7 @@ namespace render::pass::world
 		maxDrawCalls = currentDrawCall;
 		currentDrawCall = 0;
 
-		DrawStats stats = drawVertexBuffersWorld<3, VertexBasic, batchGetVbAll>(d3d, true, pass);
+		DrawStats stats = drawVertexBuffersWorld(d3d, true, pass, batchGetVbAll<VertexBasic>, batchGetVbAll<VertexBasic>);
 
 		stats::takeSample(samplers.stateChanges, stats.stateChanges);
 		stats::takeSample(samplers.draws, stats.draws);

@@ -17,7 +17,7 @@ namespace render
 	};
 
 	struct RenderSettings {
-		float viewDistance = 1000;
+		float viewDistance = 800;
 		bool distanceFog = true;
 		// fog settings about match 300% view distance in G1 
 		float distanceFogStart = 120;
@@ -42,8 +42,6 @@ namespace render
 		uint32_t multisampleCount = 4;
 		bool multisampleTransparency = true;
 		bool distantAlphaDensityFix = true;
-
-		bool depthPrepass = false;
 
 		bool skyTexBlur = true;
 

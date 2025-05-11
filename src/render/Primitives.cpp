@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "Primitives.h"
 
+#include <numeric>
+
 Color::Color(uint32_t argb) {
 	const float f = 1.0f / 255.0f;
 	r = f * (float)(uint8_t)(argb >> 16);
@@ -45,16 +47,12 @@ namespace render {
 	}
 
 	template<typename T>
-	float* begin(T& t) {
-		return t.vec;
+	float* begin(const T& t) {
+		return (float*) t.vec;
 	}
 	template<typename T>
-	const float* begin(const T& t) {
-		return t.vec;
-	}
-	template<typename T>
-	const float* end(const T& t) {
-		return t.vec + std::size(t.vec);
+	float* end(const T& t) {
+		return (float*) t.vec + std::size(t.vec);
 	}
 
 	template<typename T>
@@ -75,6 +73,12 @@ namespace render {
 		std::transform(begin(vec), end(vec), begin(result), std::bind(std::multiplies<float>(), std::placeholders::_1, scalar));
 		return result;
 	}
+	template<typename T>
+	float lengthSq(const T& vec) {
+		T squares;
+		std::transform(begin(vec), end(vec), begin(squares), std::bind(std::multiplies<float>(), std::placeholders::_1, std::placeholders::_1));
+		return std::accumulate(begin(squares), end(squares), 0);
+	}
 
 	// instantiate template functions for the types we want to support (needed because templates are not in header)
 	template Color add(const Color& vec1, const Color& vec2);
@@ -83,4 +87,7 @@ namespace render {
 
 	template Uv add(const Uv& vec1, const Uv& vec2);
 	template Uv mul(const Uv& vec, float scalar);
+
+	template Vec2 sub(const Vec2& vec1, const Vec2& vec2);
+	template float lengthSq(const Vec2& vec);
 }

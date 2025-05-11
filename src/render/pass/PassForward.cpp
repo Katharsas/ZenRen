@@ -194,9 +194,6 @@ namespace render::pass::forward
 			d3d.annotation->BeginEvent(toWString("Pass Blend: ", blendType).c_str());
 			updateBlendMode(d3d, blendType);
 			d3d.deviceContext->OMSetBlendState(blendStates.at(blendTypeIndex), nullptr, 0xffffffff);
-			if (settings.depthPrepass) {
-				world::drawPrepass(d3d, shaders, shaderCbs);
-			}
 			world::drawWorld(d3d, shaders, shaderCbs, (BlendType)blendType);
 			if (settings.wireframe) {
 				d3d.deviceContext->RSSetState(rasterizerWf);

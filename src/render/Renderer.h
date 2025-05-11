@@ -41,8 +41,10 @@ namespace render
 		// we could wrap this in a normal Texture object to make it more similar to unbatched meshes
 		ID3D11ShaderResourceView* texColorArray = nullptr;
 
+		uint32_t drawCount = 0;
+		uint32_t drawLodCount = 0;
 		std::vector<ChunkVertCluster> vertClusters;
-		uint32_t vertexCount = 0;
+		std::vector<ChunkVertCluster> vertClustersLod;
 
 		bool useIndices = false;
 		VertexBuffer vbIndices = { sizeof(VertexIndex) };

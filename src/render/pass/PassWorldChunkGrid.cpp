@@ -13,7 +13,7 @@ namespace render::pass::world::chunkgrid
 	bool sizeFinalized = false;
 
 	std::vector<std::pair<bool, DirectX::BoundingBox>> chunks;
-	std::vector<bool> chunksIntersectCamera;
+	std::vector<ChunkCameraInfo> chunksCameraInfo;
 
 	uint32_t getFlatIndex(const ChunkIndex& index)
 	{
@@ -47,13 +47,18 @@ namespace render::pass::world::chunkgrid
 	}
 	template void updateSize(const MatToChunksToVerts<VertexBasic>&);
 
+	std::pair<ChunkIndex, ChunkIndex> getIndexMinMax()
+	{
+		return { { minX, minY }, {maxX, maxY} };
+	}
+
 	uint32_t finalizeSize()
 	{
 		assert(!sizeFinalized);
 
 		uint32_t size = lengthX * lengthY;
 		chunks.resize(size);
-		chunksIntersectCamera.resize(size);
+		chunksCameraInfo.resize(size);
 		sizeFinalized = true;
 		return size;
 	}
@@ -108,7 +113,7 @@ namespace render::pass::world::chunkgrid
 			strplace(buffer, 0, ::util::leftPad(std::to_string(minY + y), cellSize));
 			for (uint16_t x = 0; x < lengthX; x++) {
 				uint32_t index = (y * (uint32_t)lengthX) + x;
-				std::string cellValue = chunksIntersectCamera[index] ? "X" : "O";
+				std::string cellValue = chunksCameraInfo[index].intersectsFrustum ? "X" : "O";
 				//std::string cellValue = toStr(chunks[index].second.Extents);
 				strplace(buffer, (x * cellSize) + cellSize, ::util::leftPad(cellValue, cellSize));
 			}
@@ -118,23 +123,24 @@ namespace render::pass::world::chunkgrid
 
 	void updateCamera(const BoundingFrustum& cameraFrustum)
 	{
+		// we ignore y since grid is 2D and also there are some misplaced benches deep underground in G1 (3500m under burg that mess up chunk center
+		Vec2 cameraOrigin = { cameraFrustum.Origin.x, cameraFrustum.Origin.z };
+
 		for (uint32_t i = 0; i < chunks.size(); i++) {
+			// frustum
 			auto& [exists, existingBbox] = chunks[i];
-			chunksIntersectCamera[i] = exists && cameraFrustum.Intersects(existingBbox);
+			chunksCameraInfo[i].intersectsFrustum = exists && cameraFrustum.Intersects(existingBbox);
+
+			// distance
+			Vec2 bboxCenter = { existingBbox.Center.x, existingBbox.Center.z };
+			float distSq = lengthSq(sub(cameraOrigin, bboxCenter));
+			chunksCameraInfo[i].distanceToCenterSq = distSq;
 		}
-		// TODO remove when all works
-		//printGrid();
 	}
 
-	bool intersectsCamera(const ChunkIndex& index)
+	ChunkCameraInfo getCameraInfo(const ChunkIndex& index)
 	{
 		assert(sizeFinalized);
-
-		return chunksIntersectCamera[getFlatIndex(index)];
-	}
-
-	std::pair<ChunkIndex, ChunkIndex> getIndexMinMax()
-	{
-		return { { minX, minY }, {maxX, maxY} };
+		return chunksCameraInfo[getFlatIndex(index)];
 	}
 }

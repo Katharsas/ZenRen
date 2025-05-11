@@ -89,4 +89,19 @@ namespace assets::meshopt
         assert(remapSize == vertexCount);
         return remap;
     }
+
+    template<typename T>
+    std::vector<VertexIndex> generateIndicesLod(const std::vector<VertexIndex>& indices, const std::vector<T>& vertsWithPosAtStart, float targetError)
+    {
+        uint32_t flags = meshopt_SimplifyErrorAbsolute | meshopt_SimplifyLockBorder;
+        const float* vertPosStart = (float*)vertsWithPosAtStart.data();
+
+        std::vector<VertexIndex> result(indices.size());
+        float actualError = 0.f;
+        uint32_t indexCountLod = meshopt_simplify(
+            result.data(), indices.data(), indices.size(), vertPosStart, vertsWithPosAtStart.size(), sizeof(T), 0, targetError, flags, &actualError);
+
+        result.resize(indexCountLod);
+        return result;
+    }
 }

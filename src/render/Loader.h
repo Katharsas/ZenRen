@@ -146,8 +146,6 @@ namespace render
 		bool isOutdoorLevel = false;
 		MatToChunksToVertsBasic worldMesh;
 		MatToChunksToVertsBasic staticMeshes;
-		//VERTEX_DATA_BY_MAT dynamicMeshes;
-		//MatToChunksToVertsBlend staticMeshesBlend;
 		std::vector<FileData> worldMeshLightmaps;
 	};
 }

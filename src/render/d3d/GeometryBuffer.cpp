@@ -32,4 +32,21 @@ namespace render::d3d
 		}
 		d3d.deviceContext->IASetIndexBuffer(buffer.buffer, format, 0);
 	}
+
+	void setVertexBuffers(D3d d3d, const std::vector<VertexBuffer>& vertexBuffers)
+	{
+		uint32_t count = vertexBuffers.size();
+		std::vector<UINT> strides(count);
+		std::vector<UINT> offsets(count);
+		std::vector<ID3D11Buffer*> buffers(count);
+
+		for (uint32_t i = 0; i < count; i++) {
+			const auto& buffer = vertexBuffers[i];
+			strides[i] = buffer.stride;
+			offsets[i] = 0;
+			buffers[i] = buffer.buffer;
+		}
+
+		d3d.deviceContext->IASetVertexBuffers(0, count, buffers.data(), strides.data(), offsets.data());
+	}
 }

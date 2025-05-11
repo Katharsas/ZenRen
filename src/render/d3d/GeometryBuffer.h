@@ -42,20 +42,5 @@ namespace render::d3d
 
 	void setIndexBuffer(D3d d3d, const VertexBuffer& buffer);
 
-	template<int N>
-	void setVertexBuffers(D3d d3d, const std::array<VertexBuffer, N>& vertexBuffers)
-	{
-		std::array<UINT, N> strides;
-		std::array<UINT, N> offsets;
-		std::array<ID3D11Buffer*, N> buffers;
-
-		for (uint32_t i = 0; i < N; i++) {
-			const auto& buffer = vertexBuffers[i];
-			strides[i] = buffer.stride;
-			offsets[i] = 0;
-			buffers[i] = buffer.buffer;
-		}
-
-		d3d.deviceContext->IASetVertexBuffers(0, N, buffers.data(), strides.data(), offsets.data());
-	}
+	void setVertexBuffers(D3d d3d, const std::vector<VertexBuffer>& vertexBuffers);
 }

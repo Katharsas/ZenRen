@@ -17,6 +17,10 @@ namespace render::pass::world
 		bool drawStaticObjects = true;
 		bool drawSky = true;
 
+		bool enableLod = true;
+		float lodRadius = 300;
+		bool lowLodOnly = false;
+
 		bool enableFrustumCulling = true;
 		bool updateFrustumCulling = true;
 
@@ -40,7 +44,6 @@ namespace render::pass::world
 	void init(D3d d3d);
 	Color getBackgroundColor();
 	void drawSky(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs);
-	void drawPrepass(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs);
 	void drawWorld(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs, BlendType pass);
 	void drawWireframe(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs, BlendType pass);
 	void clean();

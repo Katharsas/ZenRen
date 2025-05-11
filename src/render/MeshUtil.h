@@ -7,6 +7,8 @@
 
 namespace render
 {
+    // TODO split into math util and mesh util or move some stuff to Primitive.h?
+
     template <XYZ V3>
     bool isZero(const V3& vec, float threshold)
     {

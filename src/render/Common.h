@@ -66,7 +66,7 @@ namespace render
 
 	// TODO make adjustable for reload, implement level selection and changing vdf path with load button
 	// TODO should be based on vertex density by default (make "auto" setting available)
-	const float chunkSizePerDim = 145;// optimized for G1, ideally we would first caluclate the bounds of the worldmesh and then use middlepoint and size
+	const float chunkSizePerDim = 100;// optimized for G1, ideally we would first caluclate the bounds of the worldmesh and then use middlepoint and size
 
 	struct ChunkIndex {
 		int16_t x;
@@ -112,6 +112,7 @@ namespace render
 	struct Verts {
 		bool useIndices;
 		std::vector<VertexIndex> vecIndex;
+		std::vector<VertexIndex> vecIndexLod;
 		std::vector<VertexPos> vecPos;
 		std::vector<F> vecOther;
 	};
@@ -177,7 +178,12 @@ namespace render
 	template <VERTEX_FEATURE F>
 	struct VertsBatch {
 		std::vector<ChunkVertCluster> vertClusters;
-		std::vector<VertexIndex> vecIndex;
+		std::vector<ChunkVertCluster> vertClustersLod;// TODO make sure we do not have empty cluster cells in here
+
+		std::vector<VertexIndex> vecIndex;// all LOD indices are inserted after normal indices
+		uint32_t lodStart = 0;// count of non-LOD indices
+
+		//std::vector<VertexIndex> vecIndexLod;
 		std::vector<VertexPos> vecPos;
 		std::vector<F> vecOther;
 		// TODO either remove vec prefix everywhere and use plural or not consistently

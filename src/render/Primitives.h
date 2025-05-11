@@ -175,4 +175,5 @@ namespace render {
 	template<typename T> T add(const T& vec1, const T& vec2);
 	template<typename T> T sub(const T& vec1, const T& vec2);
 	template<typename T> T mul(const T& vec, float scalar);
+	template<typename T> float lengthSq(const T& vec);
 }
