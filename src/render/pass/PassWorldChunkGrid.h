@@ -11,12 +11,8 @@ namespace render::pass::world::chunkgrid
 		float distanceToCenterSq = 0;
 	};
 
-	template <VERTEX_FEATURE F>
-	void updateSize(const MatToChunksToVerts<F>& meshData);
-	std::pair<ChunkIndex, ChunkIndex> getIndexMinMax();
-	uint32_t finalizeSize();
-	template <VERTEX_FEATURE F>
-	void updateMesh(const MatToChunksToVerts<F>& meshDataVariants);
+	uint16_t init(const grid::Grid& grid);
+	std::pair<GridPos, GridPos> getIndexMinMax();
 	void updateCamera(const DirectX::BoundingFrustum& cameraFrustum);
-	ChunkCameraInfo getCameraInfo(const ChunkIndex& index);
+	ChunkCameraInfo getCameraInfo(const GridPos& index);
 }

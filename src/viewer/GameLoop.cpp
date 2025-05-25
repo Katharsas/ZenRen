@@ -23,8 +23,8 @@ namespace viewer
 
 	struct FrameTimes {
 		render::stats::TimeSampler full;
-		render::stats::TimeSampler update;
 		render::stats::TimeSampler render;
+		render::stats::TimeSampler present;
 		render::stats::TimeSampler wait;
 	}
 	frameTimes;
@@ -67,23 +67,21 @@ namespace viewer
 		render::gui::addInfo("", {
 			[]() -> void {
 				uint32_t fullTime = render::stats::getTimeSamplerStats(frameTimes.full).average;
-				uint32_t updateTime = render::stats::getTimeSamplerStats(frameTimes.update).average;
 				uint32_t renderTime = render::stats::getTimeSamplerStats(frameTimes.render).average;
+				uint32_t presentTime = render::stats::getTimeSamplerStats(frameTimes.present).average;
 				
 				const int32_t fpsReal = fullTime == 0 ? 0 : (1000000 / fullTime);
 
 				std::stringstream buffer;
 				buffer << "FPS:  " << util::leftPad(std::to_string(fpsReal), 4) << '\n';
-
-				// when frame limiter is enabled GPU time is masked by sleep time
-				if (!settings.frameLimiterEnabled) {
-					buffer << "  Render: " + util::leftPad(std::to_string(renderTime), 4) << " us\n";
+				buffer << "  Total: " + util::leftPad(std::to_string(fullTime), 4) << " us";
+				if (settings.frameLimiterEnabled) {
+					buffer << " [LIMITED]";
 				}
-				else {
-					buffer << "  Render: (limited)"  << '\n';
-				}
+				buffer << '\n';
+				buffer << "    Render  (CPU): " + util::leftPad(std::to_string(renderTime), 4) << " us\n";
+				buffer << "    Present (GPU): " + util::leftPad(std::to_string(presentTime), 4) << " us\n";
 
-				buffer << "  Update: " + util::leftPad(std::to_string(updateTime), 4) << " us\n";
 				ImGui::Text(buffer.str().c_str());
 			}
 		});
@@ -141,30 +139,33 @@ namespace viewer
 
 	void renderAndSleep()
 	{
+		// This render loop's latency is optimal as long as full frame time fits inside frame limit (limiter is adding sleep time).
+		// Otherwise however overlapping CPU and GPU time could halve frametime in best case, but also increases latency to over one frame.
+		// See: https://gamedev.stackexchange.com/a/109400
+		// TODO: Visualize tradeoff. Maybe have both as an option (or select automatically if FPS increase makes up for increased latency)
+
 		// START RENDER
 		float deltaTime = (float) frameTimes.full.sampleRestart() / 1000000;
-		frameTimes.update.start(frameTimes.full.last);
+		frameTimes.render.start(frameTimes.full.last);
 
 		processUserInput(deltaTime);
 		render::update(deltaTime);
-
-		render::stats::sampleAndStart(frameTimes.update, frameTimes.render);
-
 		render::renderFrame();
 
-		render::stats::sampleAndStart(frameTimes.render, frameTimes.wait);
+		render::stats::sampleAndStart(frameTimes.render, frameTimes.present);
+
+		render::presentFrameBlocking();
+
+		render::stats::sampleAndStart(frameTimes.present, frameTimes.wait);
 
 		int32_t frameTimeTarget = 0;
 		
 		if (settings.frameLimiterEnabled)
 		{
 			frameTimeTarget = 1000000 / settings.frameLimit;
-			const int32_t sleepTarget = frameTimeTarget - (frameTimes.update.lastTimeMicros + frameTimes.render.lastTimeMicros);
+			const int32_t sleepTarget = frameTimeTarget - (frameTimes.render.lastTimeMicros + frameTimes.present.lastTimeMicros);
 			if (sleepTarget > 0)
 			{
-				// sleep_for can wake up about once every 1,4ms
-				//std::this_thread::sleep_for(std::chrono::microseconds(100));
-
 				// microsleep can wake up about once every 0,5ms
 				microsleep(sleepTarget + 470); // make sure we never get too short frametimes
 			}

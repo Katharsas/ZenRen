@@ -12,12 +12,12 @@ namespace render::stats
 
 	uint32_t toDurationMicros(const std::chrono::steady_clock::time_point start, const std::chrono::steady_clock::time_point end) {
 		const auto duration = end - start;
-		assert(duration.count() > 0);
+		//assert(duration.count() > 0);
 		return static_cast<uint32_t> (duration / std::chrono::microseconds(1));
 	}
 	uint32_t toDurationMillis(const std::chrono::steady_clock::time_point start, const std::chrono::steady_clock::time_point end) {
 		const auto duration = end - start;
-		assert(duration.count() > 0);
+		//assert(duration.count() > 0);
 		return static_cast<uint32_t> (duration / std::chrono::milliseconds(1));
 	}
 

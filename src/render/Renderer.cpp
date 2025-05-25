@@ -302,7 +302,11 @@ namespace render
 		d3d.annotation->BeginEvent(L"imgui");
 		gui::draw();
 		d3d.annotation->EndEvent();
+	}
 
+	void presentFrameBlocking()
+	{
+		auto& d3d = dx11;
 		post::resolveAndPresent(d3d, swapchain);
 	}
 

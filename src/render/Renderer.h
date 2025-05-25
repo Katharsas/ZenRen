@@ -101,4 +101,5 @@ namespace render
 	void cleanD3D();
 	void update(float deltaTime);
 	void renderFrame();
+	void presentFrameBlocking();
 }

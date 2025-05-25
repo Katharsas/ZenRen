@@ -17,9 +17,11 @@ namespace render::pass::world
 		bool drawStaticObjects = true;
 		bool drawSky = true;
 
+		bool chunkedRendering = true;
+
+		bool lowLodOnly = false;
 		bool enableLod = true;
 		float lodRadius = 300;
-		bool lowLodOnly = false;
 
 		bool enableFrustumCulling = true;
 		bool updateFrustumCulling = true;
