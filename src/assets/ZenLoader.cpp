@@ -141,7 +141,7 @@ namespace assets
         return statics;
     }
 
-    bool loadInstanceVisual(MatToChunksToVertsBasic& target, const StaticInstance& instance, bool indexed, bool debugChecksEnabled)
+    bool loadInstanceVisual(MatToChunksToVertsBasic& target, const Grid& grid, const StaticInstance& instance, bool indexed, bool debugChecksEnabled)
     {
         using namespace FormatsSource;
         using namespace FormatsCompiled;
@@ -156,7 +156,7 @@ namespace assets
                 LOG(INFO) << "Failed to find MRM data for visual: " << name;
                 return false;
             }
-            loadInstanceMesh(target, *meshOpt.value(), instance, indexed, debugChecksEnabled);
+            loadInstanceMesh(target, grid, *meshOpt.value(), instance, indexed, debugChecksEnabled);
             return true;
         }
         case VisualType::MODEL: {
@@ -175,7 +175,7 @@ namespace assets
                     // try MDH+MDM
                 }
                 else {
-                    loadInstanceModel(target, meshOpt.value()->hierarchy, meshOpt.value()->mesh, instance, indexed, debugChecksEnabled);
+                    loadInstanceModel(target, grid, meshOpt.value()->hierarchy, meshOpt.value()->mesh, instance, indexed, debugChecksEnabled);
                     return true;
                 }
             } {
@@ -188,13 +188,13 @@ namespace assets
                     LOG(INFO) << "Failed to find MDH + MDM data for visual: " << name;
                     return false;
                 }
-                loadInstanceModel(target, *mdhOpt.value(), *mdmOpt.value(), instance, indexed, debugChecksEnabled);
+                loadInstanceModel(target, grid, *mdhOpt.value(), *mdmOpt.value(), instance, indexed, debugChecksEnabled);
                 return true;
             }
         }
         case VisualType::DECAL: {
             assert(TGA.isExtOf(name));
-            loadInstanceDecal(target, instance, indexed, debugChecksEnabled);
+            loadInstanceDecal(target, grid, instance, indexed, debugChecksEnabled);
             return true;
         }
         default: {
@@ -228,7 +228,7 @@ namespace assets
         out.isOutdoorLevel = world.world_bsp_tree.mode == zenkit::BspTreeType::OUTDOOR;
         sampler.logMillisAndRestart("Loader: World data parsed");
 
-        loadWorldMesh(out.worldMesh, world.world_mesh, !debug.disableVertexIndices, debug.validateMeshData);
+        out.chunkGrid = loadWorldMesh(out.worldMesh, world.world_mesh, !debug.disableVertexIndices, debug.validateMeshData);
 
         for (uint32_t i = 0; i < world.world_mesh.lightmap_textures.size(); i++) {
             auto& lightmap = world.world_mesh.lightmap_textures.at(i);
@@ -256,7 +256,7 @@ namespace assets
 
             uint32_t instanceCount = 0;
             for (auto& instance : vobs) {
-                bool success = loadInstanceVisual(out.staticMeshes, instance, !debug.disableVertexIndices, debug.validateMeshData);
+                bool success = loadInstanceVisual(out.staticMeshes, out.chunkGrid, instance, !debug.disableVertexIndices, debug.validateMeshData);
                 if (success) {
                     instanceCount++;
                 }

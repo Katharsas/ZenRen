@@ -304,19 +304,19 @@ namespace render::pass::world
 			// TODO chunks with very few verts should be allowed to be enabled if range is active currently, if that helps joining ranges (test!)
 
 			for (uint32_t i = 0; i < vertClusters.size(); i++) {
-				const ChunkIndex& chunkIndex = vertClusters[i].pos;
+				const GridPos& gridPos = vertClusters[i].gridPos;
 				uint32_t vertStartIndex = vertClusters[i].vertStartIndex;
 
-				auto camera = chunkgrid::getCameraInfo(chunkIndex);
+				auto camera = chunkgrid::getCameraInfo(gridPos);
 				bool isInsideLodRadius = ignoreLodRadius || (isLowLod == camera.distanceToCenterSq > lodRadiusSq);
 
 				bool currentChunkActive = camera.intersectsFrustum && isInsideLodRadius;
 
 				if (worldSettings.chunkFilterXEnabled) {
-					currentChunkActive = currentChunkActive && chunkIndex.x == worldSettings.chunkFilterX;
+					currentChunkActive = currentChunkActive && gridPos.x == worldSettings.chunkFilterX;
 				}
 				if (worldSettings.chunkFilterYEnabled) {
-					currentChunkActive = currentChunkActive && chunkIndex.y == worldSettings.chunkFilterY;
+					currentChunkActive = currentChunkActive && gridPos.y == worldSettings.chunkFilterY;
 				}
 
 				if (!rangeActive && currentChunkActive) {

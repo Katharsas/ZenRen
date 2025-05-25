@@ -7,15 +7,15 @@ namespace render::pass::world::chunkgrid
 {
 	using namespace DirectX;
 
-	int16_t minX = SHRT_MAX, minY = SHRT_MAX;
-	int16_t maxX = SHRT_MIN, maxY = SHRT_MIN;
+	uint8_t minX = UCHAR_MAX, minY = UCHAR_MAX;
+	uint8_t maxX = 0, maxY = 0;
 	int16_t lengthX, lengthY;
 	bool sizeFinalized = false;
 
 	std::vector<std::pair<bool, DirectX::BoundingBox>> chunks;
 	std::vector<ChunkCameraInfo> chunksCameraInfo;
 
-	uint32_t getFlatIndex(const ChunkIndex& index)
+	uint32_t getFlatIndex(const GridPos& index)
 	{
 		uint16_t x = index.x - minX;
 		uint16_t y = index.y - minY;
@@ -35,11 +35,11 @@ namespace render::pass::world::chunkgrid
 		assert(!sizeFinalized);
 
 		for (const auto& [material, chunkToVerts] : meshData) {
-			for (const auto& [chunkIndex, verts] : chunkToVerts) {
-				minX = std::min(minX, chunkIndex.x);
-				minY = std::min(minY, chunkIndex.y);
-				maxX = std::max(maxX, chunkIndex.x);
-				maxY = std::max(maxY, chunkIndex.y);
+			for (const auto& [gridPos, verts] : chunkToVerts) {
+				minX = std::min(minX, gridPos.x);
+				minY = std::min(minY, gridPos.y);
+				maxX = std::max(maxX, gridPos.x);
+				maxY = std::max(maxY, gridPos.y);
 			}
 		}
 		lengthX = (maxX - minX) + 1;
@@ -69,12 +69,12 @@ namespace render::pass::world::chunkgrid
 		assert(sizeFinalized);
 
 		for (const auto& [material, chunkToVerts] : meshData) {
-			for (const auto& [chunkIndex, verts] : chunkToVerts) {
+			for (const auto& [gridPos, verts] : chunkToVerts) {
 				if (verts.vecPos.empty()) {
 					continue;
 				}
 				const BoundingBox vertBbox = createBbox(verts.vecPos);
-				uint32_t flatIndex = getFlatIndex(chunkIndex);
+				uint32_t flatIndex = getFlatIndex(gridPos);
 				auto& [exists, existingBbox] = chunks[flatIndex];
 				if (exists) {
 					BoundingBox::CreateMerged(existingBbox, existingBbox, vertBbox);
@@ -138,7 +138,7 @@ namespace render::pass::world::chunkgrid
 		}
 	}
 
-	ChunkCameraInfo getCameraInfo(const ChunkIndex& index)
+	ChunkCameraInfo getCameraInfo(const GridPos& index)
 	{
 		assert(sizeFinalized);
 		return chunksCameraInfo[getFlatIndex(index)];

@@ -12,7 +12,7 @@ namespace assets
 		bool loadVobs = true;
 		bool validateMeshData = true;
 
-		bool disableVobToLightVisibilityRayChecks = false;
+		bool disableVobToLightVisibilityRayChecks = true;
 		bool disableVertexIndices = false;
 
 		bool vobsTint = false;
@@ -144,6 +144,7 @@ namespace render
 
 	struct RenderData {
 		bool isOutdoorLevel = false;
+		Grid chunkGrid;
 		MatToChunksToVertsBasic worldMesh;
 		MatToChunksToVertsBasic staticMeshes;
 		std::vector<FileData> worldMeshLightmaps;

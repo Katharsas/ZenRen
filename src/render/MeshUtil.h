@@ -59,7 +59,7 @@ namespace render
     DirectX::XMVECTOR bboxCenter(const std::array<DirectX::XMVECTOR, 2>& bbox);
     DirectX::XMVECTOR centroidPos(const std::array<DirectX::XMVECTOR, 3>& posXm);
     DirectX::XMVECTOR calcFlatFaceNormal(const std::array<DirectX::XMVECTOR, 3>& posXm);
-    ChunkIndex toChunkIndex(DirectX::XMVECTOR posXm);
+    GridPos toGridPos(const Grid& grid, DirectX::XMVECTOR posXm);
 
     inline std::ostream& operator <<(std::ostream& os, const DirectX::XMVECTOR& that)
     {
@@ -80,15 +80,11 @@ namespace render
     template <typename C1, typename C2>
     void insert(MatToChunksToVertsBasic& target, const Material& material, const C1& positions, const C2& normalsAndUvs)
     {
-        std::unordered_map<ChunkIndex, VertsBasic>& meshData = ::util::getOrCreateDefault(target, material);
+        std::unordered_map<GridPos, VertsBasic>& meshData = ::util::getOrCreateDefault(target, material);
         
         for (uint32_t i = 0; i < positions.size(); i += 3) {
-            const ChunkIndex chunkIndex = toChunkIndex(centroidPos({
-                toXM4Pos(positions[i]),
-                toXM4Pos(positions[i + 1]),
-                toXM4Pos(positions[i + 2])
-            }));
-            VertsBasic& chunkData = ::util::getOrCreateDefault(meshData, chunkIndex);
+            const GridPos gridPos = { 0, 0 };// TODO this is kinda bad
+            VertsBasic& chunkData = ::util::getOrCreateDefault(meshData, gridPos);
 
             // TODO copied from MeshFromVdfLoader for now, clean up
             chunkData.vecPos.push_back(positions[i]);
@@ -102,5 +98,5 @@ namespace render
 
     void warnIfNotNormalized(const DirectX::XMVECTOR& source);
 
-    void printXMMatrix(const DirectX::XMMATRIX& matrix);
+    void printXMMatrix(const DirectX::XMMATRIX& matrix, const std::string& numberFormat);
 }

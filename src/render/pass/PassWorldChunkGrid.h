@@ -18,5 +18,5 @@ namespace render::pass::world::chunkgrid
 	template <VERTEX_FEATURE F>
 	void updateMesh(const MatToChunksToVerts<F>& meshDataVariants);
 	void updateCamera(const DirectX::BoundingFrustum& cameraFrustum);
-	ChunkCameraInfo getCameraInfo(const ChunkIndex& index);
+	ChunkCameraInfo getCameraInfo(const GridPos& index);
 }
