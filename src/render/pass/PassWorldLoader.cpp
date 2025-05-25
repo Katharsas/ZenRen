@@ -1,11 +1,12 @@
 #include "stdafx.h"
 #include "PassWorldLoader.h"
 
+#include "render/pass/PassWorldChunkGrid.h"
+
 #include "render/d3d/TextureBuffer.h"
 #include "render/d3d/GeometryBuffer.h"
 #include "render/PerfStats.h"
 #include "render/Loader.h"
-#include "PassWorldChunkGrid.h"
 
 #include "assets/AssetCache.h"
 #include "assets/AssetFinder.h"
@@ -157,9 +158,9 @@ namespace render::pass::world
 	}
 
 	template <VERTEX_FEATURE F>
-	bool compareByChunkIndex(pair<ChunkIndex, vector<pair<Material, Verts<F>>>> const& lhs, pair<ChunkIndex, vector<pair<Material, Verts<F>>>> const& rhs) {
-		const ChunkIndex& lhsIndex = lhs.first;
-		const ChunkIndex& rhsIndex = rhs.first;
+	bool compareByGridPos(pair<GridPos, vector<pair<Material, Verts<F>>>> const& lhs, pair<GridPos, vector<pair<Material, Verts<F>>>> const& rhs) {
+		const GridPos& lhsIndex = lhs.first;
+		const GridPos& rhsIndex = rhs.first;
 		if (lhsIndex.y == rhsIndex.y) {
 			return lhsIndex.x < rhsIndex.x;
 		}
@@ -167,44 +168,44 @@ namespace render::pass::world
 	}
 
 	template <VERTEX_FEATURE F>
-	vector<pair<ChunkIndex, vector<pair<Material, Verts<F>>>>> groupAndSortByChunkIndex(const vector<pair<Material, const ChunkToVerts<F> *>>& batchData)
+	vector<pair<GridPos, vector<pair<Material, Verts<F>>>>> groupAndSortByGridCell(const vector<pair<Material, const ChunkToVerts<F> *>>& batchData)
 	{
 		// use unordered_map to group
-		unordered_map<ChunkIndex, vector<pair<Material, Verts<F>>>> chunkBuckets;
+		unordered_map<GridPos, vector<pair<Material, Verts<F>>>> chunkBuckets;
 
 		for (const auto& [mat, chunkData] : batchData) {
-			for (const auto& [chunkIndex, chunkVerts] : *chunkData) {
+			for (const auto& [gridPos, chunkVerts] : *chunkData) {
 
-				auto& vec = ::util::getOrCreateDefault(chunkBuckets, chunkIndex);
+				auto& vec = ::util::getOrCreateDefault(chunkBuckets, gridPos);
 				vec.push_back({ mat, chunkVerts });
 			}
 		}
 
 		// convert unordered_map to vector for sorting
-		vector<pair<ChunkIndex, vector<pair<Material, Verts<F>>>>> result;
+		vector<pair<GridPos, vector<pair<Material, Verts<F>>>>> result;
 		result.reserve(chunkBuckets.size());
 
-		for (const auto& [chunkIndex, chunkData] : chunkBuckets) {
-			result.push_back({chunkIndex, chunkData});
+		for (const auto& [gridPos, chunkData] : chunkBuckets) {
+			result.push_back({gridPos, chunkData});
 		}
 
 		// ideally we would maybe sort by morton code or something like that (implement "uint32_t getMortonIndex(ChunkIndex)" in ChunkGrid or similar)
 		// for now we just sort by y then x which already reduces number of draw calls significantly (due to vert range merging of continuous active grid cells)
-		std::sort(result.begin(), result.end(), &compareByChunkIndex<F>);
+		std::sort(result.begin(), result.end(), &compareByGridPos<F>);
 
 		return result;
 	}
 
 	template <VERTEX_FEATURE F>
-	vector<pair<uint32_t, vector<pair<ChunkIndex, vector<pair<Material, Verts<F>>>>>>> splitByVertCount(
-		const vector<pair<ChunkIndex, vector<pair<Material, Verts<F>>>>>& batchData, uint32_t maxVertCount)
+	vector<pair<uint32_t, vector<pair<GridPos, vector<pair<Material, Verts<F>>>>>>> splitByVertCount(
+		const vector<pair<GridPos, vector<pair<Material, Verts<F>>>>>& batchData, uint32_t maxVertCount)
 	{
-		vector<pair<uint32_t, vector<pair<ChunkIndex, vector<pair<Material, Verts<F>>>>>>> result;
+		vector<pair<uint32_t, vector<pair<GridPos, vector<pair<Material, Verts<F>>>>>>> result;
 
-		vector<pair<ChunkIndex, vector<pair<Material, Verts<F>>>>> currentBatch;
+		vector<pair<GridPos, vector<pair<Material, Verts<F>>>>> currentBatch;
 		uint32_t currentBatchVertCount = 0;
 
-		for (const auto& [chunkIndex, vertDataByMat] : batchData) {
+		for (const auto& [gridPos, vertDataByMat] : batchData) {
 
 			uint32_t chunkVertCount = 0;
 			for (const auto& [material, vertData] : vertDataByMat) {
@@ -217,7 +218,7 @@ namespace render::pass::world
 				currentBatch.clear();
 				currentBatchVertCount = 0;
 			}
-			currentBatch.push_back({ chunkIndex, vertDataByMat });
+			currentBatch.push_back({ gridPos, vertDataByMat });
 			currentBatchVertCount += chunkVertCount;
 		}
 
@@ -229,7 +230,7 @@ namespace render::pass::world
 	}
 
 	template <VERTEX_FEATURE F>
-	pair<VertsBatch<F>, LoadResult> flattenIntoBatch(const vector<pair<ChunkIndex, vector<pair<Material, Verts<F>>>>>& batchData)
+	pair<VertsBatch<F>, LoadResult> flattenIntoBatch(const vector<pair<GridPos, vector<pair<Material, Verts<F>>>>>& batchData)
 	{
 		LoadResult result;
 		result.states = 1;
@@ -266,12 +267,12 @@ namespace render::pass::world
 		result.verts = useIndices ? indexCount : vertCount;
 		result.vertsLod = useIndices ? indexLodCount : vertCount;
 
-		for (const auto& [chunkIndex, vertDataByMat] : batchData) {
+		for (const auto& [gridPos, vertDataByMat] : batchData) {
 			// set vertex data
 			uint32_t currentVertIndex = useIndices ? target.vecIndex.size() : target.vecPos.size();
 			uint32_t currentVertIndexLod = useIndices ? lodIndices.size() : 0;
-			target.vertClusters.push_back({ chunkIndex, currentVertIndex });
-			target.vertClustersLod.push_back({ chunkIndex, indexCount + currentVertIndexLod });
+			target.vertClusters.push_back({ gridPos, currentVertIndex });
+			target.vertClustersLod.push_back({ gridPos, indexCount + currentVertIndexLod });
 
 			for (const auto& [material, vertData] : vertDataByMat) {
 				// rewrite indices
@@ -347,13 +348,13 @@ namespace render::pass::world
 			
 			for (const auto& [texInfo, batchData] : batchedMeshData) {
 				
-				vector<pair<ChunkIndex, vector<pair<Material, Verts<F>>>>> batchDataByChunk = groupAndSortByChunkIndex(batchData);
+				vector<pair<GridPos, vector<pair<Material, Verts<F>>>>> batchDataByGridCell = groupAndSortByGridCell(batchData);
 				
 				// split current batch into multiple smaller batches along chunk boundaries if it contains too many verts to prevent OOM crashes
-				vector<pair<uint32_t, vector<pair<ChunkIndex, vector<pair<Material, Verts<F>>>>>>> batchDataSplit =
-					splitByVertCount(batchDataByChunk, vertCountPerBatch);
+				vector<pair<uint32_t, vector<pair<GridPos, vector<pair<Material, Verts<F>>>>>>> batchDataSplit =
+					splitByVertCount(batchDataByGridCell, vertCountPerBatch);
 				
-				batchDataByChunk.clear();// lots of memory that are no longer needed
+				batchDataByGridCell.clear();// lots of memory that are no longer needed
 
 				for (const auto& [vertCount, batchData] : batchDataSplit) {
 					const auto [batchDataFlat, batchLoadResult] = flattenIntoBatch(batchData);
@@ -472,13 +473,8 @@ namespace render::pass::world
 		sampler.logMillisAndRestart("Level: Uploaded lightmap textures");
 
 		// chunk grid
-		chunkgrid::updateSize(data.worldMesh);
-		chunkgrid::updateSize(data.staticMeshes);
-		uint32_t cellCount = chunkgrid::finalizeSize();
-		chunkgrid::updateMesh(data.worldMesh);
-		chunkgrid::updateMesh(data.staticMeshes);
+		uint32_t cellCount = chunkgrid::init(data.chunkGrid);
 		LOG(INFO) << "Level: Computed Chunk Grid - Cells: " << cellCount;
-		sampler.logMillisAndRestart("Level: Computed chunk grid");
 
 		LoadResult loadResult;
 

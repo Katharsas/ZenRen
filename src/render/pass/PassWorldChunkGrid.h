@@ -6,17 +6,25 @@
 
 namespace render::pass::world::chunkgrid
 {
-	struct ChunkCameraInfo {
+	struct GridIndex {
+		uint16_t outerIndex;
+		uint16_t innerIndex;
+	};
+
+	struct CellCameraInfo {
 		bool intersectsFrustum = false;
 		float distanceToCenterSq = 0;
 	};
 
-	template <VERTEX_FEATURE F>
-	void updateSize(const MatToChunksToVerts<F>& meshData);
-	std::pair<ChunkIndex, ChunkIndex> getIndexMinMax();
-	uint32_t finalizeSize();
-	template <VERTEX_FEATURE F>
-	void updateMesh(const MatToChunksToVerts<F>& meshDataVariants);
-	void updateCamera(const DirectX::BoundingFrustum& cameraFrustum);
-	ChunkCameraInfo getCameraInfo(const ChunkIndex& index);
+	struct LayerCellCameraInfo {
+		DirectX::ContainmentType intersectType = DirectX::ContainmentType::DISJOINT;
+	};
+
+	uint16_t init(const grid::Grid& grid);
+	std::pair<GridPos, GridPos> getIndexMinMax();
+	void updateCamera(const DirectX::BoundingFrustum& cameraFrustum, bool updateCulling, bool updateDistances);
+
+	GridIndex getIndex(const GridPos& index);
+	LayerCellCameraInfo getCameraInfoOuter(uint16_t outerIndex);
+	CellCameraInfo getCameraInfoInner(uint16_t innerIndex);
 }

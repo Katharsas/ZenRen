@@ -6,6 +6,7 @@
 
 #include "Util.h"
 #include "render/Primitives.h"
+#include "render/Grid.h"
 
 #include "magic_enum.hpp"
 
@@ -66,7 +67,7 @@ namespace render
 
 	// TODO make adjustable for reload, implement level selection and changing vdf path with load button
 	// TODO should be based on vertex density by default (make "auto" setting available)
-	const float chunkSizePerDim = 100;// optimized for G1, ideally we would first caluclate the bounds of the worldmesh and then use middlepoint and size
+	const float chunkSizePerDim = 50;// optimized for G1, ideally we would first caluclate the bounds of the worldmesh and then use middlepoint and size
 
 	struct ChunkIndex {
 		int16_t x;
@@ -85,15 +86,15 @@ namespace render
 			}
 		};
 	};
-	} namespace std { template <> struct hash<render::ChunkIndex> : render::ChunkIndex::Hash {}; } namespace render {
-	
 	inline std::ostream& operator <<(std::ostream& os, const ChunkIndex& that)
 	{
 		return os << "[X=" << that.x << " Y=" << that.y << "]";
 	}
+	} namespace std { template <> struct hash<render::ChunkIndex> : render::ChunkIndex::Hash {}; } namespace render {
+
 
 	struct ChunkVertCluster {
-		ChunkIndex pos;
+		GridPos gridPos;
 		uint32_t vertStartIndex;
 	};
 
@@ -163,7 +164,7 @@ namespace render
 	} namespace std { template <> struct hash<render::Material> : render::Material::Hash {}; } namespace render {
 
 	template <VERTEX_FEATURE F>
-	using ChunkToVerts = std::unordered_map<ChunkIndex, Verts<F>>;
+	using ChunkToVerts = std::unordered_map<GridPos, Verts<F>>;
 	
 	template <VERTEX_FEATURE F>
 	using MatToChunksToVerts = std::unordered_map<Material, ChunkToVerts<F>>;
@@ -224,14 +225,14 @@ namespace render
 
 	struct VertKey {
 		const Material mat;
-		const ChunkIndex chunkIndex;
+		const GridPos gridPos;
 		const uint32_t vertIndex; // we assume the vert vector is not modified during lifetime of index
 
 		// TODO maybe the whole struct should be templated instead of every single method
 		template <VERTEX_FEATURE F>
 		const VertsBasic& get(const MatToChunksToVerts<F>& meshData) const
 		{
-			return meshData.find(this->mat)->second.find(this->chunkIndex)->second;
+			return meshData.find(this->mat)->second.find(this->gridPos)->second;
 		}
 		template <VERTEX_FEATURE F>
 		const std::array<VertexPos, 3> getPos(const MatToChunksToVerts<F>& meshData) const

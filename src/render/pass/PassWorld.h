@@ -17,9 +17,11 @@ namespace render::pass::world
 		bool drawStaticObjects = true;
 		bool drawSky = true;
 
+		bool chunkedRendering = true;
+
+		bool lowLodOnly = false;
 		bool enableLod = true;
 		float lodRadius = 300;
-		bool lowLodOnly = false;
 
 		bool enableFrustumCulling = true;
 		bool updateFrustumCulling = true;
@@ -38,7 +40,7 @@ namespace render::pass::world
 
 	LoadWorldResult loadWorld(D3d d3d, const std::string& level);
 	void updateObjects(float deltaTime);
-	void updateCameraFrustum(const DirectX::BoundingFrustum& cameraFrustum);
+	void updateCameraFrustum(const DirectX::BoundingFrustum& cameraFrustum, bool hasCameraMoved);
 	WorldSettings& getWorldSettings();
 	void initLinearSampler(D3d d3d, RenderSettings& settings);
 	void init(D3d d3d);

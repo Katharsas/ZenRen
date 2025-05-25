@@ -22,6 +22,7 @@ namespace render::camera {
 		XMVECTOR up;// normalized
 	};
 
+	bool hasChanged = true;
 	CameraMatrices matrices;
 	CameraLocation location;
 
@@ -56,17 +57,22 @@ namespace render::camera {
 		return matrices.frustum;
 	}
 
-	void init() {
+	void init()
+	{
 		location = g2NewWorldCity;
 	}
 
-	XMVECTOR getCameraPosition() {
+	XMVECTOR getCameraPosition()
+	{
 		return location.position;
 	}
 
-	void updateCamera(bool reverseZ, BufferSize& viewportSize, float viewDistance) {
-		
-		//reverseZ = false;
+	bool updateCamera(bool reverseZ, BufferSize& viewportSize, float viewDistance)
+	{
+		if (!hasChanged) {
+			return false;
+		}
+
 		// Set view & projection matrix
 		matrices.view = XMMatrixLookAtLH(location.position, location.target, location.up);
 
@@ -83,42 +89,55 @@ namespace render::camera {
 		BoundingFrustum::CreateFromMatrix(matrices.frustum, projectionForFrustum);
 		XMVECTOR determinant;
 		matrices.frustum.Transform(matrices.frustum, XMMatrixInverse(&determinant, matrices.view));
+
+		hasChanged = false;
+		return true;
 	}
 
-	void moveCameraDepth(float amount) {
+	void moveCameraDepth(float amount)
+	{
 		auto targetRelNorm = XMVector4Normalize(location.target - location.position);
 		auto transl = targetRelNorm * amount;
 		location.position = location.position + transl;
 		location.target = location.target + transl;
+		hasChanged = true;
 	}
 
-	void moveCameraHorizontal(float amount) {
+	void moveCameraHorizontal(float amount)
+	{
 		auto targetRel = location.target - location.position;
 		auto cross = XMVector4Cross(targetRel, location.up, XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f));
 		auto norm = XMVector4Normalize(cross);
 		auto transl = norm * amount * -1;
 		location.position = location.position + transl;
 		location.target = location.target + transl;
+		hasChanged = true;
 	}
 
-	void moveCameraVertical(float amount) {
+	void moveCameraVertical(float amount)
+	{
 		auto transl = location.up * amount;
 		location.position = location.position + transl;
 		location.target = location.target + transl;
+		hasChanged = true;
 	}
 
-	void turnCameraHorizontal(float amount) {
+	void turnCameraHorizontal(float amount)
+	{
 		auto transf = XMMatrixRotationAxis(location.up, amount);
 		auto targetRel = location.target - location.position;
 		auto targetRelNew = XMVector4Transform(targetRel, transf);
 		location.target = location.position + targetRelNew;
+		hasChanged = true;
 	}
 
-	void turnCameraVertical(float amount) {
+	void turnCameraVertical(float amount)
+	{
 		auto targetRel = location.target - location.position;
 		auto axis = XMVector3Cross(location.up, targetRel);
 		auto transf = XMMatrixRotationAxis(axis, amount);
 		auto targetRelNew = XMVector4Transform(targetRel, transf);
 		location.target = location.position + targetRelNew;
+		hasChanged = true;
 	}
 }

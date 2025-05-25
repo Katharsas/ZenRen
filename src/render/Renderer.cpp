@@ -289,10 +289,10 @@ namespace render
 		//}
 		reinitRenderer(d3d, renderState);
 
-		camera::updateCamera(settings.reverseZ, renderSize, settings.viewDistance);
+		bool hasCameraChanged = camera::updateCamera(settings.reverseZ, renderSize, settings.viewDistance);
 
 		// foward pipeline renders scene to linear backbuffer
-		forward::draw(d3d, shaders, settings);
+		forward::draw(d3d, shaders, settings, hasCameraChanged);
 		
 		// postprocessing pipeline renders linear backbuffer to real backbuffer
 		post::draw(d3d, linearBackBufferResource, shaders, settings);
@@ -302,7 +302,11 @@ namespace render
 		d3d.annotation->BeginEvent(L"imgui");
 		gui::draw();
 		d3d.annotation->EndEvent();
+	}
 
+	void presentFrameBlocking()
+	{
+		auto& d3d = dx11;
 		post::resolveAndPresent(d3d, swapchain);
 	}
 

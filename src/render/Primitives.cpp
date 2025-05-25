@@ -88,6 +88,8 @@ namespace render {
 	template Uv add(const Uv& vec1, const Uv& vec2);
 	template Uv mul(const Uv& vec, float scalar);
 
+	template Vec2 add(const Vec2& vec1, const Vec2& vec2);
 	template Vec2 sub(const Vec2& vec1, const Vec2& vec2);
+	template Vec2 mul(const Vec2& vec, float scalar);
 	template float lengthSq(const Vec2& vec);
 }

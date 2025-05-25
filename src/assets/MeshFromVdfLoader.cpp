@@ -28,6 +28,7 @@ namespace assets
     using ::std::unordered_set;
     using ::std::optional;
     using ::std::pair;
+    using ::render::grid::Grid;
 	using ::util::getOrCreate;
 
     constexpr bool meshoptOptimize = true;
@@ -41,6 +42,11 @@ namespace assets
     // 1.7f preserves house windows (newworld)
     // 1.0f preserves single barrels (addon beach)
     constexpr float objectLodMinSize = 1.7f;
+
+    // Smaller scale causes outer cells (at grid border) to contain more verts, allowing to balance
+    // empty border regions better against dense central regions.
+    // For G2 NEWWORLD, optimal value would be much smaller, but G1 WORLD newcamp sadly lies on the edge of the world.
+    constexpr float GRID_SCALE = 0.95f;
 
     const float zeroThreshold = 0.000001f;
     const XMMATRIX identity = XMMatrixIdentity();
@@ -85,7 +91,7 @@ namespace assets
     struct Face {
         array<VertexPos, 3> pos;
         array<VertexBasic, 3> features;
-        ChunkIndex chunkIndex;
+        GridPos gridPos;
     };
 
     // ###########################################################################
@@ -481,6 +487,7 @@ namespace assets
 
     Face loadWorldFace(
         const zenkit::Mesh& mesh,
+        const Grid& grid,
         uint32_t faceIndex,
         uint32_t vertIndex,
         bool debugChecksEnabled,
@@ -523,11 +530,23 @@ namespace assets
             faceOther.at(2 - i) = other;
             vertIndex++;
         }
-        const ChunkIndex chunkIndex = toChunkIndex(centroidPos(facePosXm));
-        return { facePos, faceOther, chunkIndex };
+        GridPos gridPos = toGridPos(grid, centroidPos(facePosXm));
+        return { facePos, faceOther, gridPos };
     }
 
-    void loadWorldMeshActual(
+    array<Vec2, 2> calculateBbox2d(const vector<glm::vec3>& verts)
+    {
+        auto bbox = array { Vec2 {FLT_MAX, FLT_MAX}, Vec2 {-FLT_MAX, -FLT_MAX} };
+        for (auto vert : verts) {
+            bbox[0].x = std::min(bbox[0].x, vert.x);
+            bbox[0].y = std::min(bbox[0].y, vert.z);
+            bbox[1].x = std::max(bbox[1].x, vert.x);
+            bbox[1].y = std::max(bbox[1].y, vert.z);
+        }
+        return bbox;
+    }
+
+    Grid loadWorldMeshActual(
         MatToChunksToVertsBasic& target,
         const zenkit::Mesh& worldMesh,
         bool indexed,
@@ -542,6 +561,12 @@ namespace assets
         }
         NormalsStats normalStats;
         uint32_t faceCountTotal = worldMesh.polygons.material_indices.size();
+
+        // grid
+        auto [bboxMin, bboxMax] = calculateBbox2d(worldMesh.vertices);
+        bboxMin = mul(bboxMin, G_ASSET_RESCALE);
+        bboxMax = mul(bboxMax, G_ASSET_RESCALE);
+        Grid grid = grid::init(bboxMin, bboxMax, GRID_SCALE, faceCountTotal);
 
         // Sort face indices by material
         unordered_map<uint32_t, vector<uint32_t>> matIndexToFaceIndex;
@@ -573,11 +598,11 @@ namespace assets
 
             auto [it, wasInserted] = target.try_emplace(material);
             assert(wasInserted);
-            unordered_map<ChunkIndex, VertsBasic>& chunks = it->second;
+            unordered_map<GridPos, VertsBasic>& chunks = it->second;
 
             // In theory we could write all data to target (chunks) directly for world mesh, because worldmesh
             // is only loaded once, but to keep things consistent with VOB loading, we use temporary buffers here also.
-            unordered_map<ChunkIndex, VertsBasic> chunksTemp;
+            unordered_map<GridPos, VertsBasic> chunksTemp;
 
             // Create vertex data and group by chunkIndex
             for (uint32_t i = 0; i < faceCountMat; i++)
@@ -585,8 +610,8 @@ namespace assets
                 uint32_t currentFace = faceIndices.at(i);
                 uint32_t currentVert = currentFace * 3;
 
-                const Face face = loadWorldFace(worldMesh, currentFace, currentVert, debugChecksEnabled, normalStats);
-                auto [it, wasInserted] = chunksTemp.try_emplace(face.chunkIndex);
+                const Face face = loadWorldFace(worldMesh, grid, currentFace, currentVert, debugChecksEnabled, normalStats);
+                auto [it, wasInserted] = chunksTemp.try_emplace(face.gridPos);
                 auto& vertsTemp = it->second;
                 if (wasInserted) {
                     // initialize with space relative to full material data to hopefully keep resizing reallocations low
@@ -599,6 +624,9 @@ namespace assets
 
             // Per material and chunkIndex: generate indices and optimize vertex and index data with meshoptimizer
             for (auto& [chunkIndex, vertsTemp] : chunksTemp) {
+                // update grid bbox
+                grid::updateBounds(grid, chunkIndex, createBboxFromPoints(vertsTemp.vecPos));
+
                 uint32_t vertexCount = vertsTemp.vecPos.size();
 
                 // Create indices to reduce vertexCount, optimize
@@ -628,18 +656,21 @@ namespace assets
         if (debugChecksEnabled) {
             loadStats.normalsWorldMesh = normalStats;
         }
+        return grid;
     }
 
-    void loadWorldMesh(
+    Grid loadWorldMesh(
         MatToChunksToVertsBasic& target,
         const zenkit::Mesh& worldMesh,
         bool indexed,
         bool debugChecksEnabled)
     {
+        Grid grid = loadWorldMeshActual(target, worldMesh, indexed, debugChecksEnabled);
         uint32_t instances = 1;
-        for (uint32_t i = 0; i < instances; ++i) {
+        for (uint32_t i = 1; i < instances; ++i) {
             loadWorldMeshActual(target, worldMesh, indexed, debugChecksEnabled);
         }
+        return grid;
     }
 
 
@@ -863,7 +894,7 @@ namespace assets
 
     void instantiateAndInsert(
         MatToChunksToVertsBasic& target,
-        const ChunkIndex& chunkIndex,
+        const GridPos& gridPos,
         const unordered_map<Material, VertsPacked>& verts,
         const StaticInstance& instance,
         bool isDecal)
@@ -874,7 +905,7 @@ namespace assets
         for (auto& [material, packed] : verts) {
             bool indexed = !packed.indices.empty();
             auto& chunks = util::getOrCreateDefault(target, material);
-            auto [it, wasInserted] = chunks.try_emplace(chunkIndex);
+            auto [it, wasInserted] = chunks.try_emplace(gridPos);
             VertsBasic& targetVerts = it->second;
             if (wasInserted) {
                 targetVerts.useIndices = indexed;
@@ -908,6 +939,7 @@ namespace assets
 
     void loadInstanceMesh(
         MatToChunksToVertsBasic& target,
+        Grid& grid,
         const zenkit::MultiResolutionMesh& mesh,
         const StaticInstance& instance,
         uint32_t submeshId,
@@ -924,6 +956,7 @@ namespace assets
         util::hashCombine(hash, instance.visual_name);
         util::hashCombine(hash, submeshId);
 
+        // oriented bb might be tighter than aabb, so we don't use instance.bbox here
         Vec3 halfWidth = toVec3(mesh.obbox.half_width);
         float bboxMaxDim = std::max(std::max(halfWidth.x, halfWidth.y), halfWidth.z) * 2 * G_ASSET_RESCALE;
 
@@ -935,19 +968,24 @@ namespace assets
             return;
         }
 
-        ChunkIndex chunkIndex = toChunkIndex(bboxCenter(instance.bbox));
-        instantiateAndInsert(target, chunkIndex, cachedVerts, instance, false);
+        XMVECTOR centerXm = bboxCenter(instance.bbox);
+        XMVECTOR halfWidthXm = centerXm - instance.bbox[0];
+
+        GridPos gridPos = toGridPos(grid, centerXm);
+        grid::updateBounds(grid, gridPos, BoundingBox(toFloat3(centerXm), toFloat3(halfWidthXm)));
+        instantiateAndInsert(target, gridPos, cachedVerts, instance, false);
     }
 
     void loadInstanceMesh(
         MatToChunksToVertsBasic& target,
+        Grid& grid,
         const zenkit::MultiResolutionMesh& mesh,
         const StaticInstance& instance,
         bool indexed,
         bool debugChecksEnabled)
     {
         // TODO pass all instances of a single mesh together here so we can clear mesh cache after all are done
-        loadInstanceMesh(target, mesh, instance, 0, indexed, debugChecksEnabled);
+        loadInstanceMesh(target, grid, mesh, instance, 0, indexed, debugChecksEnabled);
     }
 
     XMMATRIX rescale(const XMMATRIX& transform)
@@ -961,6 +999,7 @@ namespace assets
 
     void loadInstanceModel(
         MatToChunksToVertsBasic& target,
+        Grid& grid,
         const zenkit::ModelHierarchy& hierarchy,
         const zenkit::ModelMesh& model,
         const StaticInstance& instance,
@@ -977,7 +1016,7 @@ namespace assets
             // TODO softskin animation
             StaticInstance newInstance = instance;
             newInstance.transform = XMMatrixMultiply(transformRoot, instance.transform);
-            loadInstanceMesh(target, mesh.mesh, newInstance, meshId++, indexed, debugChecksEnabled);
+            loadInstanceMesh(target, grid, mesh.mesh, newInstance, meshId++, indexed, debugChecksEnabled);
         }
 
         unordered_map<string, uint32_t> attachmentToNode;
@@ -1001,7 +1040,7 @@ namespace assets
 
             StaticInstance newInstance = instance;
             newInstance.transform = XMMatrixMultiply(transform, instance.transform);
-            loadInstanceMesh(target, mesh, newInstance, meshId++, indexed, debugChecksEnabled);
+            loadInstanceMesh(target, grid, mesh, newInstance, meshId++, indexed, debugChecksEnabled);
         }
     }
 
@@ -1067,6 +1106,7 @@ namespace assets
 
     void loadInstanceDecal(
         MatToChunksToVertsBasic& target,
+        Grid& grid,
         const StaticInstance& instance,
         bool indexed,
         bool debugChecksEnabled
@@ -1092,8 +1132,12 @@ namespace assets
             vertsPacked.emplace(material, VertsPacked{ .vertsPacked = std::move(vertsPre) });
         }
 
-        ChunkIndex chunkIndex = toChunkIndex(bboxCenter(instance.bbox));
-        instantiateAndInsert(target, chunkIndex, vertsPacked, instance, true);
+        XMVECTOR centerXm = bboxCenter(instance.bbox);
+        XMVECTOR halfWidthXm = centerXm - instance.bbox[0];
+
+        GridPos gridPos = toGridPos(grid, centerXm);
+        grid::updateBounds(grid, gridPos, BoundingBox(toFloat3(centerXm), toFloat3(halfWidthXm)));
+        instantiateAndInsert(target, gridPos, vertsPacked, instance, true);
     }
 
     void printAndResetLoadStats(bool debugChecksEnabled)

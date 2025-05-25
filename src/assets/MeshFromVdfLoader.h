@@ -1,7 +1,9 @@
 #pragma once
 
-#include "AssetCache.h"
+#include "assets/AssetCache.h"
+
 #include "render/Loader.h"
+#include "render/Grid.h"
 
 #include "zenkit/World.hh"
 #include "zenkit/MultiResolutionMesh.hh"
@@ -10,7 +12,7 @@
 
 namespace assets
 {
-    void loadWorldMesh(
+    render::grid::Grid loadWorldMesh(
         render::MatToChunksToVertsBasic& target,
         const zenkit::Mesh& worldMesh,
         bool indexed,
@@ -18,6 +20,7 @@ namespace assets
     
     void loadInstanceMesh(
         render::MatToChunksToVertsBasic& target,
+        render::grid::Grid& grid,
         const zenkit::MultiResolutionMesh& mesh,
         const render::StaticInstance& instance,
         bool indexed,
@@ -25,6 +28,7 @@ namespace assets
 
     void loadInstanceModel(
         render::MatToChunksToVertsBasic& target,
+        render::grid::Grid& grid,
         const zenkit::ModelHierarchy& hierarchy,
         const zenkit::ModelMesh& model,
         const render::StaticInstance& instance,
@@ -33,6 +37,7 @@ namespace assets
 
     void loadInstanceDecal(
         render::MatToChunksToVertsBasic& target,
+        render::grid::Grid& grid,
         const render::StaticInstance& instance,
         bool indexed,
         bool debugChecksEnabled

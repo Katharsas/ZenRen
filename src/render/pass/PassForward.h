@@ -8,7 +8,7 @@
 namespace render::pass::forward
 {
 	void clean();
-	void draw(D3d d3d, ShaderManager* shaders, const RenderSettings& settings);
+	void draw(D3d d3d, ShaderManager* shaders, const RenderSettings& settings, bool hasCameraChanged);
 	ID3D11ShaderResourceView* initRenderBuffer(D3d d3d, BufferSize& size, uint32_t multisampleCount);
 	void initViewport(BufferSize& size);
 	void initDepthBuffer(D3d d3d, BufferSize& size, uint32_t multisampleCount, bool reverseZ);

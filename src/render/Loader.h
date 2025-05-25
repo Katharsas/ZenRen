@@ -144,6 +144,7 @@ namespace render
 
 	struct RenderData {
 		bool isOutdoorLevel = false;
+		grid::Grid chunkGrid;
 		MatToChunksToVertsBasic worldMesh;
 		MatToChunksToVertsBasic staticMeshes;
 		std::vector<FileData> worldMeshLightmaps;

@@ -140,3 +140,33 @@ void ImGui::EndGroupPanel()
 void ImGui::PushStyleColorDebugText() {
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.f, 0.8f, 0.2f, 0.7f));
 }
+
+namespace ImGui
+{
+    // TODO why not use this namespace in entire file?
+
+    ImGuiDataType_ dataType(uint8_t __) {
+        return ImGuiDataType_U8;
+    }
+    ImGuiDataType_ dataType(int8_t __) {
+        return ImGuiDataType_S8;
+    }
+    ImGuiDataType_ dataType(uint16_t __) {
+        return ImGuiDataType_U16;
+    }
+    ImGuiDataType_ dataType(int16_t __) {
+        return ImGuiDataType_S16;
+    }
+    ImGuiDataType_ dataType(uint32_t __) {
+        return ImGuiDataType_U32;
+    }
+    ImGuiDataType_ dataType(int32_t __) {
+        return ImGuiDataType_S32;
+    }
+    ImGuiDataType_ dataType(float __) {
+        return ImGuiDataType_Float;
+    }
+    ImGuiDataType_ dataType(double __) {
+        return ImGuiDataType_Double;
+    }
+}

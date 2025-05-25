@@ -202,7 +202,7 @@ float4 SampleLightmap(float3 uvLightmap)
 float4 PS_Main(PS_IN input) : SV_TARGET
 {
     // do our own circular clipping (stable during rotations)
-    if (input.distance > 1000) {
+    if (input.distance > viewDistance) {
         discard;
     }
     

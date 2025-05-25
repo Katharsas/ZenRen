@@ -108,12 +108,16 @@ namespace render::pass::world
 				ImGui::Checkbox("Draw VOBs/MOBs", &worldSettings.drawStaticObjects);
 				ImGui::Checkbox("Draw Sky", &worldSettings.drawSky);
 				ImGui::VerticalSpacing();
-				ImGui::Checkbox("LOD Enabled", &worldSettings.enableLod);
+				ImGui::Checkbox("Chunked Rendering", &worldSettings.chunkedRendering);
+				ImGui::VerticalSpacing();
 				ImGui::Checkbox("LOD Low Only", &worldSettings.lowLodOnly);
+				ImGui::BeginDisabled(!worldSettings.chunkedRendering);
+				ImGui::Checkbox("LOD Enabled", &worldSettings.enableLod);
 				ImGui::SliderFloat("##LodCrossover", &worldSettings.lodRadius, 0, 3000, "%.0f LOD Crossover");
 				ImGui::VerticalSpacing();
 				ImGui::Checkbox("Enable Frustum Culling", &worldSettings.enableFrustumCulling);
 				ImGui::Checkbox("Update Frustum Culling", &worldSettings.updateFrustumCulling);
+				ImGui::EndDisabled();
 				ImGui::VerticalSpacing();
 				ImGui::Checkbox("Debug Shader", &worldSettings.debugWorldShaderEnabled);
 				ImGui::Checkbox("Debug Single Draw", &worldSettings.debugSingleDrawEnabled);
@@ -126,6 +130,7 @@ namespace render::pass::world
 
 		render::gui::addSettings("World Draw Filter", {
 			[&]() -> void {
+				ImGui::BeginDisabled(!worldSettings.chunkedRendering);
 				ImGui::PushItemWidth(gui::constants().elementWidth);
 				ImGui::PushStyleColorDebugText();
 
@@ -135,14 +140,15 @@ namespace render::pass::world
 				auto [min, max] = chunkgrid::getIndexMinMax();
 
 				ImGui::BeginDisabled(!worldSettings.chunkFilterXEnabled);
-				ImGui::SliderScalar("ChunkIndex X", ImGuiDataType_S16, &worldSettings.chunkFilterX, &min.x, &max.x);
+				ImGui::SliderScalar("ChunkIndex X", ImGui::dataType(min.x), &worldSettings.chunkFilterX, &min.x, &max.x);
 				ImGui::EndDisabled();
 				ImGui::BeginDisabled(!worldSettings.chunkFilterYEnabled);
-				ImGui::SliderScalar("ChunkIndex Y", ImGuiDataType_S16, &worldSettings.chunkFilterY, &min.y, &max.y);
+				ImGui::SliderScalar("ChunkIndex Y", ImGui::dataType(min.y), &worldSettings.chunkFilterY, &min.y, &max.y);
 				ImGui::EndDisabled();
 
 				ImGui::PopStyleColor();
 				ImGui::PopItemWidth();
+				ImGui::EndDisabled();
 			}
 			});
 
@@ -172,10 +178,12 @@ namespace render::pass::world
 		updateTimeOfDay(worldSettings.timeOfDay + (worldSettings.timeOfDayChangeSpeed * deltaTime));
 	}
 
-	void updateCameraFrustum(const BoundingFrustum& cameraFrustum)
+	void updateCameraFrustum(const BoundingFrustum& cameraFrustum, bool hasCameraMoved)
 	{
-		if (worldSettings.enableFrustumCulling && worldSettings.updateFrustumCulling) {
-			chunkgrid::updateCamera(camera::getFrustum());
+		if (worldSettings.chunkedRendering) {
+			bool updateCulling = worldSettings.enableFrustumCulling && worldSettings.updateFrustumCulling && hasCameraMoved;
+			bool updateDistances = hasCameraMoved;
+			chunkgrid::updateCamera(camera::getFrustum(), updateCulling, updateDistances);
 		}
 	}
 
@@ -263,7 +271,7 @@ namespace render::pass::world
 		return stats;
 	}
 
-	DrawStats drawMeshCluster(D3d d3d, const vector<ChunkVertCluster>& vertClusters, uint32_t drawCount, bool indexed, bool isLowLod, bool ignoreLodRadius)
+	DrawStats drawMeshClusters(D3d d3d, const vector<ChunkVertCluster>& vertClusters, uint32_t drawCount, bool indexed, bool isLowLod, bool ignoreLodRadius)
 	{
 		// TODO select closest chunks (any that overlap a "min render box" around camera) and render them first for early-z discards
 		// TODO fix view-coordinate normal lighting and move to pixel shader so lighting can profit from early-z
@@ -273,7 +281,9 @@ namespace render::pass::world
 
 		// TODO cutoff should be adjustable in GUI
 		uint32_t ignoreAllChunksVertThreshold = 1000;
-		if (!worldSettings.enableFrustumCulling || drawCount <= ignoreAllChunksVertThreshold) {
+
+		if (!worldSettings.chunkedRendering || drawCount <= ignoreAllChunksVertThreshold) {
+			if (isLowLod && !ignoreLodRadius) return stats;
 			// for small number of verts per batch we ignore the clusters to save draw calls
 			stats += draw(d3d, drawCount, drawOffset, indexed);
 		}
@@ -304,19 +314,21 @@ namespace render::pass::world
 			// TODO chunks with very few verts should be allowed to be enabled if range is active currently, if that helps joining ranges (test!)
 
 			for (uint32_t i = 0; i < vertClusters.size(); i++) {
-				const ChunkIndex& chunkIndex = vertClusters[i].pos;
+				const GridPos& gridPos = vertClusters[i].gridPos;
 				uint32_t vertStartIndex = vertClusters[i].vertStartIndex;
 
-				auto camera = chunkgrid::getCameraInfo(chunkIndex);
+				auto gridIndex = chunkgrid::getIndex(gridPos);
+				auto camera = chunkgrid::getCameraInfoInner(gridIndex.innerIndex);
 				bool isInsideLodRadius = ignoreLodRadius || (isLowLod == camera.distanceToCenterSq > lodRadiusSq);
+				bool isInsideFrustum = !worldSettings.enableFrustumCulling || camera.intersectsFrustum;
 
-				bool currentChunkActive = camera.intersectsFrustum && isInsideLodRadius;
+				bool currentChunkActive = isInsideFrustum && isInsideLodRadius;
 
 				if (worldSettings.chunkFilterXEnabled) {
-					currentChunkActive = currentChunkActive && chunkIndex.x == worldSettings.chunkFilterX;
+					currentChunkActive = currentChunkActive && gridPos.x == worldSettings.chunkFilterX;
 				}
 				if (worldSettings.chunkFilterYEnabled) {
-					currentChunkActive = currentChunkActive && chunkIndex.y == worldSettings.chunkFilterY;
+					currentChunkActive = currentChunkActive && gridPos.y == worldSettings.chunkFilterY;
 				}
 
 				if (!rangeActive && currentChunkActive) {
@@ -369,14 +381,14 @@ namespace render::pass::world
 				d3d.annotation->BeginEvent(L"LOD High");
 				// TODO set constant buffer for LOD if shader LOD is enabled
 				bool ignoreLodRadius = !indexed || !hasLod || !worldSettings.enableLod;
-				stats += drawMeshCluster(d3d, mesh.vertClusters, mesh.drawCount, indexed, false, ignoreLodRadius);
+				stats += drawMeshClusters(d3d, mesh.vertClusters, mesh.drawCount, indexed, false, ignoreLodRadius);
 				d3d.annotation->EndEvent();
 			}
 			if (indexed && (worldSettings.lowLodOnly || (hasLod && worldSettings.enableLod))) {
 				d3d.annotation->BeginEvent(L"LOD Low");
 				// TODO set constant buffer for LOD if shader LOD is enabled
 				//stats.stateChanges++;
-				stats += drawMeshCluster(d3d, mesh.vertClustersLod, mesh.drawLodCount, indexed, true, worldSettings.lowLodOnly);
+				stats += drawMeshClusters(d3d, mesh.vertClustersLod, mesh.drawLodCount, indexed, true, worldSettings.lowLodOnly);
 				d3d.annotation->EndEvent();
 			}
 		}

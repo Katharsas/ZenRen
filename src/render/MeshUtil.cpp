@@ -15,6 +15,13 @@ namespace render
         return XMMATRIX(matrix);
     }
 
+    XMFLOAT3 toFloat3(const XMVECTOR& xm4)
+    {
+        XMFLOAT3 result;
+        XMStoreFloat3(&result, xm4);
+        return result;
+    }
+
     Vec3 toVec3(const XMFLOAT3& xmf3)
     {
         return Vec3{ xmf3.x, xmf3.y, xmf3.z };
@@ -57,15 +64,10 @@ namespace render
         return  XMVector3Normalize(XMVector3Cross(XMVectorSubtract(posXm[2], posXm[0]), XMVectorSubtract(posXm[1], posXm[0])));
     }
 
-    ChunkIndex toChunkIndex(XMVECTOR posXm)
+    GridPos toGridPos(const grid::Grid& grid, XMVECTOR posXm)
     {
-        const static XMVECTOR chunkSize = toXM4Pos(Vec3{ chunkSizePerDim, chunkSizePerDim, chunkSizePerDim });
-        XMVECTOR indexXm = XMVectorFloor(XMVectorDivide(posXm, chunkSize));
-
-        XMFLOAT4 result;
-        XMStoreFloat4(&result, indexXm);
-
-        return { (int16_t)result.x, (int16_t)result.z };
+        Vec3 pos = toVec3(posXm);
+        return grid::getGridPosForPoint(grid, { pos.x, pos.z });
     }
 
     void warnIfNotNormalized(const XMVECTOR& source)
@@ -79,15 +81,16 @@ namespace render
         }
     }
 
-    void printXMMatrix(const XMMATRIX& matrix)
+    void printXMMatrix(const XMMATRIX& matrix, const std::string& numberFormat)
     {
+        // Example numberFormat = :7.2f
         XMFLOAT4X4 tmp;
         XMStoreFloat4x4(&tmp, matrix);
         LOG(DEBUG) << "Matrix:";
-        constexpr const char* f = "    {:7.2f}, {:7.2f}, {:7.2f}, {:7.2f}";
-        LOG(DEBUG) << std::format(f, tmp._11, tmp._12, tmp._13, tmp._14);
-        LOG(DEBUG) << std::format(f, tmp._21, tmp._22, tmp._23, tmp._24);
-        LOG(DEBUG) << std::format(f, tmp._31, tmp._32, tmp._33, tmp._34);
-        LOG(DEBUG) << std::format(f, tmp._41, tmp._42, tmp._43, tmp._44);
+        std::string format = "    {" + numberFormat + "}, {" + numberFormat + "}, {" + numberFormat + "}, {" + numberFormat + "}";
+        LOG(DEBUG) << std::vformat(format, std::make_format_args(tmp._11, tmp._12, tmp._13, tmp._14));
+        LOG(DEBUG) << std::vformat(format, std::make_format_args(tmp._21, tmp._22, tmp._23, tmp._24));
+        LOG(DEBUG) << std::vformat(format, std::make_format_args(tmp._31, tmp._32, tmp._33, tmp._34));
+        LOG(DEBUG) << std::vformat(format, std::make_format_args(tmp._41, tmp._42, tmp._43, tmp._44));
     }
 }

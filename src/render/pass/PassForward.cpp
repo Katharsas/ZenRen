@@ -149,7 +149,7 @@ namespace render::pass::forward
 		return ::util::utf8ToWide(prefix + std::string(magic_enum::enum_name(blendType)));
 	}
 
-	void draw(D3d d3d, ShaderManager* shaders, const RenderSettings& settings) {
+	void draw(D3d d3d, ShaderManager* shaders, const RenderSettings& settings, bool hasCameraChanged) {
 		d3d.annotation->BeginEvent(L"Pass Foward");
 
 		// set the linear back buffer as rtv
@@ -174,7 +174,7 @@ namespace render::pass::forward
 
 		// update camera
 		updateCamera(d3d);
-		world::updateCameraFrustum(camera::getFrustum());
+		world::updateCameraFrustum(camera::getFrustum(), hasCameraChanged);
 
 		// set common constant buffers
 		d3d.deviceContext->VSSetConstantBuffers(0, 1, &shaderCbs.settingsCb);
