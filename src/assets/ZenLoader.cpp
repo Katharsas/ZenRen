@@ -141,7 +141,7 @@ namespace assets
         return statics;
     }
 
-    bool loadInstanceVisual(MatToChunksToVertsBasic& target, const Grid& grid, const StaticInstance& instance, bool indexed, bool debugChecksEnabled)
+    bool loadInstanceVisual(MatToChunksToVertsBasic& target, Grid& grid, const StaticInstance& instance, bool indexed, bool debugChecksEnabled)
     {
         using namespace FormatsSource;
         using namespace FormatsCompiled;

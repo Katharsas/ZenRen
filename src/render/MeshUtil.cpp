@@ -15,6 +15,13 @@ namespace render
         return XMMATRIX(matrix);
     }
 
+    XMFLOAT3 toFloat3(const XMVECTOR& xm4)
+    {
+        XMFLOAT3 result;
+        XMStoreFloat3(&result, xm4);
+        return result;
+    }
+
     Vec3 toVec3(const XMFLOAT3& xmf3)
     {
         return Vec3{ xmf3.x, xmf3.y, xmf3.z };

@@ -5,6 +5,7 @@
 
 namespace render
 {
+	// TODO rename to CellPos? TODO move to render::grid again?
 	struct GridPos {
 		uint8_t x;
 		uint8_t y;
@@ -28,18 +29,43 @@ namespace render
 	}
 } namespace std { template <> struct hash<render::GridPos> : render::GridPos::Hash {}; } namespace render {
 
+	namespace grid
+	{
+		struct CellInfo {
+			bool isInUse = false;
+			DirectX::BoundingBox bbox;
+		};
+
+		struct LayerCellInfo {
+			bool isInUse;
+			DirectX::BoundingBox bbox;
+		};
+
+		template<typename T, typename L>
+		struct LayeredCells {
+			std::vector<T> baseCells;
+			std::vector<L> layerCells;
+			std::function<L(std::ranges::input_range<T>)> updateLayer;
+		};
+	}
+	
+	// TODO move to render::grid?
 	struct Grid {
 		Vec2 boundsMin, boundsMax;
 		float distance;
-		uint8_t cellsPerDim;
-		uint8_t cellsPerDimMain;
-		uint8_t cellsPerDimSub;
+		uint8_t cellCountXY;
+		uint8_t groupSize = 0;
+
+		std::vector<grid::CellInfo> cells;
+		std::vector<grid::LayerCellInfo> layerCells;
 	};
 
 	namespace grid
 	{
 		Grid init(Vec2 boundsMin, Vec2 boundsMax, float scale, uint32_t faceCount);
-
 		GridPos getGridPosForPoint(const Grid& grid, Vec2 point);
+		uint16_t getIndex(GridPos pos);
+		void updateGridBounds(Grid& grid, GridPos pos, const DirectX::BoundingBox& bbox);
+		void updateHierarchy(Grid& grid);
 	}
 }

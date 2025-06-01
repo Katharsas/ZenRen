@@ -472,13 +472,8 @@ namespace render::pass::world
 		sampler.logMillisAndRestart("Level: Uploaded lightmap textures");
 
 		// chunk grid
-		chunkgrid::updateSize(data.worldMesh);
-		chunkgrid::updateSize(data.staticMeshes);
-		uint32_t cellCount = chunkgrid::finalizeSize();
-		chunkgrid::updateMesh(data.worldMesh);
-		chunkgrid::updateMesh(data.staticMeshes);
+		uint32_t cellCount = chunkgrid::init(data.chunkGrid);
 		LOG(INFO) << "Level: Computed Chunk Grid - Cells: " << cellCount;
-		sampler.logMillisAndRestart("Level: Computed chunk grid");
 
 		LoadResult loadResult;
 

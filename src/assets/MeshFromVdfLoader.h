@@ -20,7 +20,7 @@ namespace assets
     
     void loadInstanceMesh(
         render::MatToChunksToVertsBasic& target,
-        const render::Grid& grid,
+        render::Grid& grid,
         const zenkit::MultiResolutionMesh& mesh,
         const render::StaticInstance& instance,
         bool indexed,
@@ -28,7 +28,7 @@ namespace assets
 
     void loadInstanceModel(
         render::MatToChunksToVertsBasic& target,
-        const render::Grid& grid,
+        render::Grid& grid,
         const zenkit::ModelHierarchy& hierarchy,
         const zenkit::ModelMesh& model,
         const render::StaticInstance& instance,
@@ -37,7 +37,7 @@ namespace assets
 
     void loadInstanceDecal(
         render::MatToChunksToVertsBasic& target,
-        const render::Grid& grid,
+        render::Grid& grid,
         const render::StaticInstance& instance,
         bool indexed,
         bool debugChecksEnabled

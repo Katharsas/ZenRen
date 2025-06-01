@@ -30,6 +30,8 @@ namespace render
 
     DirectX::XMMATRIX toXMMatrix(const float * matrix);
 
+    DirectX::XMFLOAT3 toFloat3(const DirectX::XMVECTOR& xm4);
+
     template <XY V2>
     Uv toUv(const V2& vec)
     {
@@ -66,6 +68,14 @@ namespace render
         DirectX::XMFLOAT4 float4;
         DirectX::XMStoreFloat4(&float4, that);
         return os << "[X:" << float4.x << " Y:" << float4.y << " Z:" << float4.z << " W:" << float4.w << "]";
+    }
+
+    template <typename T>
+    DirectX::BoundingBox createBboxFromPoints(const std::vector<T>& positions)
+    {
+        DirectX::BoundingBox result;
+        DirectX::BoundingBox::CreateFromPoints(result, positions.size(), (const DirectX::XMFLOAT3*)positions.data(), sizeof(T));
+        return result;
     }
 
     template <typename C1, typename C2>

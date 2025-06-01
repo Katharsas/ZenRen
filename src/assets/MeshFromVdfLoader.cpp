@@ -623,6 +623,9 @@ namespace assets
 
             // Per material and chunkIndex: generate indices and optimize vertex and index data with meshoptimizer
             for (auto& [chunkIndex, vertsTemp] : chunksTemp) {
+                // update grid bbox
+                grid::updateGridBounds(grid, chunkIndex, createBboxFromPoints(vertsTemp.vecPos));
+
                 uint32_t vertexCount = vertsTemp.vecPos.size();
 
                 // Create indices to reduce vertexCount, optimize
@@ -1008,7 +1011,7 @@ namespace assets
 
     void loadInstanceMesh(
         MatToChunksToVertsBasic& target,
-        const Grid& grid,
+        Grid& grid,
         const zenkit::MultiResolutionMesh& mesh,
         const StaticInstance& instance,
         uint32_t submeshId,
@@ -1025,6 +1028,7 @@ namespace assets
         util::hashCombine(hash, instance.visual_name);
         util::hashCombine(hash, submeshId);
 
+        // oriented bb might be tighter than aabb, so we don't use instance.bbox here
         Vec3 halfWidth = toVec3(mesh.obbox.half_width);
         float bboxMaxDim = std::max(std::max(halfWidth.x, halfWidth.y), halfWidth.z) * 2 * G_ASSET_RESCALE;
 
@@ -1036,13 +1040,17 @@ namespace assets
             return;
         }
 
-        GridPos gridPos = toGridPos(grid, bboxCenter(instance.bbox));
+        XMVECTOR centerXm = bboxCenter(instance.bbox);
+        XMVECTOR halfWidthXm = centerXm - instance.bbox[0];
+
+        GridPos gridPos = toGridPos(grid, centerXm);
+        grid::updateGridBounds(grid, gridPos, BoundingBox(toFloat3(centerXm), toFloat3(halfWidthXm)));
         instantiateAndInsert(target, gridPos, cachedVerts, instance, false);
     }
 
     void loadInstanceMesh(
         MatToChunksToVertsBasic& target,
-        const Grid& grid,
+        Grid& grid,
         const zenkit::MultiResolutionMesh& mesh,
         const StaticInstance& instance,
         bool indexed,
@@ -1063,7 +1071,7 @@ namespace assets
 
     void loadInstanceModel(
         MatToChunksToVertsBasic& target,
-        const Grid& grid,
+        Grid& grid,
         const zenkit::ModelHierarchy& hierarchy,
         const zenkit::ModelMesh& model,
         const StaticInstance& instance,
@@ -1170,7 +1178,7 @@ namespace assets
 
     void loadInstanceDecal(
         MatToChunksToVertsBasic& target,
-        const Grid& grid,
+        Grid& grid,
         const StaticInstance& instance,
         bool indexed,
         bool debugChecksEnabled
@@ -1196,7 +1204,11 @@ namespace assets
             vertsPacked.emplace(material, VertsPacked{ .vertsPacked = std::move(vertsPre) });
         }
 
-        GridPos gridPos = toGridPos(grid, bboxCenter(instance.bbox));
+        XMVECTOR centerXm = bboxCenter(instance.bbox);
+        XMVECTOR halfWidthXm = centerXm - instance.bbox[0];
+
+        GridPos gridPos = toGridPos(grid, centerXm);
+        grid::updateGridBounds(grid, gridPos, BoundingBox(toFloat3(centerXm), toFloat3(halfWidthXm)));
         instantiateAndInsert(target, gridPos, vertsPacked, instance, true);
     }
 

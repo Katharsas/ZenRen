@@ -6,87 +6,35 @@
 namespace render::pass::world::chunkgrid
 {
 	using namespace DirectX;
+	using std::vector;
 
-	uint8_t minX = UCHAR_MAX, minY = UCHAR_MAX;
-	uint8_t maxX = 0, maxY = 0;
-	int16_t lengthX, lengthY;
-	bool sizeFinalized = false;
+	// TODO calculate empty areas?
+	//uint8_t minX = UCHAR_MAX, minY = UCHAR_MAX;
+	//uint8_t maxX = 0, maxY = 0;
 
-	std::vector<std::pair<bool, DirectX::BoundingBox>> chunks;
-	std::vector<ChunkCameraInfo> chunksCameraInfo;
+	bool isInitialized = false;
+	Grid grid;
+	uint16_t size = 0;
 
-	uint32_t getFlatIndex(const GridPos& index)
+	vector<ChunkCameraInfo> chunksCameraInfo;
+
+	uint16_t init(const Grid& gridParam)
 	{
-		uint16_t x = index.x - minX;
-		uint16_t y = index.y - minY;
-		return (y * (uint32_t)lengthX) + x;
-	}
-
-	DirectX::BoundingBox createBbox(const std::vector<VertexPos> vecPos)
-	{
-		BoundingBox result;
-		BoundingBox::CreateFromPoints(result, vecPos.size(), (const XMFLOAT3*)vecPos.data(), sizeof(VertexPos));
-		return result;
-	}
-
-	template <VERTEX_FEATURE F>
-	void updateSize(const MatToChunksToVerts<F>& meshData)
-	{
-		assert(!sizeFinalized);
-
-		for (const auto& [material, chunkToVerts] : meshData) {
-			for (const auto& [gridPos, verts] : chunkToVerts) {
-				minX = std::min(minX, gridPos.x);
-				minY = std::min(minY, gridPos.y);
-				maxX = std::max(maxX, gridPos.x);
-				maxY = std::max(maxY, gridPos.y);
-			}
-		}
-		lengthX = (maxX - minX) + 1;
-		lengthY = (maxY - minY) + 1;
-	}
-	template void updateSize(const MatToChunksToVerts<VertexBasic>&);
-
-	std::pair<ChunkIndex, ChunkIndex> getIndexMinMax()
-	{
-		return { { minX, minY }, {maxX, maxY} };
-	}
-
-	uint32_t finalizeSize()
-	{
-		assert(!sizeFinalized);
-
-		uint32_t size = lengthX * lengthY;
-		chunks.resize(size);
+		grid = gridParam;
+		size = grid.cellCountXY * grid.cellCountXY;
 		chunksCameraInfo.resize(size);
-		sizeFinalized = true;
+
+		// TODO hierarchy
+
+		isInitialized = true;
 		return size;
 	}
 
-	template <VERTEX_FEATURE F>
-	void updateMesh(const MatToChunksToVerts<F>& meshData)
+	std::pair<GridPos, GridPos> getIndexMinMax()
 	{
-		assert(sizeFinalized);
-
-		for (const auto& [material, chunkToVerts] : meshData) {
-			for (const auto& [gridPos, verts] : chunkToVerts) {
-				if (verts.vecPos.empty()) {
-					continue;
-				}
-				const BoundingBox vertBbox = createBbox(verts.vecPos);
-				uint32_t flatIndex = getFlatIndex(gridPos);
-				auto& [exists, existingBbox] = chunks[flatIndex];
-				if (exists) {
-					BoundingBox::CreateMerged(existingBbox, existingBbox, vertBbox);
-				}
-				else {
-					existingBbox = vertBbox;
-					exists = true;
-				}
-			}
-		}
+		return { { 0u, 0u }, { grid.cellCountXY, grid.cellCountXY } };
 	}
-	template void updateMesh(const MatToChunksToVerts<VertexBasic>&);
+
 
 	void strplace(std::string& str, uint32_t index, const std::string& str2)
 	{
@@ -102,22 +50,23 @@ namespace render::pass::world::chunkgrid
 
 	void printGrid(uint16_t cellSize = 3)
 	{
-		std::string buffer((lengthX * cellSize) + cellSize, ' ');
+		float size = grid.cellCountXY;
+		std::string buffer((size * cellSize) + cellSize, ' ');
 
-		for (uint16_t x = 0; x < lengthX; x++) {
-			strplace(buffer, (x * cellSize) + cellSize, ::util::leftPad(std::to_string(minX + x), cellSize));
+		for (uint8_t x = 0; x < size; x++) {
+			strplace(buffer, (x * cellSize) + cellSize, ::util::leftPad(std::to_string(x), cellSize));
 		}
 		LOG(DEBUG) << buffer;
 
-		for (uint16_t y = 0; y < lengthY; y++) {
-			strplace(buffer, 0, ::util::leftPad(std::to_string(minY + y), cellSize));
-			for (uint16_t x = 0; x < lengthX; x++) {
-				uint32_t index = (y * (uint32_t)lengthX) + x;
+		for (uint8_t y = 0; y < size; y++) {
+			strplace(buffer, 0, ::util::leftPad(std::to_string(y), cellSize));
+			for (uint8_t x = 0; x < size; x++) {
+				uint32_t index = grid::getIndex({ x, y });
 				std::string cellValue = chunksCameraInfo[index].intersectsFrustum ? "X" : "O";
 				//std::string cellValue = toStr(chunks[index].second.Extents);
 				strplace(buffer, (x * cellSize) + cellSize, ::util::leftPad(cellValue, cellSize));
 			}
-			LOG(DEBUG) << buffer;
+			LOG(DEBUG) << buffer; 
 		}
 	}
 
@@ -126,13 +75,13 @@ namespace render::pass::world::chunkgrid
 		// we ignore y since grid is 2D and also there are some misplaced benches deep underground in G1 (3500m under burg that mess up chunk center
 		Vec2 cameraOrigin = { cameraFrustum.Origin.x, cameraFrustum.Origin.z };
 
-		for (uint32_t i = 0; i < chunks.size(); i++) {
+		for (uint32_t i = 0; i < size; i++) {
 			// frustum
-			auto& [exists, existingBbox] = chunks[i];
-			chunksCameraInfo[i].intersectsFrustum = exists && cameraFrustum.Intersects(existingBbox);
+			auto& cell = grid.cells[i];
+			chunksCameraInfo[i].intersectsFrustum = cell.isInUse && cameraFrustum.Intersects(cell.bbox);
 
 			// distance
-			Vec2 bboxCenter = { existingBbox.Center.x, existingBbox.Center.z };
+			Vec2 bboxCenter = { cell.bbox.Center.x, cell.bbox.Center.z };
 			float distSq = lengthSq(sub(cameraOrigin, bboxCenter));
 			chunksCameraInfo[i].distanceToCenterSq = distSq;
 		}
@@ -140,7 +89,7 @@ namespace render::pass::world::chunkgrid
 
 	ChunkCameraInfo getCameraInfo(const GridPos& index)
 	{
-		assert(sizeFinalized);
-		return chunksCameraInfo[getFlatIndex(index)];
+		assert(isInitialized);
+		return chunksCameraInfo[grid::getIndex(index)];
 	}
 }
