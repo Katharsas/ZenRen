@@ -72,15 +72,25 @@ namespace render::grid
 		float cellsPerDimTarget = std::sqrt(cellsTarget);
 
 		uint32_t cellsPerDimPowerOf2 = std::pow(2, (uint32_t) std::ceil(std::log2(cellsPerDimTarget)));
-		if (cellsPerDimPowerOf2 > 8) {
-			grid.cellsPerDimMain = 8;
-			grid.cellsPerDimSub = std::min(cellsPerDimPowerOf2 / 8, 4u);// we never go over 8 * 4 cells to save CPU
+		//if (cellsPerDimPowerOf2 > 8) {
+		//	grid.cellsPerDimMain = 8;
+		//	grid.cellsPerDimSub = std::min(cellsPerDimPowerOf2 / 8, 4u);// we never go over 8 * 4 cells to save CPU
+		//}
+		//else {
+		//	grid.cellsPerDimMain = cellsPerDimPowerOf2;
+		//	grid.cellsPerDimSub = 1;
+		//}
+		//grid.cellsPerDim = grid.cellsPerDimMain * grid.cellsPerDimSub;
+
+		grid.cellCountXY = std::min(cellsPerDimPowerOf2, 8u * 4u);// we never go over 8 * 4 cells to save CPU
+		grid.cells.resize(grid.cellCountXY * grid.cellCountXY);
+
+		if (grid.cellCountXY > 8) {
+			grid.groupSize = grid.cellCountXY / 8;// do we actually prefer 8 * 2 over 4 * 4? 
+			uint8_t layerCellsPerDim = grid.cellCountXY / grid.groupSize;
+			grid.layerCells.resize(layerCellsPerDim * layerCellsPerDim);
 		}
-		else {
-			grid.cellsPerDimMain = cellsPerDimPowerOf2;
-			grid.cellsPerDimSub = 1;
-		}
-		grid.cellsPerDim = grid.cellsPerDimMain * grid.cellsPerDimSub;
+
 		return grid;
 	}
 
@@ -105,9 +115,22 @@ namespace render::grid
 		// if we put them into Grid struct and take a Vec3, but that kinda messes up the architecture
 		// or take both Vec2 and Vec3?? or just keep things as they are since we need the per-face
 		// bboxes anyway for light blocking
+		
+		// TODO or pass boundingBox in addition to Vec2??! would make placing vobs much faster since we just call once per vob
+		// instead of once per vob face, or have separate function updateGridBounds(Grid, GridPos, Bbox)
 		return GridPos{
-			.x = rescaleToIndex(grid.boundsMin.x, grid.boundsMax.x, point.x, grid.cellsPerDim),
-			.y = rescaleToIndex(grid.boundsMin.y, grid.boundsMax.y, point.y, grid.cellsPerDim),
+			.x = rescaleToIndex(grid.boundsMin.x, grid.boundsMax.x, point.x, grid.cellCountXY),
+			.y = rescaleToIndex(grid.boundsMin.y, grid.boundsMax.y, point.y, grid.cellCountXY),
 		};
+	}
+
+	uint16_t getIndex(GridPos pos)
+	{
+		return morton::encode2d(pos.x, pos.y);
+	}
+
+	void updateGridBounds(Grid& grid, GridPos pos, const DirectX::BoundingBox& bbox)
+	{
+		auto& cell = grid.cells.at(getIndex(pos));
 	}
 }
