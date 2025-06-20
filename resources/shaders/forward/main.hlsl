@@ -1,5 +1,19 @@
 #include "common.hlsl"
 
+cbuffer cbWorldSettings : register(b5)
+{
+    bool enablePerPixelLod;
+    bool enableLodDithering;
+}
+
+cbuffer cbLodRange : register(b6)
+{
+    float fadeInStart;// if 0, use dither seed 0, otherwise 1
+    float fadeInEnd;
+    float fadeOutStart;
+    float fadeOutEnd;
+}
+
 //--------------------------------------------------------------------------------------
 // Vertex Shader
 //--------------------------------------------------------------------------------------
@@ -202,9 +216,10 @@ float4 SampleLightmap(float3 uvLightmap)
 float4 PS_Main(PS_IN input) : SV_TARGET
 {
     // do our own circular clipping (stable during rotations)
-    if (input.distance > viewDistance) {
-        discard;
-    }
+    clip(viewDistance - input.distance);
+    
+    // LOD
+    clip(enablePerPixelLod && (input.distance < fadeInStart || input.distance >= fadeOutEnd) ? -1 : 1);
     
     // light color
         float4 lightColor;

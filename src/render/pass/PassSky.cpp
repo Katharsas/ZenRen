@@ -34,15 +34,17 @@ namespace render::pass::sky
         std::vector<LAYER_UVS> vecOther;
     };
 
-    __declspec(align(16))
-    struct CbSkyLayer {
+    __declspec(align(16)) struct CbSkyLayer {
         Color light;// original only uses values other than 1 on overlay
         float alpha;
         uint32_t blurDisabled;
     };
 
-    __declspec(align(16))
-    struct CbSkyLayerSettings {
+    __declspec(align(16)) struct CbSkyLayerSettings {
+        static uint16_t slot() {
+            return 4;
+        }
+
         // Note: smallest type for constant buffer values is 32 bit; cannot use bool or uint_16 without packing
         Color colBackground;
         CbSkyLayer texLayers[2];
@@ -74,7 +76,7 @@ namespace render::pass::sky
     array<SkyTexture, 4> skyTextures;
 
     ID3D11SamplerState* linearSamplerState = nullptr;
-    ID3D11Buffer* skyLayerSettingsCb = nullptr;
+    d3d::ConstantBuffer<CbSkyLayerSettings> skyLayerSettingsCb = {};
 
     vector<array<XMVECTOR, 3>> createSkyVerts()
     {
@@ -201,7 +203,7 @@ namespace render::pass::sky
         d3d::updateConstantBuf(d3d, skyLayerSettingsCb, layerSettings);
     }
 
-    void drawSky(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs, ID3D11SamplerState* layerSampler)
+    void drawSky(D3d d3d, ShaderManager* shaders, ID3D11SamplerState* layerSampler)
     {
         d3d.annotation->BeginEvent(L"sky");
 
@@ -212,8 +214,8 @@ namespace render::pass::sky
         d3d.deviceContext->PSSetShader(shader->getPixelShader(), 0, 0);
 
         // constant buffer
-        d3d.deviceContext->VSSetConstantBuffers(4, 1, &skyLayerSettingsCb);
-        d3d.deviceContext->PSSetConstantBuffers(4, 1, &skyLayerSettingsCb);
+        d3d.deviceContext->VSSetConstantBuffers(CbSkyLayerSettings::slot(), 1, &skyLayerSettingsCb.buffer);
+        d3d.deviceContext->PSSetConstantBuffers(CbSkyLayerSettings::slot(), 1, &skyLayerSettingsCb.buffer);
 
         // textures
         d3d.deviceContext->PSSetSamplers(0, 1, &layerSampler);
@@ -232,7 +234,7 @@ namespace render::pass::sky
     void initConstantBuffers(D3d d3d)
     {
         // TODO this should probably be dynamic, see https://www.gamedev.net/forums/topic/673486-difference-between-d3d11-usage-default-and-d3d11-usage-dynamic/
-        d3d::createConstantBuf<CbSkyLayerSettings>(d3d, &skyLayerSettingsCb, BufferUsage::WRITE_GPU);
+        d3d::createConstantBuf(d3d, skyLayerSettingsCb, BufferUsage::WRITE_GPU);
     }
 
     void clean()
@@ -242,6 +244,6 @@ namespace render::pass::sky
             delete skyTexture.tex;
         }
         release(linearSamplerState);
-        release(skyLayerSettingsCb);
+        skyLayerSettingsCb.release();
     }
 }

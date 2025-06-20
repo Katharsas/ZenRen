@@ -80,14 +80,6 @@ namespace render
 		}
 	};
 
-	struct ShaderCbs
-	{
-		ID3D11Buffer* settingsCb = nullptr;
-		ID3D11Buffer* cameraCb = nullptr;
-		ID3D11Buffer* blendModeCb = nullptr;
-		ID3D11Buffer* debugCb = nullptr;
-	};
-
 	struct LoadWorldResult {
 		bool loaded = false;
 		bool isOutdoorLevel = false;

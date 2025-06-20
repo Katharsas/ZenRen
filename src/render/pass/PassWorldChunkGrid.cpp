@@ -170,9 +170,29 @@ namespace render::pass::world::chunkgrid
 
 		for (uint32_t i = 0; i < grid.cellCount; i++) {
 			auto& cell = grid.cells.base[i];
-			Vec2 bboxCenter = { cell.bbox.Center.x, cell.bbox.Center.z };
-			float distSq = lengthSq(sub(cameraOrigin, bboxCenter));
-			cellsCamera.base[i].distanceToCenterSq = distSq;
+			if (cell.isInUse) {
+				auto& cellCamera = cellsCamera.base[i];
+
+				Vec2 bboxCenter = { cell.bbox.Center.x, cell.bbox.Center.z };
+				Vec2 bboxExtents = { cell.bbox.Extents.x, cell.bbox.Extents.z };
+				Vec2 toBboxCenter = sub(cameraOrigin, bboxCenter);
+
+				cellCamera.distanceCenterSq = lengthSq(toBboxCenter);
+
+				Vec2 bboxExtentsDirected = {
+					std::copysign(bboxExtents.x, toBboxCenter.x),
+					std::copysign(bboxExtents.y, toBboxCenter.y)
+				};
+				Vec2 tobboxFarCorner = add(toBboxCenter, bboxExtentsDirected);
+				Vec2 tobboxNearCorner = add(toBboxCenter, mul(bboxExtentsDirected, -1));
+
+				cellCamera.distanceCornerNearSq = lengthSq(tobboxNearCorner);
+				cellCamera.distanceCornerFarSq = lengthSq(tobboxFarCorner);
+
+				// if we are inside bbox, nearCorner can be further than center, but farCorner must always be furthest
+				assert(cellCamera.distanceCornerFarSq >= cellCamera.distanceCenterSq);
+				assert(cellCamera.distanceCornerFarSq >= cellCamera.distanceCornerNearSq);
+			}
 		}
 	}
 

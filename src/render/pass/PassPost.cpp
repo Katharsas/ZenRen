@@ -9,8 +9,7 @@
 
 namespace render::pass::post
 {
-	__declspec(align(16))
-		struct CbPostSettings {
+	__declspec(align(16)) struct CbPostSettings {
 		// Note: smallest type for constant buffer values is 32 bit; cannot use bool or uint_16 without packing
 
 		float contrast;
@@ -34,7 +33,7 @@ namespace render::pass::post
 	ID3D11DepthStencilState* depthStateNone = nullptr;
 	ID3D11RasterizerState* rasterizer;
 
-	ID3D11Buffer* settingsCb = nullptr;
+	d3d::ConstantBuffer<CbPostSettings> settingsCb = {};
 
 	uint32_t downsamplingSamples = 8;
 
@@ -58,9 +57,8 @@ namespace render::pass::post
 			multisampleDepthView,
 			depthStateNone,
 			rasterizer,
-
-			settingsCb,
 		});
+		settingsCb.release();
 	}
 
 	void updatePostSettingsCb(D3d d3d, const RenderSettings& settings) {
@@ -108,7 +106,7 @@ namespace render::pass::post
 
 		Shader* toneMappingShader = shaders->getShader("toneMapping");
 		updatePostSettingsCb(d3d, settings);
-		d3d.deviceContext->PSSetConstantBuffers(0, 1, &settingsCb);
+		d3d.deviceContext->PSSetConstantBuffers(0, 1, &settingsCb.buffer);
 		renderToTexure(d3d, toneMappingShader, linearBackBuffer, rtv, depth);
 
 		if (!renderDirectlyToBackBuffer) {
@@ -313,6 +311,6 @@ namespace render::pass::post
 	void initConstantBuffers(D3d d3d)
 	{
 		// TODO this should probably be dynamic, see https://www.gamedev.net/forums/topic/673486-difference-between-d3d11-usage-default-and-d3d11-usage-dynamic/
-		d3d::createConstantBuf<CbPostSettings>(d3d, &settingsCb, BufferUsage::WRITE_GPU);
+		d3d::createConstantBuf(d3d, settingsCb, BufferUsage::WRITE_GPU);
 	}
 }

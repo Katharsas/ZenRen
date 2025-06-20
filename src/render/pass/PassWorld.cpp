@@ -11,6 +11,7 @@
 #include "render/Camera.h"
 #include "render/Sky.h"
 #include "render/PerfStats.h"
+#include "render/d3d/ConstantBuffer.h"
 #include "render/d3d/GeometryBuffer.h"
 
 #include "Util.h"
@@ -32,6 +33,29 @@ namespace render::pass::world
 	WorldSettings worldSettings;
 
 	ID3D11SamplerState* linearSamplerState = nullptr;
+
+	__declspec(align(16)) struct CbWorldSettings {
+		static uint16_t slot() {
+			return 5;
+		}
+
+		int32_t enablePerPixelLod;
+		int32_t enableLodDithering;
+	};
+
+	__declspec(align(16)) struct CbLodRange {
+		static uint16_t slot() {
+			return 6;
+		}
+
+		float fadeInBegin;// if 0, use dither seed 0, otherwise 1
+		float fadeInEnd;
+		float fadeOutBegin;
+		float fadeOutEnd;
+	};
+
+	d3d::ConstantBuffer<CbWorldSettings> worldSettingsCb = {};
+	d3d::ConstantBuffer<CbLodRange> lodRangeCb = {};
 
 	int32_t selectedDebugTexture = 0;
 
@@ -109,15 +133,31 @@ namespace render::pass::world
 				ImGui::Checkbox("Draw Sky", &worldSettings.drawSky);
 				ImGui::VerticalSpacing();
 				ImGui::Checkbox("Chunked Rendering", &worldSettings.chunkedRendering);
+
 				ImGui::VerticalSpacing();
 				ImGui::Checkbox("LOD Low Only", &worldSettings.lowLodOnly);
 				ImGui::BeginDisabled(!worldSettings.chunkedRendering);
+
+				ImGui::PopStyleColor();
 				ImGui::Checkbox("LOD Enabled", &worldSettings.enableLod);
-				ImGui::SliderFloat("##LodCrossover", &worldSettings.lodRadius, 0, 3000, "%.0f LOD Crossover");
+				ImGui::BeginDisabled(!worldSettings.enableLod);
+				ImGui::SliderFloat("##LodCrossover", &worldSettings.lodRadius, 0, 1000, "%.0f LOD Crossover", ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat);
+				ImGui::PushStyleColorDebugText();
+
+				ImGui::Checkbox("LOD Per Pixel", &worldSettings.enablePerPixelLod);
+				ImGui::BeginDisabled(!worldSettings.enablePerPixelLod);
+				ImGui::Checkbox("LOD Dithering", &worldSettings.enableLodDithering);
+				ImGui::BeginDisabled(!worldSettings.enableLodDithering);
+				ImGui::SliderFloat("##LodCrossoverWidth", &worldSettings.lodRadiusDitherWidth, 0, 100, "%.0f LOD Crossover Width");
+				ImGui::EndDisabled();
+				ImGui::EndDisabled();
+				ImGui::EndDisabled();
+
 				ImGui::VerticalSpacing();
 				ImGui::Checkbox("Enable Frustum Culling", &worldSettings.enableFrustumCulling);
 				ImGui::Checkbox("Update Frustum Culling", &worldSettings.updateFrustumCulling);
 				ImGui::EndDisabled();
+				
 				ImGui::VerticalSpacing();
 				ImGui::Checkbox("Debug Shader", &worldSettings.debugWorldShaderEnabled);
 				ImGui::Checkbox("Debug Single Draw", &worldSettings.debugSingleDrawEnabled);
@@ -178,13 +218,22 @@ namespace render::pass::world
 		updateTimeOfDay(worldSettings.timeOfDay + (worldSettings.timeOfDayChangeSpeed * deltaTime));
 	}
 
-	void updateCameraFrustum(const BoundingFrustum& cameraFrustum, bool hasCameraMoved)
+	void updatePrepareDraws(D3d d3d, const BoundingFrustum& cameraFrustum, bool hasCameraMoved)
 	{
 		if (worldSettings.chunkedRendering) {
 			bool updateCulling = worldSettings.enableFrustumCulling && worldSettings.updateFrustumCulling && hasCameraMoved;
 			bool updateDistances = hasCameraMoved;
 			chunkgrid::updateCamera(camera::getFrustum(), updateCulling, updateDistances);
 		}
+
+		CbWorldSettings cbWorldSettings;
+		bool isLodEnabled = worldSettings.chunkedRendering && worldSettings.enableLod;
+		cbWorldSettings.enablePerPixelLod = isLodEnabled && worldSettings.enablePerPixelLod;
+		cbWorldSettings.enableLodDithering = isLodEnabled && worldSettings.enablePerPixelLod && worldSettings.enableLodDithering;
+
+		d3d::updateConstantBuf(d3d, worldSettingsCb, cbWorldSettings);
+		d3d.deviceContext->VSSetConstantBuffers(CbWorldSettings::slot(), 1, &worldSettingsCb.buffer);
+		d3d.deviceContext->PSSetConstantBuffers(CbWorldSettings::slot(), 1, &worldSettingsCb.buffer);
 	}
 
 	WorldSettings& getWorldSettings() {
@@ -223,6 +272,9 @@ namespace render::pass::world
 		// select which primtive type we are using, TODO this should be managed more centrally, because otherwise changing this affects other parts of pipeline
 		d3d.deviceContext->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+		d3d::createConstantBuf(d3d, worldSettingsCb, BufferUsage::WRITE_GPU);
+		d3d::createConstantBuf(d3d, lodRangeCb, BufferUsage::WRITE_GPU);
+
 		sky::initConstantBuffers(d3d);
 	}
 
@@ -235,13 +287,13 @@ namespace render::pass::world
 		}
 	}
 
-	void drawSky(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs)
+	void drawSky(D3d d3d, ShaderManager* shaders)
 	{
 		if (world.isOutdoorLevel && worldSettings.drawSky) {
 			const auto layers = getSkyLayers(worldSettings.timeOfDay);
 			bool swapLayers = getSwapLayers(worldSettings.timeOfDay);
 			sky::updateSkyLayers(d3d, layers, getSkyColor(worldSettings.timeOfDay), worldSettings.timeOfDay, swapLayers);
-			sky::drawSky(d3d, shaders, cbs, linearSamplerState);
+			sky::drawSky(d3d, shaders, linearSamplerState);
 		}
 	}
 
@@ -271,7 +323,19 @@ namespace render::pass::world
 		return stats;
 	}
 
-	DrawStats drawMeshClusters(D3d d3d, const vector<ChunkVertCluster>& vertClusters, uint32_t drawCount, bool indexed, bool isLowLod, bool ignoreLodRadius)
+	void updateLodRangeCb(D3d d3d, bool ignoreLodRadius, bool isLodNear, float lodRadiusBegin, float lodRadiusEnd)
+	{
+		CbLodRange cbLodRange;
+		bool hasLodBegin = !ignoreLodRadius && !isLodNear;
+		bool hasLodEnd = !ignoreLodRadius && isLodNear;
+		cbLodRange.fadeInBegin = hasLodBegin ? lodRadiusBegin : 0;
+		cbLodRange.fadeInEnd = hasLodBegin ? lodRadiusEnd : 0;
+		cbLodRange.fadeOutBegin = hasLodEnd ? lodRadiusBegin : FLT_MAX;
+		cbLodRange.fadeOutEnd =   hasLodEnd ? lodRadiusEnd : FLT_MAX;
+		d3d::updateConstantBuf(d3d, lodRangeCb, cbLodRange);
+	}
+
+	DrawStats drawMeshClusters(D3d d3d, const vector<ChunkVertCluster>& vertClusters, uint32_t drawCount, bool indexed, bool isLodNear, bool ignoreLodRadius)
 	{
 		// TODO select closest chunks (any that overlap a "min render box" around camera) and render them first for early-z discards
 		// TODO fix view-coordinate normal lighting and move to pixel shader so lighting can profit from early-z
@@ -283,24 +347,33 @@ namespace render::pass::world
 		uint32_t ignoreAllChunksVertThreshold = 1000;
 
 		if (!worldSettings.chunkedRendering || drawCount <= ignoreAllChunksVertThreshold) {
-			if (isLowLod && !ignoreLodRadius) return stats;
+			if (!isLodNear && !ignoreLodRadius) return stats;
 			// for small number of verts per batch we ignore the clusters to save draw calls
 			stats += draw(d3d, drawCount, drawOffset, indexed);
 		}
 		else {
-			// TODO LOD Rendering:
-			// enableLod - enable reduced LOD drawing
-			// lodRadius - camera-to-chunkcenter distance where full LOD crosses over to reduced LOD
-			// enablePerVertexLod - instead of just rendering each chunk with either LOD (resulting in per-chunk LOD switches),
-			//     render all chunks that touch lodRadiusWidth with both LODs and let shader select or dither LOD
-			// enableLodDither - requires enablePerVertexLod, select dither pattern instead of just switching LOD at radius
-			// lodRadiusWidth - requires enableLodDither, splits lodRadius into lodRadiusStart and lodRadiusEnd, dithering is interpolated over this range
-			// reducedLodOnly - debug option to only render all chunks with reduced LOD, ignored all other options
-			// 
-			// Split draws into per-LOD draws since we need to potentially bind constant buffers to tell shader which LOD it is drawing
-			// so it can select dither pattern, also should make code more straightforward
+			// TODO implement LOD Dithering in shader:
 
-			float lodRadiusSq = std::pow(worldSettings.lodRadius, 2);
+			float lodRadius = worldSettings.lodRadius;
+			float lodRadiusBegin = lodRadius;
+			float lodRadiusEnd = lodRadius;
+
+			if (worldSettings.enablePerPixelLod) {
+				if (worldSettings.enableLodDithering) {
+					lodRadiusBegin = std::max(0.f, lodRadius - worldSettings.lodRadiusDitherWidth);
+					lodRadiusEnd = worldSettings.lodRadius + worldSettings.lodRadiusDitherWidth;
+				}
+
+				// LOD range constant buffer
+				updateLodRangeCb(d3d, ignoreLodRadius, isLodNear, lodRadiusBegin, lodRadiusEnd);
+				d3d.deviceContext->PSSetConstantBuffers(CbLodRange::slot(), 1, &lodRangeCb.buffer);
+				stats.stateChanges++;
+			}
+
+			float lodRadiusSq = std::pow(lodRadius, 2);
+			float lodRadiusBeginSq = std::pow(lodRadiusBegin, 2);
+			float lodRadiusEndSq = std::pow(lodRadiusEnd, 2);
+
 
 			uint32_t ignoreChunkVertThreshold = 500;// TODO
 
@@ -319,9 +392,17 @@ namespace render::pass::world
 
 				auto gridIndex = chunkgrid::getIndex(gridPos);
 				auto camera = chunkgrid::getCameraInfoInner(gridIndex.innerIndex);
-				bool isInsideLodRadius = ignoreLodRadius || (isLowLod == camera.distanceToCenterSq > lodRadiusSq);
-				bool isInsideFrustum = !worldSettings.enableFrustumCulling || camera.intersectsFrustum;
 
+				bool isInsideLodRadius = false;
+				if (worldSettings.enablePerPixelLod) {
+					isInsideLodRadius = ignoreLodRadius || (isLodNear ?
+						lodRadiusBeginSq > camera.distanceCornerNearSq :
+						lodRadiusEndSq < camera.distanceCornerFarSq);
+				} else {
+					isInsideLodRadius = ignoreLodRadius || (isLodNear == camera.distanceCenterSq <= lodRadiusSq);
+				}
+
+				bool isInsideFrustum = !worldSettings.enableFrustumCulling || camera.intersectsFrustum;
 				bool currentChunkActive = isInsideFrustum && isInsideLodRadius;
 
 				if (worldSettings.chunkFilterXEnabled) {
@@ -379,16 +460,13 @@ namespace render::pass::world
 
 			if (!indexed || (!worldSettings.lowLodOnly || !hasLod)) {
 				d3d.annotation->BeginEvent(L"LOD High");
-				// TODO set constant buffer for LOD if shader LOD is enabled
 				bool ignoreLodRadius = !indexed || !hasLod || !worldSettings.enableLod;
-				stats += drawMeshClusters(d3d, mesh.vertClusters, mesh.drawCount, indexed, false, ignoreLodRadius);
+				stats += drawMeshClusters(d3d, mesh.vertClusters, mesh.drawCount, indexed, true, ignoreLodRadius);
 				d3d.annotation->EndEvent();
 			}
 			if (indexed && (worldSettings.lowLodOnly || (hasLod && worldSettings.enableLod))) {
 				d3d.annotation->BeginEvent(L"LOD Low");
-				// TODO set constant buffer for LOD if shader LOD is enabled
-				//stats.stateChanges++;
-				stats += drawMeshClusters(d3d, mesh.vertClustersLod, mesh.drawLodCount, indexed, true, worldSettings.lowLodOnly);
+				stats += drawMeshClusters(d3d, mesh.vertClustersLod, mesh.drawLodCount, indexed, false, worldSettings.lowLodOnly);
 				d3d.annotation->EndEvent();
 			}
 		}
@@ -413,7 +491,7 @@ namespace render::pass::world
 		return stats;
 	};
 
-	void drawWireframe(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs, BlendType pass)
+	void drawWireframe(D3d d3d, ShaderManager* shaders, BlendType pass)
 	{
 		Shader* shader = shaders->getShader("forward/wireframe");
 		d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
@@ -423,7 +501,7 @@ namespace render::pass::world
 		drawVertexBuffersWorld(d3d, false, pass, batchGetVbPos<VertexBasic>, batchGetVbPos<VertexBasic>);
 	}
 
-	void drawWorld(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs, BlendType pass)
+	void drawWorld(D3d d3d, ShaderManager* shaders, BlendType pass)
 	{
 		d3d.annotation->BeginEvent(L"Main");
 
@@ -462,5 +540,7 @@ namespace render::pass::world
 		sky::clean();
 		clearZenLevel();
 		release(linearSamplerState);
+		worldSettingsCb.release();
+		lodRangeCb.release();
 	}
 }

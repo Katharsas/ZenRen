@@ -13,7 +13,9 @@ namespace render::pass::world::chunkgrid
 
 	struct CellCameraInfo {
 		bool intersectsFrustum = false;
-		float distanceToCenterSq = 0;
+		float distanceCenterSq = 0;
+		float distanceCornerNearSq = 0;
+		float distanceCornerFarSq = 0;
 	};
 
 	struct LayerCellCameraInfo {

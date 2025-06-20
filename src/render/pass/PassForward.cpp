@@ -67,7 +67,21 @@ namespace render::pass::forward
 	std::array<ID3D11BlendState*, BLEND_TYPE_COUNT> blendStates = { nullptr, nullptr, nullptr, nullptr };
 	ID3D11BlendState* blendStateNoAtc = nullptr;// Alpha to coverage must be disabled for transparent surfaces; always nullptr (default blendstate)
 
-	ShaderCbs shaderCbs;
+	struct ShaderCbs
+	{
+		d3d::ConstantBuffer<CbGlobalSettings> settingsCb = {};
+		d3d::ConstantBuffer<CbCamera> cameraCb = {};
+		d3d::ConstantBuffer<CbBlendMode> blendModeCb = {};
+		d3d::ConstantBuffer<CbDebug> debugCb = {};
+
+		void release()
+		{
+			settingsCb.release();
+			cameraCb.release();
+			blendModeCb.release();
+			debugCb.release();
+		}
+	} shaderCbs;
 
 
 	void clean()
@@ -84,11 +98,8 @@ namespace render::pass::forward
 			rasterizer,
 			rasterizerWf,
 			blendStateNoAtc,
-
-			shaderCbs.settingsCb,
-			shaderCbs.cameraCb,
-			shaderCbs.blendModeCb,
 		});
+		shaderCbs.release();
 	}
 
 	void updateSettings(D3d d3d, const RenderSettings& settings)
@@ -174,17 +185,18 @@ namespace render::pass::forward
 
 		// update camera
 		updateCamera(d3d);
-		world::updateCameraFrustum(camera::getFrustum(), hasCameraChanged);
 
 		// set common constant buffers
-		d3d.deviceContext->VSSetConstantBuffers(0, 1, &shaderCbs.settingsCb);
-		d3d.deviceContext->PSSetConstantBuffers(0, 1, &shaderCbs.settingsCb);
-		d3d.deviceContext->VSSetConstantBuffers(1, 1, &shaderCbs.cameraCb);
-		d3d.deviceContext->PSSetConstantBuffers(1, 1, &shaderCbs.cameraCb);
-		d3d.deviceContext->VSSetConstantBuffers(2, 1, &shaderCbs.blendModeCb);
-		d3d.deviceContext->PSSetConstantBuffers(2, 1, &shaderCbs.blendModeCb);
-		d3d.deviceContext->VSSetConstantBuffers(3, 1, &shaderCbs.debugCb);
-		d3d.deviceContext->PSSetConstantBuffers(3, 1, &shaderCbs.debugCb);
+		d3d.deviceContext->VSSetConstantBuffers(0, 1, &shaderCbs.settingsCb.buffer);
+		d3d.deviceContext->PSSetConstantBuffers(0, 1, &shaderCbs.settingsCb.buffer);
+		d3d.deviceContext->VSSetConstantBuffers(1, 1, &shaderCbs.cameraCb.buffer);
+		d3d.deviceContext->PSSetConstantBuffers(1, 1, &shaderCbs.cameraCb.buffer);
+		d3d.deviceContext->VSSetConstantBuffers(2, 1, &shaderCbs.blendModeCb.buffer);
+		d3d.deviceContext->PSSetConstantBuffers(2, 1, &shaderCbs.blendModeCb.buffer);
+		d3d.deviceContext->VSSetConstantBuffers(3, 1, &shaderCbs.debugCb.buffer);
+		d3d.deviceContext->PSSetConstantBuffers(3, 1, &shaderCbs.debugCb.buffer);
+
+		world::updatePrepareDraws(d3d, camera::getFrustum(), hasCameraChanged);
 
 		// opaque / alpha tested passes (unsorted)
 		uint8_t blendTypeIndex = 0;
@@ -194,10 +206,10 @@ namespace render::pass::forward
 			d3d.annotation->BeginEvent(toWString("Pass Blend: ", blendType).c_str());
 			updateBlendMode(d3d, blendType);
 			d3d.deviceContext->OMSetBlendState(blendStates.at(blendTypeIndex), nullptr, 0xffffffff);
-			world::drawWorld(d3d, shaders, shaderCbs, (BlendType)blendType);
+			world::drawWorld(d3d, shaders, (BlendType)blendType);
 			if (settings.wireframe) {
 				d3d.deviceContext->RSSetState(rasterizerWf);
-				world::drawWireframe(d3d, shaders, shaderCbs, (BlendType)blendType);
+				world::drawWireframe(d3d, shaders, (BlendType)blendType);
 				d3d.deviceContext->RSSetState(rasterizer);
 			}
 			d3d.annotation->EndEvent();
@@ -205,7 +217,7 @@ namespace render::pass::forward
 			// draw sky (depth disabled, camera at origin)
 			d3d.deviceContext->OMSetBlendState(blendStateNoAtc, NULL, 0xffffffff);
 			updateCamera(d3d, true);
-			world::drawSky(d3d, shaders, shaderCbs);
+			world::drawSky(d3d, shaders);
 			updateCamera(d3d);
 		}
 		blendTypeIndex++;
@@ -219,10 +231,10 @@ namespace render::pass::forward
 				d3d.annotation->BeginEvent(toWString("Pass Blend: ", blendType).c_str());
 				updateBlendMode(d3d, blendType);
 				d3d.deviceContext->OMSetBlendState(blendStates.at(blendTypeIndex), blendFactorCol.vec, 0xffffffff);
-				world::drawWorld(d3d, shaders, shaderCbs, blendType);
+				world::drawWorld(d3d, shaders, blendType);
 				if (settings.wireframe) {
 					d3d.deviceContext->RSSetState(rasterizerWf);
-					world::drawWireframe(d3d, shaders, shaderCbs, blendType);
+					world::drawWireframe(d3d, shaders, blendType);
 					d3d.deviceContext->RSSetState(rasterizer);
 				}
 				d3d.annotation->EndEvent();
@@ -399,9 +411,9 @@ namespace render::pass::forward
 	void initConstantBuffers(D3d d3d)
 	{
 		// TODO these should probably be dynamic, see https://www.gamedev.net/forums/topic/673486-difference-between-d3d11-usage-default-and-d3d11-usage-dynamic/
-		d3d::createConstantBuf<CbGlobalSettings>(d3d, &shaderCbs.settingsCb, BufferUsage::WRITE_GPU);
-		d3d::createConstantBuf<CbCamera>(d3d, &shaderCbs.cameraCb, BufferUsage::WRITE_GPU);
-		d3d::createConstantBuf<CbBlendMode>(d3d, &shaderCbs.blendModeCb, BufferUsage::WRITE_GPU);
-		d3d::createConstantBuf<CbDebug>(d3d, &shaderCbs.debugCb, BufferUsage::WRITE_GPU);
+		d3d::createConstantBuf(d3d, shaderCbs.settingsCb, BufferUsage::WRITE_GPU);
+		d3d::createConstantBuf(d3d, shaderCbs.cameraCb, BufferUsage::WRITE_GPU);
+		d3d::createConstantBuf(d3d, shaderCbs.blendModeCb, BufferUsage::WRITE_GPU);
+		d3d::createConstantBuf(d3d, shaderCbs.debugCb, BufferUsage::WRITE_GPU);
 	}
 }

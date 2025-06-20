@@ -22,6 +22,9 @@ namespace render::pass::world
 		bool lowLodOnly = false;
 		bool enableLod = true;
 		float lodRadius = 300;
+		bool enablePerPixelLod = false;
+		bool enableLodDithering = false;
+		float lodRadiusDitherWidth = 20;
 
 		bool enableFrustumCulling = true;
 		bool updateFrustumCulling = true;
@@ -40,14 +43,14 @@ namespace render::pass::world
 
 	LoadWorldResult loadWorld(D3d d3d, const std::string& level);
 	void updateObjects(float deltaTime);
-	void updateCameraFrustum(const DirectX::BoundingFrustum& cameraFrustum, bool hasCameraMoved);
+	void updatePrepareDraws(D3d d3d, const DirectX::BoundingFrustum& cameraFrustum, bool hasCameraMoved);
 	WorldSettings& getWorldSettings();
 	void initLinearSampler(D3d d3d, RenderSettings& settings);
 	void init(D3d d3d);
 	Color getBackgroundColor();
-	void drawSky(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs);
-	void drawWorld(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs, BlendType pass);
-	void drawWireframe(D3d d3d, ShaderManager* shaders, const ShaderCbs& cbs, BlendType pass);
+	void drawSky(D3d d3d, ShaderManager* shaders);
+	void drawWorld(D3d d3d, ShaderManager* shaders, BlendType pass);
+	void drawWireframe(D3d d3d, ShaderManager* shaders, BlendType pass);
 	void clean();
 }
 
