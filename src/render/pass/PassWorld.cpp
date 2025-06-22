@@ -57,6 +57,9 @@ namespace render::pass::world
 	d3d::ConstantBuffer<CbWorldSettings> worldSettingsCb = {};
 	d3d::ConstantBuffer<CbLodRange> lodRangeCb = {};
 
+	float minLodStart = 0.00001f;
+	float minLodWidth = 0.001f;// since this is added to potentially bigger number, we have less precision
+
 	int32_t selectedDebugTexture = 0;
 
 	uint32_t currentDrawCall = 0;
@@ -329,8 +332,8 @@ namespace render::pass::world
 		bool hasLodBegin = !ignoreLodRadius && !isLodNear;
 		bool hasLodEnd = !ignoreLodRadius && isLodNear;
 		cbLodRange.fadeInBegin = hasLodBegin ? lodRadiusBegin : 0;
-		cbLodRange.fadeInEnd = hasLodBegin ? lodRadiusEnd : 0;
-		cbLodRange.fadeOutBegin = hasLodEnd ? lodRadiusBegin : FLT_MAX;
+		cbLodRange.fadeInEnd = hasLodBegin ? lodRadiusEnd : minLodWidth;
+		cbLodRange.fadeOutBegin = hasLodEnd ? lodRadiusBegin : (FLT_MAX - (0.00001f * FLT_MAX));
 		cbLodRange.fadeOutEnd =   hasLodEnd ? lodRadiusEnd : FLT_MAX;
 		d3d::updateConstantBuf(d3d, lodRangeCb, cbLodRange);
 	}
@@ -360,8 +363,10 @@ namespace render::pass::world
 
 			if (worldSettings.enablePerPixelLod) {
 				if (worldSettings.enableLodDithering) {
-					lodRadiusBegin = std::max(0.f, lodRadius - worldSettings.lodRadiusDitherWidth);
-					lodRadiusEnd = worldSettings.lodRadius + worldSettings.lodRadiusDitherWidth;
+					// updateLodRangeCb uses value of 0 signal to shader that isLodNear == true, so lodRadiusBegin must not be 0
+					lodRadiusBegin = std::max(minLodStart, lodRadius - worldSettings.lodRadiusDitherWidth);
+					// lodRadiusEnd must not equal lodRadiusBegin, otherwise shader divides by 0
+					lodRadiusEnd = std::max(lodRadiusBegin + minLodWidth, worldSettings.lodRadius + worldSettings.lodRadiusDitherWidth) ;
 				}
 
 				// LOD range constant buffer
@@ -396,10 +401,10 @@ namespace render::pass::world
 				bool isInsideLodRadius = false;
 				if (worldSettings.enablePerPixelLod) {
 					isInsideLodRadius = ignoreLodRadius || (isLodNear ?
-						lodRadiusBeginSq > camera.distanceCornerNearSq :
-						lodRadiusEndSq < camera.distanceCornerFarSq);
+						camera.distanceCornerNearSq < lodRadiusEndSq:
+						camera.distanceCornerFarSq > lodRadiusBeginSq);
 				} else {
-					isInsideLodRadius = ignoreLodRadius || (isLodNear == camera.distanceCenterSq <= lodRadiusSq);
+					isInsideLodRadius = ignoreLodRadius || (isLodNear == camera.distanceCenter2dSq <= lodRadiusSq);
 				}
 
 				bool isInsideFrustum = !worldSettings.enableFrustumCulling || camera.intersectsFrustum;

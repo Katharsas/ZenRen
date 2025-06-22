@@ -2,6 +2,7 @@
 #include "PassWorldChunkGrid.h"
 
 #include "Util.h"
+#include "Render/MeshUtil.h"
 #include "render/PerfStats.h"
 #include "render/Gui.h"
 
@@ -164,33 +165,36 @@ namespace render::pass::world::chunkgrid
 		stats::takeSample(stats.intersectsSampler, stats.intersects);
 
 		// distance
-
-		// we ignore y since grid is 2D and also there are some misplaced benches deep underground in G1 (3500m under burg that mess up chunk center
-		Vec2 cameraOrigin = { cameraFrustum.Origin.x, cameraFrustum.Origin.z };
+		Vec3 cameraOrigin = toVec3(cameraFrustum.Origin);
+		// for chunk-based LOD, we ignore y since grid is 2D and also there are some misplaced benches deep underground in G1 (3500m under burg that mess up chunk center
+		Vec2 cameraOrigin2d = { cameraFrustum.Origin.x, cameraFrustum.Origin.z };
 
 		for (uint32_t i = 0; i < grid.cellCount; i++) {
 			auto& cell = grid.cells.base[i];
 			if (cell.isInUse) {
 				auto& cellCamera = cellsCamera.base[i];
 
-				Vec2 bboxCenter = { cell.bbox.Center.x, cell.bbox.Center.z };
-				Vec2 bboxExtents = { cell.bbox.Extents.x, cell.bbox.Extents.z };
-				Vec2 toBboxCenter = sub(cameraOrigin, bboxCenter);
+				// 2D (center)
+				Vec2 bboxCenter2d = { cell.bbox.Center.x, cell.bbox.Center.z };
+				Vec2 toBboxCenter2d = sub(cameraOrigin2d, bboxCenter2d);
+				cellCamera.distanceCenter2dSq = lengthSq(toBboxCenter2d);
 
-				cellCamera.distanceCenterSq = lengthSq(toBboxCenter);
+				// 3D (near/far corners)
+				Vec3 bboxCenter = toVec3(cell.bbox.Center);
+				Vec3 bboxExtents = toVec3(cell.bbox.Extents);
+				Vec3 toBboxCenter = sub(cameraOrigin, bboxCenter);
 
-				Vec2 bboxExtentsDirected = {
+				Vec3 bboxExtentsDirected = {
 					std::copysign(bboxExtents.x, toBboxCenter.x),
-					std::copysign(bboxExtents.y, toBboxCenter.y)
+					std::copysign(bboxExtents.y, toBboxCenter.y),
+					std::copysign(bboxExtents.z, toBboxCenter.z)
 				};
-				Vec2 tobboxFarCorner = add(toBboxCenter, bboxExtentsDirected);
-				Vec2 tobboxNearCorner = add(toBboxCenter, mul(bboxExtentsDirected, -1));
+				Vec3 tobboxFarCorner = add(toBboxCenter, bboxExtentsDirected);
+				Vec3 tobboxNearCorner = add(toBboxCenter, mul(bboxExtentsDirected, -1));
 
 				cellCamera.distanceCornerNearSq = lengthSq(tobboxNearCorner);
 				cellCamera.distanceCornerFarSq = lengthSq(tobboxFarCorner);
 
-				// if we are inside bbox, nearCorner can be further than center, but farCorner must always be furthest
-				assert(cellCamera.distanceCornerFarSq >= cellCamera.distanceCenterSq);
 				assert(cellCamera.distanceCornerFarSq >= cellCamera.distanceCornerNearSq);
 			}
 		}

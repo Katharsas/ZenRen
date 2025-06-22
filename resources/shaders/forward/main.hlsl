@@ -154,8 +154,28 @@ struct PS_IN
     float3 light : LIGHT_INTENSITY;
     
     float distance : DISTANCE;
-    //float4 position : SV_POSITION;
+    float4 position : SV_POSITION;
 };
+
+float BayerMatrix4x4(uint2 pos)
+{
+    static const float bayerConstants[4][4] =
+    {
+        { 0.0625, 0.5625, 0.1875, 0.6875 },
+        { 0.8125, 0.3125, 0.9375, 0.4375 },
+        { 0.2500, 0.7500, 0.1250, 0.6250 },
+        { 1.0000, 0.5000, 0.8750, 0.3750 },
+    };
+    pos = pos % 4;
+    return bayerConstants[pos.x][pos.y];
+}
+
+bool DitherTest(uint2 pos, float weight)
+{
+    float limit = BayerMatrix4x4(pos);
+    //return (sign(weight) * (saturate(abs(weight)) - limit)) >= 0;// when weight is negative, return inverted weight
+    return saturate(weight) - limit >= 0;
+}
 
 float CalcMipLevel(float2 texCoord)
 {
@@ -219,7 +239,22 @@ float4 PS_Main(PS_IN input) : SV_TARGET
     clip(viewDistance - input.distance);
     
     // LOD
-    clip(enablePerPixelLod && (input.distance < fadeInStart || input.distance >= fadeOutEnd) ? -1 : 1);
+    if (enablePerPixelLod) {
+        static const float distOverlap = 0.9f; // fix gaps, for example: G2 Khorinis fishing boats  
+        if (enableLodDithering) {
+            // TODO still a bit slow?
+            // TODO lodNear chunk directly close to camera is completely missing for low LOD radius, check draw code!
+            // TODO maybe fadeInStart should just be negative for nearLOD so we don't run into any problems
+            float fadeInWeight = inv_lerp(fadeInStart, fadeInEnd, input.distance + 0.001);
+            clip(DitherTest(input.position.xy, fadeInWeight) ? 1 : -1);
+            float fadeOutWeight = saturate(inv_lerp(fadeOutStart, fadeOutEnd, input.distance - distOverlap));
+            clip(!DitherTest(input.position.xy, fadeOutWeight) ? 1 : -1);
+        }
+        else {
+            clip((input.distance < fadeInStart || input.distance >= fadeOutEnd + distOverlap) ? -1 : 1);
+        }
+    }
+    
     
     // light color
         float4 lightColor;
