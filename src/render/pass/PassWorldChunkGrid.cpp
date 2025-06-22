@@ -220,4 +220,10 @@ namespace render::pass::world::chunkgrid
 		assert(isInitialized);
 		return cellsCamera.base[innerIndex];
 	}
+
+	grid::CellInfo getCellInfoInner(uint16_t innerIndex)
+	{
+		assert(isInitialized);
+		return grid.cells.base[innerIndex];
+	}
 }

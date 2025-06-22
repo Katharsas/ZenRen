@@ -17,9 +17,11 @@
 #include "Util.h"
 
 // TODO move to RenderDebugGui
-#include "../Gui.h"
+#include "render/Gui.h"
+#include "render/GuiHelper.h"
 #include <imgui.h>
 #include "imgui/imgui_custom.h"
+#include "magic_enum.hpp"
 
 namespace render::pass::world
 {
@@ -34,33 +36,32 @@ namespace render::pass::world
 
 	ID3D11SamplerState* linearSamplerState = nullptr;
 
-	__declspec(align(16)) struct CbWorldSettings {
-		static uint16_t slot() {
-			return 5;
-		}
 
-		int32_t enablePerPixelLod;
-		int32_t enableLodDithering;
+	enum CbLodRangeType {
+		NONE,
+		MAX, // maxRange, clip/fade farther pixels
+		MIN, // minRange, clip/fade nearer pixels
 	};
 
 	__declspec(align(16)) struct CbLodRange {
 		static uint16_t slot() {
-			return 6;
+			return 5;
 		}
 
-		float fadeInBegin;// if 0, use dither seed 0, otherwise 1
-		float fadeInEnd;
-		float fadeOutBegin;
-		float fadeOutEnd;
+		uint32_t rangeType;
+		int32_t ditherEnabled;
+		float rangeBegin;
+		float rangeEnd;
 	};
 
-	d3d::ConstantBuffer<CbWorldSettings> worldSettingsCb = {};
 	d3d::ConstantBuffer<CbLodRange> lodRangeCb = {};
 
 	float minLodStart = 0.00001f;
 	float minLodWidth = 0.001f;// since this is added to potentially bigger number, we have less precision
 
 	int32_t selectedDebugTexture = 0;
+
+	auto lodModeComboState = gui::comboStateFromEnum<LodMode>();
 
 	uint32_t currentDrawCall = 0;
 	uint32_t maxDrawCalls = 0;
@@ -136,22 +137,24 @@ namespace render::pass::world
 				ImGui::Checkbox("Draw Sky", &worldSettings.drawSky);
 				ImGui::VerticalSpacing();
 				ImGui::Checkbox("Chunked Rendering", &worldSettings.chunkedRendering);
+				ImGui::PopStyleColor();
 
 				ImGui::VerticalSpacing();
-				ImGui::Checkbox("LOD Low Only", &worldSettings.lowLodOnly);
 				ImGui::BeginDisabled(!worldSettings.chunkedRendering);
-
-				ImGui::PopStyleColor();
 				ImGui::Checkbox("LOD Enabled", &worldSettings.enableLod);
 				ImGui::BeginDisabled(!worldSettings.enableLod);
-				ImGui::SliderFloat("##LodCrossover", &worldSettings.lodRadius, 0, 1000, "%.0f LOD Crossover", ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat);
+				ImGui::SliderFloat("##LodCrossover", &worldSettings.lodRadius, 0, 1000, "%.0f LOD Radius", ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat);
+				
 				ImGui::PushStyleColorDebugText();
+				ImGui::PushItemWidth(120);
+				gui::comboEnum("LOD Display", lodModeComboState, worldSettings.lodDisplayMode);
+				ImGui::PopItemWidth();
 
 				ImGui::Checkbox("LOD Per Pixel", &worldSettings.enablePerPixelLod);
 				ImGui::BeginDisabled(!worldSettings.enablePerPixelLod);
 				ImGui::Checkbox("LOD Dithering", &worldSettings.enableLodDithering);
 				ImGui::BeginDisabled(!worldSettings.enableLodDithering);
-				ImGui::SliderFloat("##LodCrossoverWidth", &worldSettings.lodRadiusDitherWidth, 0, 100, "%.0f LOD Crossover Width");
+				ImGui::SliderFloat("##LodCrossoverWidth", &worldSettings.lodRadiusDitherWidth, 0, 100, "%.0f LOD Fade Range");
 				ImGui::EndDisabled();
 				ImGui::EndDisabled();
 				ImGui::EndDisabled();
@@ -228,15 +231,6 @@ namespace render::pass::world
 			bool updateDistances = hasCameraMoved;
 			chunkgrid::updateCamera(camera::getFrustum(), updateCulling, updateDistances);
 		}
-
-		CbWorldSettings cbWorldSettings;
-		bool isLodEnabled = worldSettings.chunkedRendering && worldSettings.enableLod;
-		cbWorldSettings.enablePerPixelLod = isLodEnabled && worldSettings.enablePerPixelLod;
-		cbWorldSettings.enableLodDithering = isLodEnabled && worldSettings.enablePerPixelLod && worldSettings.enableLodDithering;
-
-		d3d::updateConstantBuf(d3d, worldSettingsCb, cbWorldSettings);
-		d3d.deviceContext->VSSetConstantBuffers(CbWorldSettings::slot(), 1, &worldSettingsCb.buffer);
-		d3d.deviceContext->PSSetConstantBuffers(CbWorldSettings::slot(), 1, &worldSettingsCb.buffer);
 	}
 
 	WorldSettings& getWorldSettings() {
@@ -275,7 +269,7 @@ namespace render::pass::world
 		// select which primtive type we are using, TODO this should be managed more centrally, because otherwise changing this affects other parts of pipeline
 		d3d.deviceContext->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		d3d::createConstantBuf(d3d, worldSettingsCb, BufferUsage::WRITE_GPU);
+		//d3d::createConstantBuf(d3d, worldSettingsCb, BufferUsage::WRITE_GPU);
 		d3d::createConstantBuf(d3d, lodRangeCb, BufferUsage::WRITE_GPU);
 
 		sky::initConstantBuffers(d3d);
@@ -298,6 +292,32 @@ namespace render::pass::world
 			sky::updateSkyLayers(d3d, layers, getSkyColor(worldSettings.timeOfDay), worldSettings.timeOfDay, swapLayers);
 			sky::drawSky(d3d, shaders, linearSamplerState);
 		}
+	}
+
+	std::pair<float, float> updateLodRangeCb(D3d d3d, bool ignoreLodRadius, bool isLodNear)
+	{
+		float radius = worldSettings.lodRadius;
+
+		CbLodRange cbLodRange;
+		cbLodRange.rangeType = (uint32_t)CbLodRangeType::NONE;
+		cbLodRange.ditherEnabled = false;
+		cbLodRange.rangeBegin = radius;
+		cbLodRange.rangeEnd = radius;
+
+		if (worldSettings.enablePerPixelLod) {
+			if (!ignoreLodRadius) {
+				cbLodRange.rangeType = (uint32_t)(isLodNear ? CbLodRangeType::MAX : CbLodRangeType::MIN);
+			}
+			if (worldSettings.enableLodDithering) {
+				cbLodRange.ditherEnabled = true;
+
+				float radiusHalfWidth = worldSettings.lodRadiusDitherWidth * 0.5f;
+				cbLodRange.rangeBegin = std::max(0.f, radius - radiusHalfWidth);
+				cbLodRange.rangeEnd = std::max(cbLodRange.rangeBegin + minLodWidth, radius + radiusHalfWidth);
+			}
+		}
+		d3d::updateConstantBuf(d3d, lodRangeCb, cbLodRange);
+		return { cbLodRange.rangeBegin, cbLodRange.rangeEnd };
 	}
 
 	template <VERTEX_FEATURE F>
@@ -326,16 +346,15 @@ namespace render::pass::world
 		return stats;
 	}
 
-	void updateLodRangeCb(D3d d3d, bool ignoreLodRadius, bool isLodNear, float lodRadiusBegin, float lodRadiusEnd)
+	DrawStats drawAllMeshClusters(D3d d3d, const vector<ChunkVertCluster>& vertClusters, uint32_t drawCount, bool indexed)
 	{
 		CbLodRange cbLodRange;
-		bool hasLodBegin = !ignoreLodRadius && !isLodNear;
-		bool hasLodEnd = !ignoreLodRadius && isLodNear;
-		cbLodRange.fadeInBegin = hasLodBegin ? lodRadiusBegin : 0;
-		cbLodRange.fadeInEnd = hasLodBegin ? lodRadiusEnd : minLodWidth;
-		cbLodRange.fadeOutBegin = hasLodEnd ? lodRadiusBegin : (FLT_MAX - (0.00001f * FLT_MAX));
-		cbLodRange.fadeOutEnd =   hasLodEnd ? lodRadiusEnd : FLT_MAX;
+		cbLodRange.rangeType = CbLodRangeType::NONE;
+
 		d3d::updateConstantBuf(d3d, lodRangeCb, cbLodRange);
+		d3d.deviceContext->PSSetConstantBuffers(CbLodRange::slot(), 1, &lodRangeCb.buffer);
+
+		return draw(d3d, drawCount, vertClusters.at(0).vertStartIndex, indexed);
 	}
 
 	DrawStats drawMeshClusters(D3d d3d, const vector<ChunkVertCluster>& vertClusters, uint32_t drawCount, bool indexed, bool isLodNear, bool ignoreLodRadius)
@@ -346,103 +365,79 @@ namespace render::pass::world
 
 		uint32_t drawOffset = vertClusters.at(0).vertStartIndex;
 
-		// TODO cutoff should be adjustable in GUI
-		uint32_t ignoreAllChunksVertThreshold = 1000;
+		auto [lodRadiusBegin, lodRadiusEnd] = updateLodRangeCb(d3d, ignoreLodRadius, isLodNear);
+		d3d.deviceContext->PSSetConstantBuffers(CbLodRange::slot(), 1, &lodRangeCb.buffer);
 
-		if (!worldSettings.chunkedRendering || drawCount <= ignoreAllChunksVertThreshold) {
-			if (!isLodNear && !ignoreLodRadius) return stats;
-			// for small number of verts per batch we ignore the clusters to save draw calls
-			stats += draw(d3d, drawCount, drawOffset, indexed);
-		}
-		else {
-			// TODO implement LOD Dithering in shader:
+		float lodRadiusSq = std::pow(worldSettings.lodRadius, 2);
+		float lodRadiusBeginSq = std::pow(lodRadiusBegin, 2);
+		float lodRadiusEndSq = std::pow(lodRadiusEnd, 2);
 
-			float lodRadius = worldSettings.lodRadius;
-			float lodRadiusBegin = lodRadius;
-			float lodRadiusEnd = lodRadius;
+		uint32_t ignoreChunkVertThreshold = 500;// TODO
 
+		// TODO since max number of cells is known, we could probably re-use a single static vector for all meshes
+		vector<std::pair<uint32_t, uint32_t>> vertRanges;
+		vertRanges.reserve(vertClusters.size());
+
+		bool rangeActive = false;
+		uint32_t rangeStart = drawOffset;
+
+		// TODO chunks with very few verts should be allowed to be enabled if range is active currently, if that helps joining ranges (test!)
+
+		for (uint32_t i = 0; i < vertClusters.size(); i++) {
+			const GridPos& gridPos = vertClusters[i].gridPos;
+			uint32_t vertStartIndex = vertClusters[i].vertStartIndex;
+
+			auto gridIndex = chunkgrid::getIndex(gridPos);
+			auto camera = chunkgrid::getCameraInfoInner(gridIndex.innerIndex);
+
+			bool isInsideLodRadius = false;
 			if (worldSettings.enablePerPixelLod) {
-				if (worldSettings.enableLodDithering) {
-					// updateLodRangeCb uses value of 0 signal to shader that isLodNear == true, so lodRadiusBegin must not be 0
-					lodRadiusBegin = std::max(minLodStart, lodRadius - worldSettings.lodRadiusDitherWidth);
-					// lodRadiusEnd must not equal lodRadiusBegin, otherwise shader divides by 0
-					lodRadiusEnd = std::max(lodRadiusBegin + minLodWidth, worldSettings.lodRadius + worldSettings.lodRadiusDitherWidth) ;
-				}
+				auto cell = chunkgrid::getCellInfoInner(gridIndex.innerIndex);
+				float cellHalfWidthSq = cell.bbox.Extents.x * cell.bbox.Extents.x;
 
-				// LOD range constant buffer
-				updateLodRangeCb(d3d, ignoreLodRadius, isLodNear, lodRadiusBegin, lodRadiusEnd);
-				d3d.deviceContext->PSSetConstantBuffers(CbLodRange::slot(), 1, &lodRangeCb.buffer);
-				stats.stateChanges++;
+				isInsideLodRadius = ignoreLodRadius || (isLodNear ?
+					(camera.distanceCornerNearSq < lodRadiusEndSq || camera.distanceCenter2dSq <= cellHalfWidthSq)
+					: camera.distanceCornerFarSq > lodRadiusBeginSq);
+			} else {
+				isInsideLodRadius = ignoreLodRadius || (isLodNear == camera.distanceCenter2dSq <= lodRadiusSq);
 			}
 
-			float lodRadiusSq = std::pow(lodRadius, 2);
-			float lodRadiusBeginSq = std::pow(lodRadiusBegin, 2);
-			float lodRadiusEndSq = std::pow(lodRadiusEnd, 2);
+			bool isInsideFrustum = !worldSettings.enableFrustumCulling || camera.intersectsFrustum;
+			bool currentChunkActive = isInsideFrustum && isInsideLodRadius;
 
-
-			uint32_t ignoreChunkVertThreshold = 500;// TODO
-
-			// TODO since max number of cells is known, we could probably re-use a single static vector for all meshes
-			vector<std::pair<uint32_t, uint32_t>> vertRanges;
-			vertRanges.reserve(vertClusters.size());
-
-			bool rangeActive = false;
-			uint32_t rangeStart = drawOffset;
-
-			// TODO chunks with very few verts should be allowed to be enabled if range is active currently, if that helps joining ranges (test!)
-
-			for (uint32_t i = 0; i < vertClusters.size(); i++) {
-				const GridPos& gridPos = vertClusters[i].gridPos;
-				uint32_t vertStartIndex = vertClusters[i].vertStartIndex;
-
-				auto gridIndex = chunkgrid::getIndex(gridPos);
-				auto camera = chunkgrid::getCameraInfoInner(gridIndex.innerIndex);
-
-				bool isInsideLodRadius = false;
-				if (worldSettings.enablePerPixelLod) {
-					isInsideLodRadius = ignoreLodRadius || (isLodNear ?
-						camera.distanceCornerNearSq < lodRadiusEndSq:
-						camera.distanceCornerFarSq > lodRadiusBeginSq);
-				} else {
-					isInsideLodRadius = ignoreLodRadius || (isLodNear == camera.distanceCenter2dSq <= lodRadiusSq);
-				}
-
-				bool isInsideFrustum = !worldSettings.enableFrustumCulling || camera.intersectsFrustum;
-				bool currentChunkActive = isInsideFrustum && isInsideLodRadius;
-
-				if (worldSettings.chunkFilterXEnabled) {
-					currentChunkActive = currentChunkActive && gridPos.x == worldSettings.chunkFilterX;
-				}
-				if (worldSettings.chunkFilterYEnabled) {
-					currentChunkActive = currentChunkActive && gridPos.y == worldSettings.chunkFilterY;
-				}
-
-				if (!rangeActive && currentChunkActive) {
-					// range start
-					rangeStart = vertStartIndex;
-					rangeActive = true;
-				}
-				if (rangeActive && !currentChunkActive) {
-					// range end
-					rangeActive = false;
-					vertRanges.push_back({ rangeStart, vertStartIndex });
-				}
+			if (worldSettings.chunkFilterXEnabled) {
+				currentChunkActive = currentChunkActive && gridPos.x == worldSettings.chunkFilterX;
 			}
-			// end last range
-			if (rangeActive) {
+			if (worldSettings.chunkFilterYEnabled) {
+				currentChunkActive = currentChunkActive && gridPos.y == worldSettings.chunkFilterY;
+			}
+
+			if (!rangeActive && currentChunkActive) {
+				// range start
+				rangeStart = vertStartIndex;
+				rangeActive = true;
+			}
+			if (rangeActive && !currentChunkActive) {
+				// range end
 				rangeActive = false;
-				vertRanges.push_back({ rangeStart, drawOffset + drawCount });
-			}
-
-			for (const auto [startIncl, endExcl] : vertRanges) {
-				uint32_t vertCount = endExcl - startIncl;
-
-				vertCount = (uint32_t)(vertCount * worldSettings.debugDrawVertAmount);
-				vertCount -= (vertCount % 3);
-
-				stats += draw(d3d, vertCount, startIncl, indexed);
+				vertRanges.push_back({ rangeStart, vertStartIndex });
 			}
 		}
+		// end last range
+		if (rangeActive) {
+			rangeActive = false;
+			vertRanges.push_back({ rangeStart, drawOffset + drawCount });
+		}
+
+		for (const auto [startIncl, endExcl] : vertRanges) {
+			uint32_t vertCount = endExcl - startIncl;
+
+			vertCount = (uint32_t)(vertCount * worldSettings.debugDrawVertAmount);
+			vertCount -= (vertCount % 3);
+
+			stats += draw(d3d, vertCount, startIncl, indexed);
+		}
+
 		return stats;
 	}
 
@@ -463,16 +458,32 @@ namespace render::pass::world
 
 			stats.stateChanges++;
 
-			if (!indexed || (!worldSettings.lowLodOnly || !hasLod)) {
-				d3d.annotation->BeginEvent(L"LOD High");
-				bool ignoreLodRadius = !indexed || !hasLod || !worldSettings.enableLod;
-				stats += drawMeshClusters(d3d, mesh.vertClusters, mesh.drawCount, indexed, true, ignoreLodRadius);
-				d3d.annotation->EndEvent();
+			uint32_t ignoreAllChunksVertThreshold = 1000; // TODO cutoff should be adjustable in GUI
+			bool drawAllChunks = !worldSettings.chunkedRendering || mesh.drawCount <= ignoreAllChunksVertThreshold;
+
+			if (drawAllChunks) {
+				// for small number of verts per batch we ignore the clusters to save draw calls / LOD overhead
+				if (worldSettings.lodDisplayMode != LodMode::FAR) {
+					stats += drawAllMeshClusters(d3d, mesh.vertClusters, mesh.drawCount, indexed);
+				}
 			}
-			if (indexed && (worldSettings.lowLodOnly || (hasLod && worldSettings.enableLod))) {
-				d3d.annotation->BeginEvent(L"LOD Low");
-				stats += drawMeshClusters(d3d, mesh.vertClustersLod, mesh.drawLodCount, indexed, false, worldSettings.lowLodOnly);
-				d3d.annotation->EndEvent();
+			else {
+				bool drawLod = indexed && hasLod && worldSettings.enableLod;
+
+				if (worldSettings.lodDisplayMode != LodMode::FAR) {
+					d3d.annotation->BeginEvent(L"LOD High");
+					stats += drawMeshClusters(d3d, mesh.vertClusters, mesh.drawCount, indexed, true, !drawLod);
+					d3d.annotation->EndEvent();
+				}
+				if (drawLod && worldSettings.lodDisplayMode != LodMode::NEAR) {
+					if (worldSettings.lodDisplayMode == LodMode::FULL) {
+						// drawMeshClusters sets a constant buffer -> state change between near and far LOD drawing
+						stats.stateChanges++; 
+					}
+					d3d.annotation->BeginEvent(L"LOD Low");
+					stats += drawMeshClusters(d3d, mesh.vertClustersLod, mesh.drawLodCount, indexed, false, false);
+					d3d.annotation->EndEvent();
+				}
 			}
 		}
 		return stats;
@@ -545,7 +556,6 @@ namespace render::pass::world
 		sky::clean();
 		clearZenLevel();
 		release(linearSamplerState);
-		worldSettingsCb.release();
 		lodRangeCb.release();
 	}
 }

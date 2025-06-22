@@ -9,6 +9,15 @@
 
 namespace render::pass::world
 {
+	// windows things :(
+#undef NEAR
+#undef FAR
+	enum LodMode {
+		FULL,
+		NEAR,
+		FAR,
+	};
+
 	struct WorldSettings {
 		float timeOfDay = 0.f;// range 0 to 1 (midday to midday)
 		float timeOfDayChangeSpeed = 0.f;// good showcase value: 0.03
@@ -19,7 +28,7 @@ namespace render::pass::world
 
 		bool chunkedRendering = true;
 
-		bool lowLodOnly = false;
+		LodMode lodDisplayMode = LodMode::FULL;
 		bool enableLod = true;
 		float lodRadius = 300;
 		bool enablePerPixelLod = false;

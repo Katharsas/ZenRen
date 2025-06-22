@@ -1,7 +1,8 @@
 #include "stdafx.h"
 #include "SettingsGui.h"
 
-#include "Gui.h"
+#include "render/Gui.h"
+#include "render/GuiHelper.h"
 
 #include "imgui.h"
 #include "imgui/imgui_custom.h"
@@ -10,14 +11,12 @@
 namespace render::gui::settings {
 
 	// TODO we should have checkbox toggles for each light type so we can add them up however we want
-	constexpr auto shaderModeItems = magic_enum::enum_names<ShaderMode>();
-	std::string_view shaderModeSelected = shaderModeItems[0];
+	auto shaderModeComboState = gui::comboStateFromEnum<ShaderMode>();
 
-	const std::array<std::string, 5> filterSettingsItems = { "Trilinear", "AF  x2", "AF  x4", "AF  x8", "AF x16" };
-	std::string filterSettingsSelected = filterSettingsItems[4];
+	auto filterSettingsComboState = gui::ComboState<5>({ "Trilinear", "AF  x2", "AF  x4", "AF  x8", "AF x16" }, 4);
 
-	const std::array<std::string, 4> msaaSettingsItems = { "None", "x2", "x4", "x8" };
-	std::string msaaSettingsSelected = msaaSettingsItems[2];
+	auto msaaSettingsComboState = gui::ComboState<4>({ "None", "x2", "x4", "x8" }, 2);
+
 
 	void init(RenderSettings& settings)
 	{
@@ -34,24 +33,9 @@ namespace render::gui::settings {
 
 				ImGui::VerticalSpacing();
 				ImGui::PushStyleColorDebugText();
-				
-				const auto& items = shaderModeItems;
-				std::string_view& selected = shaderModeSelected;
 
-				ImGui::PushItemWidth(120);// TODO whats up with this??
-				if (ImGui::BeginCombo("Shader Mode", std::string(selected).c_str()))
-				{
-					for (uint32_t n = 0; n < items.size(); n++)
-					{
-						auto current = items[n];
-						bool isSelected = (selected == current);
-						if (ImGui::Selectable(std::string(current).c_str(), isSelected)) {
-							selected = items[n];
-							settings.shader.mode = static_cast<ShaderMode>(n);
-						}
-					}
-					ImGui::EndCombo();
-				}
+				ImGui::PushItemWidth(120);
+				gui::comboEnum("Shader Mode", shaderModeComboState, settings.shader.mode);
 				ImGui::PopItemWidth();
 				ImGui::Checkbox("Wireframe Mode", &settings.wireframe);
 				ImGui::Checkbox("Enable Alpha", &settings.outputAlpha);
@@ -87,23 +71,10 @@ namespace render::gui::settings {
 
 		addSettings("Anti-Aliasing", {
 			[&]() -> void {
-				const auto& items = msaaSettingsItems;
-				auto& selected = msaaSettingsSelected;
-
 				ImGui::PushItemWidth(120);
-				if (ImGui::BeginCombo("MSAA", selected.c_str()))
-				{
-					for (uint32_t n = 0; n < items.size(); n++)
-					{
-						auto current = items[n].c_str();
-						bool isSelected = (selected == current);
-						if (ImGui::Selectable(current, isSelected)) {
-							selected = items[n];
-							settings.multisampleCount = 1 << n; // 2^n
-						}
-					}
-					ImGui::EndCombo();
-				}
+				gui::combo("MSAA", msaaSettingsComboState, [&](uint32_t index) -> void {
+					settings.multisampleCount = 1 << index; // 2^index
+				});
 				ImGui::PushStyleColorDebugText();
 				ImGui::Checkbox("Transparency", &settings.multisampleTransparency);
 				ImGui::Checkbox("Distant Alpha", &settings.distantAlphaDensityFix);
@@ -114,29 +85,16 @@ namespace render::gui::settings {
 
 		addSettings("Textures", {
 			[&]() -> void {
-				const auto& items = filterSettingsItems;
-				auto& selected = filterSettingsSelected;
-
 				ImGui::PushItemWidth(120);
-				if (ImGui::BeginCombo("Filter", selected.c_str()))
-				{
-					for (uint32_t n = 0; n < items.size(); n++)
-					{
-						auto current = items[n].c_str();
-						bool isSelected = (selected == current);
-						if (ImGui::Selectable(current, isSelected)) {
-							selected = items[n];
-							if (selected == items[0]) {
-								settings.anisotropicFilter = false;
-							}
-							else {
-								settings.anisotropicFilter = true;
-								settings.anisotropicLevel = 1 << n; // 2^n
-							}
-						}
+				gui::combo("Filter", filterSettingsComboState, [&](uint32_t index) -> void {
+					if (index == 0) {
+						settings.anisotropicFilter = false;
 					}
-					ImGui::EndCombo();
-				}
+					else {
+						settings.anisotropicFilter = true;
+						settings.anisotropicLevel = 1 << index; // 2^index
+					}
+				});
 				ImGui::Checkbox("Cloud Blur", &settings.skyTexBlur);
 				ImGui::PopItemWidth();
 			}

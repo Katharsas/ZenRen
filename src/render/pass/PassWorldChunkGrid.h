@@ -29,4 +29,5 @@ namespace render::pass::world::chunkgrid
 	GridIndex getIndex(const GridPos& index);
 	LayerCellCameraInfo getCameraInfoOuter(uint16_t outerIndex);
 	CellCameraInfo getCameraInfoInner(uint16_t innerIndex);
+	grid::CellInfo getCellInfoInner(uint16_t innerIndex);
 }

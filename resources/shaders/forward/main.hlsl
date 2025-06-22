@@ -1,17 +1,21 @@
 #include "common.hlsl"
 
-cbuffer cbWorldSettings : register(b5)
-{
-    bool enablePerPixelLod;
-    bool enableLodDithering;
-}
+//cbuffer cbWorldSettings : register(b5)
+//{
+//    bool enablePerPixelLod;
+//    bool enableLodDithering;
+//}
 
-cbuffer cbLodRange : register(b6)
+static const uint LOD_RANGE_NONE = 0;
+static const uint LOD_RANGE_MAX = 1;
+static const uint LOD_RANGE_MIN = 2;
+
+cbuffer cbLodRange : register(b5)
 {
-    float fadeInStart;// if 0, use dither seed 0, otherwise 1
-    float fadeInEnd;
-    float fadeOutStart;
-    float fadeOutEnd;
+    uint1 rangeType;
+    bool ditherEnabled;
+    float rangeBegin;
+    float rangeEnd;
 }
 
 //--------------------------------------------------------------------------------------
@@ -157,7 +161,12 @@ struct PS_IN
     float4 position : SV_POSITION;
 };
 
-float BayerMatrix4x4(uint2 pos)
+// TODO try blue noise 16x16, see:
+//   https://github.com/libjxl/libjxl/issues/3926
+//   https://momentsingraphics.de/BlueNoise.html#Downloads
+//   https://www.shadertoy.com/view/M3BBWh
+// TODO try temporal offset/randomness (so pattern is not fixed to camera/screen)
+float Dither4x4Ordered(uint2 pos)
 {
     static const float bayerConstants[4][4] =
     {
@@ -172,9 +181,9 @@ float BayerMatrix4x4(uint2 pos)
 
 bool DitherTest(uint2 pos, float weight)
 {
-    float limit = BayerMatrix4x4(pos);
-    //return (sign(weight) * (saturate(abs(weight)) - limit)) >= 0;// when weight is negative, return inverted weight
-    return saturate(weight) - limit >= 0;
+    float limit = Dither4x4Ordered(pos);
+    // add half step so result is evenly mapped onto range [0-1], otherwise even tiny inaccuracy can impact result for weight == 1
+    return saturate(weight + 0.03125) - limit >= 0;
 }
 
 float CalcMipLevel(float2 texCoord)
@@ -233,31 +242,36 @@ float4 SampleLightmap(float3 uvLightmap)
     return lightmaps.SampleLevel(SampleType, uvLightmap, 0.5f);
 }
 
+void ClipIfNotInLodRange(uint2 pos, float distance)
+{
+    if (rangeType != LOD_RANGE_NONE) {
+        bool doClip = false;
+        static const float LOD_RADIUS_OVERLAP = 0.9f; // fix gaps, for example: G2 Khorinis fishing boats  
+        float distWithOverlap = distance + (LOD_RADIUS_OVERLAP * 0.5f * (rangeType == LOD_RANGE_MAX ? -1.f : 1.f));
+        
+        if (ditherEnabled) {
+            float ditherWeight = inv_lerp(rangeBegin, rangeEnd, distWithOverlap);
+            doClip = (rangeType == LOD_RANGE_MAX) == DitherTest(pos, ditherWeight);
+        }
+        else {
+            // rangeBegin == rangeEnd
+            doClip = (rangeType == LOD_RANGE_MAX) == (rangeBegin <= distWithOverlap);
+        }
+        
+        clip(doClip ? -1 : 1);
+    }
+}
+
 float4 PS_Main(PS_IN input) : SV_TARGET
 {
     // do our own circular clipping (stable during rotations)
     clip(viewDistance - input.distance);
     
     // LOD
-    if (enablePerPixelLod) {
-        static const float distOverlap = 0.9f; // fix gaps, for example: G2 Khorinis fishing boats  
-        if (enableLodDithering) {
-            // TODO still a bit slow?
-            // TODO lodNear chunk directly close to camera is completely missing for low LOD radius, check draw code!
-            // TODO maybe fadeInStart should just be negative for nearLOD so we don't run into any problems
-            float fadeInWeight = inv_lerp(fadeInStart, fadeInEnd, input.distance + 0.001);
-            clip(DitherTest(input.position.xy, fadeInWeight) ? 1 : -1);
-            float fadeOutWeight = saturate(inv_lerp(fadeOutStart, fadeOutEnd, input.distance - distOverlap));
-            clip(!DitherTest(input.position.xy, fadeOutWeight) ? 1 : -1);
-        }
-        else {
-            clip((input.distance < fadeInStart || input.distance >= fadeOutEnd + distOverlap) ? -1 : 1);
-        }
-    }
-    
+    ClipIfNotInLodRange(input.position.xy, input.distance);
     
     // light color
-        float4 lightColor;
+    float4 lightColor;
     if (outputType == OUTPUT_NORMAL) {
         lightColor = float4((float3) 0.5, 1);
     }
