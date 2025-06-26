@@ -11,18 +11,27 @@
 namespace render::gui::settings {
 
 	// TODO we should have checkbox toggles for each light type so we can add them up however we want
+
 	auto shaderModeComboState = gui::comboStateFromEnum<ShaderMode>();
-
 	auto filterSettingsComboState = gui::ComboState<5>({ "Trilinear", "AF  x2", "AF  x4", "AF  x8", "AF x16" }, 4);
-
 	auto msaaSettingsComboState = gui::ComboState<4>({ "None", "x2", "x4", "x8" }, 2);
 
+	std::function<void()> notifyGameSwitch;
 
-	void init(RenderSettings& settings)
+	void init(
+		RenderSettings& settings,
+		const std::function<void()>& notifyGameSwitchParam)
 	{
+		notifyGameSwitch = notifyGameSwitchParam;
+
 		addSettings("Renderer", {
 			[&]() -> void {
 				ImGui::PushItemWidth(constants().elementWidth);
+				if (ImGui::Checkbox("Gothic 2", &settings.isG2)) {
+					notifyGameSwitch();
+				}
+
+				ImGui::VerticalSpacing();
 				ImGui::SliderFloat("##ViewDistance", &settings.viewDistance, 1, 2000, "%.0f View Distance");
 
 				ImGui::VerticalSpacing();

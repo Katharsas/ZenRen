@@ -169,7 +169,7 @@ namespace render
 
 		world::init(d3d);
 
-		gui::settings::init(settings);
+		gui::settings::init(settings, [&]() -> void { world::notifyGameSwitch(settings); });
 	}
 
 	bool loadLevel(const std::optional<std::string>& level, bool defaultSky)
@@ -180,6 +180,8 @@ namespace render
 		if (level.has_value()) {
 			auto loadResult = world::loadWorld(d3d, level.value());
 			if (loadResult.loaded) {
+				settings.isG2 = loadResult.isG2;
+				world::notifyGameSwitch(settings);
 				defaultSky = loadResult.isOutdoorLevel;
 				loaded = true;
 			}

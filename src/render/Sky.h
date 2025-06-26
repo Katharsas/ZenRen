@@ -29,5 +29,6 @@ namespace render
 	bool getSwapLayers(float timeOfDay);
 	Color getSkyLightFromIntensity(float intensity, float currentTime = defaultTime);
 	Color getSkyColor(float currentTime = defaultTime);
+	void setSkyGothicVersion(bool isG2Param);
 }
 

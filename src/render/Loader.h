@@ -143,6 +143,7 @@ namespace render
 	};
 
 	struct RenderData {
+		bool isG2 = false;
 		bool isOutdoorLevel = false;
 		grid::Grid chunkGrid;
 		MatToChunksToVertsBasic worldMesh;

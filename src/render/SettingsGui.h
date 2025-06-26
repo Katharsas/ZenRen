@@ -4,5 +4,5 @@
 
 namespace render::gui::settings
 {
-	void init(RenderSettings& settings);
+	void init(RenderSettings& settings, const std::function<void()>& notifyGameSwitch);
 }

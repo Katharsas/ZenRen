@@ -496,6 +496,7 @@ namespace render::pass::world
 
 		return {
 			.loaded = true,
+			.isG2 = data.isG2,
 			.isOutdoorLevel = world.isOutdoorLevel
 		};
 	}

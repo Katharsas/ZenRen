@@ -15,6 +15,7 @@ namespace render::pass::world
 	void updateObjects(float deltaTime);
 	void updatePrepareDraws(D3d d3d, const DirectX::BoundingFrustum& cameraFrustum, bool hasCameraMoved);
 	WorldSettings& getWorldSettings();
+	void notifyGameSwitch(RenderSettings& settings);
 	void initLinearSampler(D3d d3d, RenderSettings& settings);
 	void init(D3d d3d);
 	Color getBackgroundColor();

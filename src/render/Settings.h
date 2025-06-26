@@ -17,6 +17,8 @@ namespace render
 	};
 
 	struct RenderSettings {
+		bool isG2 = false;
+
 		float viewDistance = 800;
 		bool distanceFog = true;
 		// fog settings about match 300% view distance in G1 

@@ -82,6 +82,7 @@ namespace render
 
 	struct LoadWorldResult {
 		bool loaded = false;
+		bool isG2 = false;
 		bool isOutdoorLevel = false;
 	};
 

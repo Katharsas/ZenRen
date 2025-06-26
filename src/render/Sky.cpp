@@ -5,6 +5,31 @@ namespace render
 {
 	using std::array;
 
+	struct SkyState {
+		float timeKey;
+		Color lightColor;// same as polyColor
+		Color skyColor;// same as fogColor
+	};
+
+	struct CurrentTimeKeys {
+		float timeOfDay;// current time
+		uint32_t lastTimeKeyIndex;// most recently elapsed
+		uint32_t nextTimeKeyIndex;// upcoming
+		float delta;// how much time has passed from last to next, between 0 and 1
+	};
+
+	Color fromSRGB(uint8_t r, uint8_t g, uint8_t b) {
+		return Color(
+			fromSRGB(r / 255.f),
+			fromSRGB(g / 255.f),
+			fromSRGB(b / 255.f),
+			1.f);
+	}
+
+	float fromAlpha(uint8_t a) {
+		return a / 255.f;
+	}
+
 	namespace timekey
 	{
 		const float day = .0f;
@@ -24,24 +49,6 @@ namespace render
 	const float skyLightIntensityOutdoor = 200 / 256.0f;
 	const float skyLightIntensityIndoor = 120 / 256.0f;
 
-	struct SkyState {
-		float timeKey;
-		Color lightColor;// same as polyColor
-		Color skyColor;// same as fogColor
-	};
-
-	Color fromSRGB(uint8_t r, uint8_t g, uint8_t b) {
-		return Color(
-			fromSRGB(r / 255.f),
-			fromSRGB(g / 255.f),
-			fromSRGB(b / 255.f),
-			1.f);
-	}
-
-	float fromAlpha(uint8_t a) {
-		return a / 255.f;
-	}
-
 	// G1 defines an additional texture brightness color (domeColor1) in SkyState, however it is hardcoded to not be used by base night layer (star texture)
 	// and it is effectively set to 255 for any time other than night time, which means it only ever affects the night overlay (night clouds texture).
 	// G1 hardcodes re-scaling of domeColor1 to range 128 - 255.
@@ -60,18 +67,31 @@ namespace render
 		timekey::day_start,
 	};
 
-	const Color daySkyColor = fromSRGB(116, 89, 75);// G1 defines 4 different variants of this inside INI, use first for now
+	const Color daySkyColorG1 = fromSRGB(116, 89, 75);// G1 defines 4 different variants of this inside INI, use first for now
+	const Color daySkyColorG2 = fromSRGB(120, 140, 180);
 
-	const array skyStates = {
-		SkyState { timekey::day,         fromSRGB(255, 250, 235), daySkyColor },
-		SkyState { timekey::day_end,     fromSRGB(255, 250, 235), daySkyColor },
-		SkyState { timekey::evening,     fromSRGB(255, 185, 170), fromSRGB(180,  75,  60) },
-		SkyState { timekey::night_start, fromSRGB(105, 105, 195), fromSRGB( 20,  20,  60) },
-		SkyState { timekey::night,       fromSRGB( 40,  60, 210), fromSRGB(  5,   5,  20) },
-		SkyState { timekey::night_end,   fromSRGB( 40,  60, 210), fromSRGB(  5,   5,  20) },
-		SkyState { timekey::dawn,        fromSRGB(190, 160, 255), fromSRGB( 80,  60, 105) },
-		SkyState { timekey::day_start,   fromSRGB(255, 250, 235), daySkyColor },
-	};
+	struct SkyStates {
+		array<SkyState, std::size(timeKeys)> g1 = {
+			SkyState { timekey::day,         fromSRGB(255, 250, 235), daySkyColorG1 },
+			SkyState { timekey::day_end,     fromSRGB(255, 250, 235), daySkyColorG1 },
+			SkyState { timekey::evening,     fromSRGB(255, 185, 170), fromSRGB(180,  75,  60) },
+			SkyState { timekey::night_start, fromSRGB(105, 105, 195), fromSRGB(20,  20,  60) },
+			SkyState { timekey::night,       fromSRGB(40,  60, 210), fromSRGB(5,   5,  20) },
+			SkyState { timekey::night_end,   fromSRGB(40,  60, 210), fromSRGB(5,   5,  20) },
+			SkyState { timekey::dawn,        fromSRGB(190, 160, 255), fromSRGB(80,  60, 105) },
+			SkyState { timekey::day_start,   fromSRGB(255, 250, 235), daySkyColorG1 },
+		};
+		array<SkyState, std::size(timeKeys)> g2 = {
+			SkyState { timekey::day,         fromSRGB(255, 250, 235), daySkyColorG2 },
+			SkyState { timekey::day_end,     fromSRGB(255, 250, 235), daySkyColorG2 },
+			SkyState { timekey::evening,     fromSRGB(255, 185, 170), fromSRGB(180,  75,  60) },
+			SkyState { timekey::night_start, fromSRGB(105, 105, 195), fromSRGB(20,  20,  60) },
+			SkyState { timekey::night,       fromSRGB(40,  60, 210), fromSRGB(5,   5,  20) },
+			SkyState { timekey::night_end,   fromSRGB(40,  60, 210), fromSRGB(5,   5,  20) },
+			SkyState { timekey::dawn,        fromSRGB(190, 160, 255), fromSRGB(80,  60, 105) },
+			SkyState { timekey::day_start,   fromSRGB(255, 250, 235), daySkyColorG2 },
+		};
+	} skyStates;
 
 	const SkyTex base_DAY =   { "SKYDAY_LAYER1" };
 	const SkyTex base_NIGHT = { "SKYNIGHT_LAYER0", 20 * 4, true };
@@ -104,12 +124,13 @@ namespace render
 		SkyTexState { timekey::day_start,   over_DAY,   fromAlpha(255), speedSlow },
 	};
 
-	struct CurrentTimeKeys {
-		float timeOfDay;// current time
-		uint32_t lastTimeKeyIndex;// most recently elapsed
-		uint32_t nextTimeKeyIndex;// upcoming
-		float delta;// how much time has passed from last to next, between 0 and 1
-	};
+	bool isG2 = false;
+
+
+	auto& getSkyStates()
+	{
+		return isG2 ? skyStates.g2 : skyStates.g1;
+	}
 
 	float interpolate(float last, float next, float delta) {
 		return last + (next - last) * delta;
@@ -147,8 +168,8 @@ namespace render
 	{
 		SkyState result;
 		result.timeKey = timeKeys.timeOfDay;
-		SkyState last = skyStates[timeKeys.lastTimeKeyIndex];
-		SkyState next = skyStates[timeKeys.nextTimeKeyIndex];
+		SkyState last = getSkyStates()[timeKeys.lastTimeKeyIndex];
+		SkyState next = getSkyStates()[timeKeys.nextTimeKeyIndex];
 		float lastFactor = 1.f - timeKeys.delta;
 		float nextFactor = timeKeys.delta;
 
@@ -181,7 +202,8 @@ namespace render
 		return result;
 	}
 
-	// cache last-used interpolated values so we don't have to re-interpolate on each API call
+	// cache last-used interpolated values so we don't have to re-interpolate on each API call,
+	bool isDirty = true;
 	CurrentTimeKeys currentTimeKeys = getTimeKeysInterpolated(defaultTime);
 	SkyState currentSkyState = getSkyStateInterpolated(currentTimeKeys);
 	array<SkyTexState, 2> currentLayers = {
@@ -189,28 +211,34 @@ namespace render
 		getSkyLayerInterpolated(currentTimeKeys, false),
 	};
 
-	SkyState getSkyState(float timeOfDay)
+	void updateCachedState(float timeOfDay)
 	{
-		if (timeOfDay != currentSkyState.timeKey) {
-			if (timeOfDay != currentTimeKeys.timeOfDay) {
-				currentTimeKeys = getTimeKeysInterpolated(timeOfDay);
-			}
+		if (isDirty) {
+			currentTimeKeys = getTimeKeysInterpolated(timeOfDay);
 			currentSkyState = getSkyStateInterpolated(currentTimeKeys);
-		}
-		return currentSkyState;
-	}
-
-	array<SkyTexState, 2> getSkyLayers(float timeOfDay)
-	{
-		if (timeOfDay != currentLayers[0].timeKey) {
-			if (timeOfDay != currentTimeKeys.timeOfDay) {
-				currentTimeKeys = getTimeKeysInterpolated(timeOfDay);
-			}
 			currentLayers = {
 				getSkyLayerInterpolated(currentTimeKeys, true),
 				getSkyLayerInterpolated(currentTimeKeys, false),
 			};
 		}
+		isDirty = false;
+	}
+
+	SkyState getSkyState(float timeOfDay)
+	{
+		if (timeOfDay != currentTimeKeys.timeOfDay) {
+			isDirty = true;
+		}
+		updateCachedState(timeOfDay);
+		return currentSkyState;
+	}
+
+	array<SkyTexState, 2> getSkyLayers(float timeOfDay)
+	{
+		if (timeOfDay != currentTimeKeys.timeOfDay) {
+			isDirty = true;
+		}
+		updateCachedState(timeOfDay);
 		return currentLayers;
 	}
 
@@ -229,5 +257,11 @@ namespace render
 	Color getSkyColor(float currentTime)
 	{
 		return getSkyState(currentTime).skyColor;
+	}
+
+	void setSkyGothicVersion(bool isG2Param)
+	{
+		isG2 = isG2Param;
+		isDirty = true;
 	}
 }

@@ -160,6 +160,11 @@ namespace render::pass::world
 		return worldSettings;
 	}
 
+	void notifyGameSwitch(RenderSettings& settings)
+	{
+		setSkyGothicVersion(settings.isG2);
+	}
+
 	void initLinearSampler(D3d d3d, RenderSettings& settings)
 	{
 		// TODO use Other.h

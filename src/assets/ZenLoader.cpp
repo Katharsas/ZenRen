@@ -220,12 +220,14 @@ namespace assets
         {
             auto read = zenkit::Read::from(fileData.data, fileData.size);
             try {
-                world.load(read.get());
+                zenkit::GameVersion version = world.load(read.get());
+                out.isG2 = version == zenkit::GameVersion::GOTHIC_2;
             }
             catch (const std::exception& ex) {
                 util::throwError(ex.what());
             }
         }
+
         out.isOutdoorLevel = world.world_bsp_tree.mode == zenkit::BspTreeType::OUTDOOR;
         sampler.logMillisAndRestart("Loader: World data parsed");
 
