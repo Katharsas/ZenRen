@@ -1,12 +1,5 @@
 #pragma once
 
-#include "../Dx.h"
-#include "../Settings.h"
-#include "../Renderer.h"
-#include "../ShaderManager.h"
-
-#include "render/d3d/BlendState.h"
-
 namespace render::pass::world
 {
 	// windows things :(
@@ -49,17 +42,4 @@ namespace render::pass::world
 		int16_t chunkFilterX = 0;
 		int16_t chunkFilterY = 0;
 	};
-
-	LoadWorldResult loadWorld(D3d d3d, const std::string& level);
-	void updateObjects(float deltaTime);
-	void updatePrepareDraws(D3d d3d, const DirectX::BoundingFrustum& cameraFrustum, bool hasCameraMoved);
-	WorldSettings& getWorldSettings();
-	void initLinearSampler(D3d d3d, RenderSettings& settings);
-	void init(D3d d3d);
-	Color getBackgroundColor();
-	void drawSky(D3d d3d, ShaderManager* shaders);
-	void drawWorld(D3d d3d, ShaderManager* shaders, BlendType pass);
-	void drawWireframe(D3d d3d, ShaderManager* shaders, BlendType pass);
-	void clean();
 }
-

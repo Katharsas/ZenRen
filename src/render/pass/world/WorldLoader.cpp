@@ -1,12 +1,13 @@
 #include "stdafx.h"
-#include "PassWorldLoader.h"
+#include "WorldLoader.h"
 
-#include "render/pass/PassWorldChunkGrid.h"
+#include "WorldGrid.h"
 
 #include "render/d3d/TextureBuffer.h"
 #include "render/d3d/GeometryBuffer.h"
 #include "render/PerfStats.h"
 #include "render/Loader.h"
+#include "render/d3d/Buffer.h"
 
 #include "assets/AssetCache.h"
 #include "assets/AssetFinder.h"
@@ -16,7 +17,6 @@
 #include "Logger.h"
 #include "Util.h"
 #include "Win.h"
-#include "render/d3d/Buffer.h"
 
 namespace render::pass::world
 {

@@ -4,24 +4,23 @@
 #include <filesystem>
 #include <stdexcept>
 
-#include "PassWorldLoader.h"
-#include "PassWorldChunkGrid.h"
-#include "PassSky.h"
+#include "render/pass/world/WorldSettingsGui.h"
+#include "render/pass/world/WorldLoader.h"
+#include "render/pass/world/WorldGrid.h"
 
 #include "render/Camera.h"
 #include "render/Sky.h"
 #include "render/PerfStats.h"
 #include "render/d3d/ConstantBuffer.h"
 #include "render/d3d/GeometryBuffer.h"
+#include "render/pass/PassSky.h"
 
 #include "Util.h"
 
-// TODO move to RenderDebugGui
 #include "render/Gui.h"
-#include "render/GuiHelper.h"
-#include <imgui.h>
+
 #include "imgui/imgui_custom.h"
-#include "magic_enum.hpp"
+#include <imgui.h>
 
 namespace render::pass::world
 {
@@ -60,8 +59,6 @@ namespace render::pass::world
 	float minLodWidth = 0.001f;// since this is added to potentially bigger number, we have less precision
 
 	int32_t selectedDebugTexture = 0;
-
-	auto lodModeComboState = gui::comboStateFromEnum<LodMode>();
 
 	uint32_t currentDrawCall = 0;
 	uint32_t maxDrawCalls = 0;
@@ -118,85 +115,11 @@ namespace render::pass::world
 			}
 		});
 
-		render::gui::addSettings("World", {
-			[&]() -> void {
-				ImGui::PushItemWidth(gui::constants().elementWidth);
-				// Lables starting with ## are hidden
-				float timeOfDay = worldSettings.timeOfDay;
-				bool changed = ImGui::DragFloat("##TimeOfDay", &timeOfDay, .002f, 0, 0, "%.3f TimeOfDay");
-				if (changed) {
-					updateTimeOfDay(timeOfDay);
-				}
-				ImGui::SliderFloat("##TimeOfDayChangeSpeed", &worldSettings.timeOfDayChangeSpeed, 0, 1, "%.3f Time Speed", ImGuiSliderFlags_Logarithmic);
-				ImGui::PopItemWidth();
-				ImGui::VerticalSpacing();
-
-				ImGui::PushStyleColorDebugText();
-				ImGui::Checkbox("Draw World", &worldSettings.drawWorld);
-				ImGui::Checkbox("Draw VOBs/MOBs", &worldSettings.drawStaticObjects);
-				ImGui::Checkbox("Draw Sky", &worldSettings.drawSky);
-				ImGui::VerticalSpacing();
-				ImGui::Checkbox("Chunked Rendering", &worldSettings.chunkedRendering);
-				ImGui::PopStyleColor();
-
-				ImGui::VerticalSpacing();
-				ImGui::BeginDisabled(!worldSettings.chunkedRendering);
-				ImGui::Checkbox("LOD Enabled", &worldSettings.enableLod);
-				ImGui::BeginDisabled(!worldSettings.enableLod);
-				ImGui::SliderFloat("##LodCrossover", &worldSettings.lodRadius, 0, 1000, "%.0f LOD Radius", ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat);
-				
-				ImGui::PushStyleColorDebugText();
-				ImGui::PushItemWidth(120);
-				gui::comboEnum("LOD Display", lodModeComboState, worldSettings.lodDisplayMode);
-				ImGui::PopItemWidth();
-
-				ImGui::Checkbox("LOD Per Pixel", &worldSettings.enablePerPixelLod);
-				ImGui::BeginDisabled(!worldSettings.enablePerPixelLod);
-				ImGui::Checkbox("LOD Dithering", &worldSettings.enableLodDithering);
-				ImGui::BeginDisabled(!worldSettings.enableLodDithering);
-				ImGui::SliderFloat("##LodCrossoverWidth", &worldSettings.lodRadiusDitherWidth, 0, 100, "%.0f LOD Fade Range");
-				ImGui::EndDisabled();
-				ImGui::EndDisabled();
-				ImGui::EndDisabled();
-
-				ImGui::VerticalSpacing();
-				ImGui::Checkbox("Enable Frustum Culling", &worldSettings.enableFrustumCulling);
-				ImGui::Checkbox("Update Frustum Culling", &worldSettings.updateFrustumCulling);
-				ImGui::EndDisabled();
-				
-				ImGui::VerticalSpacing();
-				ImGui::Checkbox("Debug Shader", &worldSettings.debugWorldShaderEnabled);
-				ImGui::Checkbox("Debug Single Draw", &worldSettings.debugSingleDrawEnabled);
-				ImGui::BeginDisabled(!worldSettings.debugSingleDrawEnabled);
-				ImGui::SliderInt("Debug Single Draw Index", &worldSettings.debugSingleDrawIndex, 0, maxDrawCalls - 1);
-				ImGui::EndDisabled();
-				ImGui::PopStyleColor();
-			}
-		});
-
-		render::gui::addSettings("World Draw Filter", {
-			[&]() -> void {
-				ImGui::BeginDisabled(!worldSettings.chunkedRendering);
-				ImGui::PushItemWidth(gui::constants().elementWidth);
-				ImGui::PushStyleColorDebugText();
-
-				ImGui::Checkbox("Filter Chunks X", &worldSettings.chunkFilterXEnabled);
-				ImGui::Checkbox("Filter Chunks Y", &worldSettings.chunkFilterYEnabled);
-
-				auto [min, max] = chunkgrid::getIndexMinMax();
-
-				ImGui::BeginDisabled(!worldSettings.chunkFilterXEnabled);
-				ImGui::SliderScalar("ChunkIndex X", ImGui::dataType(min.x), &worldSettings.chunkFilterX, &min.x, &max.x);
-				ImGui::EndDisabled();
-				ImGui::BeginDisabled(!worldSettings.chunkFilterYEnabled);
-				ImGui::SliderScalar("ChunkIndex Y", ImGui::dataType(min.y), &worldSettings.chunkFilterY, &min.y, &max.y);
-				ImGui::EndDisabled();
-
-				ImGui::PopStyleColor();
-				ImGui::PopItemWidth();
-				ImGui::EndDisabled();
-			}
-			});
+		gui::init(
+			worldSettings,
+			maxDrawCalls,
+			[&]() -> void { updateTimeOfDay(worldSettings.timeOfDay); },
+			[&]() -> auto { return chunkgrid::getIndexMinMax(); });
 
 		// TODO move to RenderDebugGui
 		render::gui::addWindow("Lightmaps", {

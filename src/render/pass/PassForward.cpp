@@ -8,7 +8,7 @@
 #include "render/Camera.h"
 #include "render/Sky.h"
 #include "render/pass/PassSky.h"
-#include "render/pass/PassWorld.h"
+#include "render/pass/world/PassWorld.h"
 
 
 namespace render::pass::forward

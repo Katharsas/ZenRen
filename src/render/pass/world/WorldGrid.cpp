@@ -1,8 +1,8 @@
 #include "stdafx.h"
-#include "PassWorldChunkGrid.h"
+#include "WorldGrid.h"
 
 #include "Util.h"
-#include "Render/MeshUtil.h"
+#include "render/MeshUtil.h"
 #include "render/PerfStats.h"
 #include "render/Gui.h"
 

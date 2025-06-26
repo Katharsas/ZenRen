@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../WinDx.h"
-#include "../Renderer.h"
+#include "render/WinDx.h"
+#include "render/Renderer.h"
 
 namespace render::pass::world
 {

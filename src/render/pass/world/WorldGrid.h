@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Common.h"
+#include "render/Common.h"
 
 #include "directxcollision.h"
 

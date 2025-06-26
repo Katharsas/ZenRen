@@ -7,17 +7,17 @@
 using namespace Microsoft::WRL;
 
 #include "WinDx.h"
-#include "Settings.h"
-#include "SettingsGui.h"
-#include "Camera.h"
-#include "pass/PassForward.h"
-#include "pass/PassPost.h"
-#include "pass/PassWorld.h"
-#include "pass/PassSky.h"
-#include "ShaderManager.h"
-#include "Shader.h"
-#include "RenderUtil.h"
-#include "../Util.h"
+#include "render/Settings.h"
+#include "render/SettingsGui.h"
+#include "render/Camera.h"
+#include "render/pass/PassForward.h"
+#include "render/pass/PassPost.h"
+#include "render/pass/world/PassWorld.h"
+#include "render/pass/PassSky.h"
+#include "render/ShaderManager.h"
+#include "render/Shader.h"
+#include "render/RenderUtil.h"
+#include "Util.h"
 #include "Gui.h"
 
 #include <imgui.h>
