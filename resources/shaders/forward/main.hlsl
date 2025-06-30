@@ -204,8 +204,9 @@ float CalcDistantAlphaDensityFactor(Texture2DArray<float4> sourceTex, float2 tex
         float texHeight;
         float elements;
         sourceTex.GetDimensions(texWidth, texHeight, elements); // TODO this info could be passed with cb/sb
-        float distAlphaMipScale = 0.25f;
-        return 1 + CalcMipLevel(texCoord * float2(texWidth, texHeight)) * distAlphaMipScale;
+        float mipLevel = CalcMipLevel(texCoord * float2(texWidth, texHeight));
+        float distAlphaMipScale = 0.012f;
+        return 1 + (mipLevel * mipLevel * distAlphaMipScale);
     }
     else {
         return 1;

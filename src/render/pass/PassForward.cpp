@@ -114,7 +114,7 @@ namespace render::pass::forward
 		cbGlobalSettings.distanceFogEnd = settings.distanceFogEnd;
 		cbGlobalSettings.distanceFogSkyFactor = settings.distanceFogSkyFactor;
 
-		cbGlobalSettings.multisampleTransparency = settings.multisampleTransparency;
+		cbGlobalSettings.multisampleTransparency = settings.multisampleTransparency && settings.multisampleCount > 1;
 		cbGlobalSettings.distantAlphaDensityFix = settings.distantAlphaDensityFix;
 		cbGlobalSettings.reverseZ = settings.reverseZ;
 		cbGlobalSettings.outputType = settings.shader.mode;
