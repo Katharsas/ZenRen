@@ -87,8 +87,8 @@ namespace render::pass::sky
         auto d = toXM4Pos(Vec3 { -500, height, 500 });
 
         vector result = {
-            array { a, b, c },
-            array { a, c, d },
+            array { b, a, c },
+            array { c, a, d },
         };
         return result;
     }
@@ -99,8 +99,8 @@ namespace render::pass::sky
         auto c = Uv{ max.u, max.v };
         auto d = Uv{ min.u, max.v };
         return {
-            array { a, b, c },
-            array { a, c, d },
+            array { b, a, c },
+            array { c, a, d },
         };
     }
 

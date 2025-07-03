@@ -18,6 +18,13 @@ namespace render::d3d
 	}
 
 	template<typename T>
+	void createVertexBuf(D3d d3d, ID3D11Buffer** target, const std::vector<std::array<T, 3>>& vertexData, BufferUsage usage = BufferUsage::IMMUTABLE)
+	{
+		uint32_t byteSize = sizeof(T) * vertexData.size() * 3;
+		createGeometryBufUnsafe(d3d, target, vertexData.data(), byteSize, usage, false);
+	}
+
+	template<typename T>
 	void createIndexBuf(D3d d3d, ID3D11Buffer** target, const std::vector<T>& indexData, BufferUsage usage = BufferUsage::IMMUTABLE)
 	{
 		uint32_t byteSize = sizeof(T) * indexData.size();

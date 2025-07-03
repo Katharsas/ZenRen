@@ -1,11 +1,13 @@
 #include "stdafx.h"
 #include "PassPost.h"
 
-#include "../WinDx.h"
-#include "../Renderer.h"
-#include "../Shader.h"
+#include "render/WinDx.h"
+#include "render/Renderer.h"
+#include "render/Shader.h"
 #include "render/RenderUtil.h"
+#include "render/MeshPrimitives.h"
 #include "render/d3d/ConstantBuffer.h"
+#include "render/d3d/GeometryBuffer.h"
 
 namespace render::pass::post
 {
@@ -31,7 +33,7 @@ namespace render::pass::post
 	
 	ID3D11DepthStencilView* multisampleDepthView = nullptr;
 	ID3D11DepthStencilState* depthStateNone = nullptr;
-	ID3D11RasterizerState* rasterizer;
+	ID3D11RasterizerState* rasterizer = nullptr;
 
 	d3d::ConstantBuffer<CbPostSettings> settingsCb = {};
 
@@ -272,39 +274,28 @@ namespace render::pass::post
 	{
 		toneMappingQuad.release();
 
-		const float zNear = reverseZ ? 1.0f : 0.0f;
+		float zNear = reverseZ ? 1.0f : 0.0f;
 
-		std::array<PosUv, 6> fullscreenQuadData = { {
-			{ { -1.0f, 1.0f, zNear }, { 0.0f, 0.0f } },
-			{ { 1.0f, 1.0, zNear }, { 1.0f, 0.0f } },
-			{ { 1.0, -1.0, zNear }, { 1.0f, 1.0f } },
-			{ { -1.0f, 1.0f, zNear }, { 0.0f, 0.0f } },
-			{ { 1.0, -1.0, zNear }, { 1.0f, 1.0f } },
-			{ { -1.0, -1.0, zNear }, { 0.0f, 1.0f } },
-		} };
+		//std::vector<PosUv> verts = { {
+		//	{ {  1.0,  1.0, zNear }, { 1.0, 0.0 } },
+		//	{ { -1.0,  1.0, zNear }, { 0.0, 0.0 } },
+		//	{ {  1.0, -1.0, zNear }, { 1.0, 1.0 } },
+		//	
+		//  { {  1.0, -1.0, zNear }, { 1.0, 1.0 } },
+		//	{ { -1.0,  1.0, zNear }, { 0.0, 0.0 } },
+		//	{ { -1.0, -1.0, zNear }, { 0.0, 1.0 } },
+		//} };
 
-		// create vertex buffer containing fullscreen quad
-		{
-			D3D11_BUFFER_DESC bufferDesc = CD3D11_BUFFER_DESC();
-			ZeroMemory(&bufferDesc, sizeof(bufferDesc));
-
-			bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-			bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-			bufferDesc.ByteWidth = sizeof(PosUv) * fullscreenQuadData.size();
-
-			D3D11_SUBRESOURCE_DATA initialData;
-			initialData.pSysMem = fullscreenQuadData.data();
-			d3d.device->CreateBuffer(&bufferDesc, &initialData, &(toneMappingQuad.vertexBuffer));
-			toneMappingQuad.vertexCount = fullscreenQuadData.size();
-		}
+		std::vector<std::array<PosUv, 3>> verts = createQuadMesh<Axis::Z>({ 0, 0, zNear }, { 1, 1 }, { 0, 0 }, false);
+		
+		d3d::createVertexBuf(d3d, &(toneMappingQuad.vertexBuffer), verts);
+		toneMappingQuad.vertexCount = verts.size() * 3;
 	}
 
 	void initRasterizer(D3d d3d)
 	{
-		D3D11_RASTERIZER_DESC rasterizerDesc;
-		ZeroMemory(&rasterizerDesc, sizeof(D3D11_RASTERIZER_DESC));
-
-		rasterizerDesc.MultisampleEnable = true;
+		D3D11_RASTERIZER_DESC rasterizerDesc = CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT{});
+		rasterizerDesc.FrontCounterClockwise = true;
 		d3d.device->CreateRasterizerState(&rasterizerDesc, &rasterizer);
 	}
 

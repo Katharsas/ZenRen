@@ -159,6 +159,7 @@ namespace render
 		flags.onInit();
 		reinitRenderer(d3d, flags);
 		post::initDepthBuffer(d3d, clientSize);
+		post::initRasterizer(d3d);
 		post::initConstantBuffers(d3d);
 
 		gui::init(windowHandle, d3d);

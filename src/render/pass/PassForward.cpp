@@ -377,26 +377,24 @@ namespace render::pass::forward
 	{
 		release(rasterizer);
 		release(rasterizerWf);
-		{
-			// default
-			D3D11_RASTERIZER_DESC rasterizerDesc = CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT{});
-			// TODO, also in post for fullscreen quad to keep things consistent
-			//rasterizerDesc.FrontCounterClockwise = TRUE;
-			if (multisampleCount > 1) {
-				rasterizerDesc.MultisampleEnable = TRUE;
-			}
-			d3d.device->CreateRasterizerState(&rasterizerDesc, &rasterizer);
-		} {
-			// wireframe
-			D3D11_RASTERIZER_DESC rasterizerDesc = CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT{});
-			if (multisampleCount > 1) {
-				rasterizerDesc.MultisampleEnable = TRUE;
-			}
-			rasterizerDesc.AntialiasedLineEnable = TRUE;
-			rasterizerDesc.FillMode = D3D11_FILL_WIREFRAME;
-			rasterizerDesc.CullMode = D3D11_CULL_NONE;
-			d3d.device->CreateRasterizerState(&rasterizerDesc, &rasterizerWf);
+
+		D3D11_RASTERIZER_DESC rasterizerDesc = CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT{});
+
+		// we want counter-clockwise winding
+		rasterizerDesc.FrontCounterClockwise = true;
+
+		if (multisampleCount > 1) {
+			rasterizerDesc.MultisampleEnable = true;
 		}
+
+		// default
+		d3d.device->CreateRasterizerState(&rasterizerDesc, &rasterizer);
+
+		// wireframe
+		rasterizerDesc.AntialiasedLineEnable = true;
+		rasterizerDesc.FillMode = D3D11_FILL_WIREFRAME;
+		rasterizerDesc.CullMode = D3D11_CULL_NONE;
+		d3d.device->CreateRasterizerState(&rasterizerDesc, &rasterizerWf);
 	}
 
 	void initBlendStates(D3d d3d, uint32_t multisampleCount, bool multisampleTransparency) {

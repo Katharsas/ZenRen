@@ -16,6 +16,7 @@ namespace render::pass::post
 	void initViewport(BufferSize& size);
 	void initLinearSampler(D3d d3d, bool pointSampling);
 	void initVertexBuffers(D3d d3d, bool reverseZ);
+	void initRasterizer(D3d d3d);
 	void initConstantBuffers(D3d d3d);
 }
 

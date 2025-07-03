@@ -9,6 +9,7 @@
 
 #include "AssetCache.h"
 #include "MeshOpt.h"
+#include "render/MeshPrimitives.h"
 #include "render/MeshUtil.h"
 #include "../Util.h"
 
@@ -514,11 +515,12 @@ namespace assets
         array<VertexBasic, 3> faceOther;
 
         for (uint32_t i = 0; i < 3; i++) {
-            VertexPos pos = toVec3(facePosXm[i]);
+            VertexPos& pos = facePos.at(i);
+            pos = toVec3(facePosXm[i]);
 
-            const auto& featureZkit = mesh.features.at(mesh.polygons.feature_indices.at(vertIndex));
-            VertexBasic other;
+            VertexBasic& other = faceOther.at(i);
             other.normal = toVec3(faceNormalsXm[i]);
+            const auto& featureZkit = mesh.features.at(mesh.polygons.feature_indices.at(vertIndex));
             const auto& glmUvDiffuse = featureZkit.texture;
             other.uvDiffuse = toUv(glmUvDiffuse);
             other.colLight = fromSRGB(Color(featureZkit.light));
@@ -526,8 +528,6 @@ namespace assets
             other.lightSun = 1.0f;
             other.uvLightmap = getLightmapUvsZkit(mesh, faceIndex, facePosXm[i]);
 
-            facePos.at(2 - i) = pos;
-            faceOther.at(2 - i) = other;
             vertIndex++;
         }
         GridPos gridPos = toGridPos(grid, centroidPos(facePosXm));
@@ -711,13 +711,10 @@ namespace assets
         }
         normalStats += faceNormalStats;
 
-        // UVs, convert, flip
+        // UVs, convert
         array<VertexPrecomp, 3> face;
         for (uint32_t i = 0; i < 3; i++) {
-            // flip faces (seems like zEngine uses counter-clockwise winding, while we use clockwise winding)
-            // TODO use D3D11_RASTERIZER_DESC FrontCounterClockwise instead?
-            VertexPrecomp& vert = face.at(2 - i);
-
+            VertexPrecomp& vert = face.at(i);
             XMStoreFloat4(&vert.pos, facePosXm[i]);
             XMStoreFloat4(&vert.normal, faceNormalsXm[i]);
             vert.uvColor = getUvModelZkit({}, submesh, vertIndex + i);
@@ -1044,60 +1041,31 @@ namespace assets
         }
     }
 
-    /**
-     * Create quad.
-     */
-    vector<array<pair<XMVECTOR, Uv>, 3>> createQuadPositions(const Decal& decal)
-    {
-        auto& size = decal.quad_size;
-        auto& offset = decal.uv_offset;
-        float base = 1.f;
-        pair A = { toXM4Pos(Vec3{ -base * size.x,  base * size.y, 0 }), Uv{ 0 + offset.u, 0 + offset.v } };
-        pair B = { toXM4Pos(Vec3{  base * size.x,  base * size.y, 0 }), Uv{ 1 + offset.u, 0 + offset.v } };
-        pair C = { toXM4Pos(Vec3{  base * size.x, -base * size.y, 0 }), Uv{ 1 + offset.u, 1 + offset.v } };
-        pair D = { toXM4Pos(Vec3{ -base * size.x, -base * size.y, 0 }), Uv{ 0 + offset.u, 1 + offset.v } };
-
-        vector<array<pair<XMVECTOR, Uv>, 3>> result;
-        result.reserve(decal.two_sided ? 4 : 2);
-
-        // counter-clockwise winding to be consistent with other Gothic assets
-        // for indexing to work, vertices that can de decuplicated (A, C) must be adjacent to each other across faces
-        result.push_back({ D, C, A });
-        result.push_back({ A, C, B });
-        if (decal.two_sided) {
-            result.push_back({ B, C, A });
-            result.push_back({ A, C, D });
-        }
-
-        return result;
-    }
-
     VertsPrecomp precomputeDecal(const Decal& decal)
     {
-        auto quadFacesXm = createQuadPositions(decal);
+        auto quadFaces = createQuadMesh<Axis::Z>({0, 0, 0}, decal.quad_size, decal.uv_offset, decal.two_sided);
 
         VertsPrecomp result;
-        result.reserve(quadFacesXm.size() * 3);
+        result.reserve(quadFaces.size() * 3);
 
-        for (auto& quadFaceXm : quadFacesXm) {
+        for (auto& quadFace : quadFaces) {
             // positions
             array<XMVECTOR, 3> facePosXm;
             for (uint32_t i = 0; i < 3; i++) {
-                facePosXm[i] = quadFaceXm.at(i).first;
+                facePosXm[i] = toXM4Pos(quadFace.at(i).pos);
                 facePosXm[i] = XMVectorMultiply(facePosXm[i], XMVectorSet(G_ASSET_RESCALE, G_ASSET_RESCALE, G_ASSET_RESCALE, 1.f));
             }
 
-            //normal
+            // normal
             XMFLOAT4 faceNormal;
             XMStoreFloat4(&faceNormal, calcFlatFaceNormal(facePosXm));
 
-            // flip faces (seems like zEngine uses counter-clockwise winding, while we use clockwise winding)
-            // TODO use D3D11_RASTERIZER_DESC FrontCounterClockwise instead?
-            for (int32_t i = 2; i >= 0; i--) {
+            // store
+            for (int32_t i = 0; i < 3; i++) {
                  VertexPrecomp vert;
                  XMStoreFloat4(&vert.pos, facePosXm[i]);
                  vert.normal = faceNormal;
-                 vert.uvColor = quadFaceXm[i].second;
+                 vert.uvColor = quadFace[i].uv;
                  result.push_back(vert);
             }
         }
