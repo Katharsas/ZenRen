@@ -29,7 +29,6 @@ namespace render
 		bool wireframe = false;
 		bool reverseZ = true;
 
-		bool anisotropicFilter = true;
 		uint32_t anisotropicLevel = 16;
 
 		ShaderSettings shader = {

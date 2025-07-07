@@ -8,6 +8,7 @@
 
 #include <imgui.h>
 
+// TODO rename namespace
 namespace render::pass::world::chunkgrid
 {
 	using namespace DirectX;
@@ -103,61 +104,77 @@ namespace render::pass::world::chunkgrid
 		}
 	}
 
-	void updateInsersectForBaseCells(uint32_t start, uint32_t count, bool intersectsCameraFrustum)
+	inline bool isBaseCellIntersectOrContain(const grid::CellInfo& baseCell, uint32_t& intersectCount, const BoundingFrustum& cameraFrustum)
 	{
-		for (uint32_t i = start; i < (start + count); i++) {
-			auto& baseCell = grid.cells.base[i];
-			cellsCamera.base[i].intersectsFrustum = baseCell.isInUse && intersectsCameraFrustum;
-		}
+		return baseCell.isInUse && cameraFrustum.Intersects(baseCell.bbox) && (++intersectCount);
 	}
 
-	void updateInsersectForBaseCells(uint32_t start, uint32_t count, const BoundingFrustum& cameraFrustum)
+	inline bool isBaseCellIntersectOrContain(const grid::CellInfo& baseCell, uint32_t& intersectCount, const BoundingFrustum& cameraFrustum, ContainmentType parentIntersect)
+	{
+		return baseCell.isInUse
+			&& parentIntersect != ContainmentType::DISJOINT
+			&& (parentIntersect == ContainmentType::CONTAINS || (cameraFrustum.Intersects(baseCell.bbox) && (++intersectCount)));
+	}
+
+	template<bool FROM_PARENT>
+	void updateInsersectForBaseCells(
+		uint32_t start, uint32_t count,
+		const BoundingFrustum& cameraFrustumNormal,
+		const BoundingFrustum& cameraFrustumClose,
+		OPT_PARAM<FROM_PARENT, ContainmentType> parentIntersectNormal,
+		OPT_PARAM<FROM_PARENT, ContainmentType> parentIntersectClose)
 	{
 		for (uint32_t i = start; i < (start + count); i++) {
 			auto& baseCell = grid.cells.base[i];
-			cellsCamera.base[i].intersectsFrustum = baseCell.isInUse && cameraFrustum.Intersects(baseCell.bbox);
-			if (baseCell.isInUse) {
-				stats.intersects++;
+			auto& close = cellsCamera.base[i].intersectsFrustumClose;
+			auto& normal = cellsCamera.base[i].intersectsFrustum;
+			if constexpr (FROM_PARENT) {
+				close = isBaseCellIntersectOrContain(baseCell, stats.intersects, cameraFrustumClose, parentIntersectClose);
+				normal = close || isBaseCellIntersectOrContain(baseCell, stats.intersects, cameraFrustumNormal, parentIntersectNormal);
+			}
+			else {
+				close = isBaseCellIntersectOrContain(baseCell, stats.intersects, cameraFrustumClose);
+				normal = close || isBaseCellIntersectOrContain(baseCell, stats.intersects, cameraFrustumNormal);
 			}
 		}
 	}
 
-	void updateCamera(const BoundingFrustum& cameraFrustum, bool updateCulling, bool updateDistances)
+	void updateCamera(const BoundingFrustum& cameraFrustum, bool updateCulling, bool updateCloseIntersect, float closeRadius, bool updateDistances)
 	{
 		// frustum
 		stats.intersects = 0;
 		stats.intersectsTime.start();
 
-		if (updateCulling) {
+		BoundingFrustum closeFrustum = cameraFrustum;
+		closeFrustum.Far = closeFrustum.Near + closeRadius;
+
+		if (updateCulling || updateCloseIntersect) {
+			// if we have a hierarchical grid (layer cells) propagate intersection info from each layer cell to its contained base cells
 			if (grid.groupSize > 0) {
 				for (uint32_t layerIndex = 0, baseIndex = 0; layerIndex < grid.cells.layer.size(); layerIndex++, baseIndex += grid.groupSize) {
 					auto& layerCell = grid.cells.layer[layerIndex];
 					auto& layerCellCamera = cellsCamera.layer[layerIndex];
 
 					if (layerCell.isInUse) {
-						ContainmentType containment = cameraFrustum.Contains(layerCell.bbox);
-						layerCellCamera.intersectType = containment;
-						stats.intersects++;
+						ContainmentType& containmentNormal = layerCellCamera.intersectFrustumType;
+						ContainmentType& containmentClose = layerCellCamera.intersectFrustumCloseType;
+						if (updateCulling) {
+							containmentNormal = cameraFrustum.Contains(layerCell.bbox);
+							stats.intersects++;
+						}
+						if (updateCloseIntersect) {
+							containmentClose = closeFrustum.Contains(layerCell.bbox);
+							stats.intersects++;
+						}
 
 						uint32_t groupStart = layerIndex * grid.groupSize;
-
-						if (containment == ContainmentType::DISJOINT) {
-							updateInsersectForBaseCells(groupStart, grid.groupSize, false);
-						}
-						else if (containment == ContainmentType::CONTAINS) {
-							updateInsersectForBaseCells(groupStart, grid.groupSize, true);
-						}
-						else if (containment == ContainmentType::INTERSECTS) {
-							updateInsersectForBaseCells(groupStart, grid.groupSize, cameraFrustum);
-						}
-						else {
-							assert(false);
-						}
+						updateInsersectForBaseCells<true>(groupStart, grid.groupSize, cameraFrustum, closeFrustum, containmentNormal, containmentClose);
 					}
 				}
 			}
+			// otherwise we just have updat base cells one by one
 			else {
-				updateInsersectForBaseCells(0, grid.cellCount, cameraFrustum);
+				updateInsersectForBaseCells<false>(0, grid.cellCount, cameraFrustum, closeFrustum, {}, {});
 			}
 		}
 
@@ -208,6 +225,8 @@ namespace render::pass::world::chunkgrid
 			.innerIndex = innerIndex
 		};
 	}
+
+	// TODO should all of the below stuff return const references?
 
 	LayerCellCameraInfo getCameraInfoOuter(uint16_t outerIndex)
 	{

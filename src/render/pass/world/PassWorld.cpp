@@ -13,6 +13,7 @@
 #include "render/PerfStats.h"
 #include "render/d3d/ConstantBuffer.h"
 #include "render/d3d/GeometryBuffer.h"
+#include "render/d3d/Sampler.h"
 #include "render/pass/PassSky.h"
 
 #include "Util.h"
@@ -33,7 +34,7 @@ namespace render::pass::world
 
 	WorldSettings worldSettings;
 
-	ID3D11SamplerState* linearSamplerState = nullptr;
+	ID3D11SamplerState* samplerState = nullptr;
 
 
 	enum CbLodRangeType {
@@ -54,6 +55,57 @@ namespace render::pass::world
 	};
 
 	d3d::ConstantBuffer<CbLodRange> lodRangeCb = {};
+
+	struct DrawRange {
+		uint32_t start;
+		uint32_t count;
+	};
+
+	struct MergedDrawsBuilder {
+	private:
+		bool currentRangeActive = false;
+		uint32_t currentRangeStart = 0;
+
+	public:
+		std::vector<DrawRange> draws;
+
+		void reinit(uint32_t maxDraws)
+		{
+			assert(!currentRangeActive);
+			currentRangeStart = 0;
+			draws.clear();
+			draws.reserve(maxDraws);
+		}
+
+		void finalizeRange(uint32_t drawEndExlusive)
+		{
+			assert(drawEndExlusive >= currentRangeStart);
+			if (currentRangeActive) {
+				// range end
+				currentRangeActive = false;
+				uint32_t drawCount = drawEndExlusive - currentRangeStart;
+				if (drawCount > 0) {
+					draws.push_back({ currentRangeStart, drawCount });
+				}
+			}
+		}
+
+		void createOrFinalizeRange(bool isActive, uint32_t drawStart)
+		{
+			// TODO chunks with very few verts should be allowed to be enabled if range is active currently, if that helps joining ranges (test!)
+			uint32_t ignoreChunkVertThreshold = 500;// TODO
+
+			assert(drawStart >= currentRangeStart);
+			if (!currentRangeActive && isActive) {
+				// range start
+				currentRangeStart = drawStart;
+				currentRangeActive = true;
+			}
+			if (!isActive) {
+				finalizeRange(drawStart);
+			}
+		}
+	};
 
 	float minLodStart = 0.00001f;
 	float minLodWidth = 0.001f;// since this is added to potentially bigger number, we have less precision
@@ -113,7 +165,7 @@ namespace render::pass::world
 				buffer << "Verts: " << verts << "k" << '\n';
 				ImGui::Text(buffer.str().c_str());
 			}
-		});
+			});
 
 		gui::init(
 			worldSettings,
@@ -130,12 +182,12 @@ namespace render::pass::world
 
 				float zoom = 2.0f;
 				if (world.debugTextures.size() >= 1) {
-					if (selectedDebugTexture >= 0 && selectedDebugTexture < (int32_t) world.debugTextures.size()) {
+					if (selectedDebugTexture >= 0 && selectedDebugTexture < (int32_t)world.debugTextures.size()) {
 						ImGui::Image((ImTextureID)world.debugTextures.at(selectedDebugTexture)->GetResourceView(), { 256 * zoom, 256 * zoom });
 					}
 				}
 			}
-		});
+			});
 	}
 
 	LoadWorldResult loadWorld(D3d d3d, const std::string& level) {
@@ -147,12 +199,19 @@ namespace render::pass::world
 		updateTimeOfDay(worldSettings.timeOfDay + (worldSettings.timeOfDayChangeSpeed * deltaTime));
 	}
 
-	void updatePrepareDraws(D3d d3d, const BoundingFrustum& cameraFrustum, bool hasCameraMoved)
+	void updatePrepareDraws(D3d d3d, const BoundingFrustum& cameraFrustum, bool hasCameraChanged)
 	{
 		if (worldSettings.chunkedRendering) {
-			bool updateCulling = worldSettings.enableFrustumCulling && worldSettings.updateFrustumCulling && hasCameraMoved;
-			bool updateDistances = hasCameraMoved;
-			chunkgrid::updateCamera(camera::getFrustum(), updateCulling, updateDistances);
+			bool updateCulling = worldSettings.enableFrustumCulling && worldSettings.updateFrustumCulling && hasCameraChanged;
+
+			static float previousCloseRadius = 0;
+			bool closeRadiusChanged = previousCloseRadius != worldSettings.renderCloseRadius;
+			previousCloseRadius = worldSettings.renderCloseRadius;
+			bool updateCloseIntersect = (worldSettings.renderCloseFirst && hasCameraChanged) || closeRadiusChanged;
+
+			bool updateDistances = hasCameraChanged;
+
+			chunkgrid::updateCamera(camera::getFrustum(), updateCulling, updateCloseIntersect, worldSettings.renderCloseRadius, updateDistances);
 		}
 	}
 
@@ -167,27 +226,7 @@ namespace render::pass::world
 
 	void initLinearSampler(D3d d3d, RenderSettings& settings)
 	{
-		// TODO use Other.h
-		if (linearSamplerState != nullptr) {
-			linearSamplerState->Release();
-		}
-		D3D11_SAMPLER_DESC samplerDesc = CD3D11_SAMPLER_DESC();
-		ZeroMemory(&samplerDesc, sizeof(samplerDesc));
-
-		if (settings.anisotropicFilter) {
-			samplerDesc.Filter = D3D11_FILTER_ANISOTROPIC;
-		} else {
-			samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-		}
-		samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
-		samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
-		samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
-		samplerDesc.MaxAnisotropy = settings.anisotropicLevel;
-		samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
-		samplerDesc.MinLOD = 0;
-		samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
-
-		d3d.device->CreateSamplerState(&samplerDesc, &linearSamplerState);
+		d3d::createSampler(d3d, &samplerState, settings.anisotropicLevel);
 	}
 
 	void init(D3d d3d)
@@ -218,7 +257,7 @@ namespace render::pass::world
 			const auto layers = getSkyLayers(worldSettings.timeOfDay);
 			bool swapLayers = getSwapLayers(worldSettings.timeOfDay);
 			sky::updateSkyLayers(d3d, layers, getSkyColor(worldSettings.timeOfDay), worldSettings.timeOfDay, swapLayers);
-			sky::drawSky(d3d, shaders, linearSamplerState);
+			sky::drawSky(d3d, shaders, samplerState);
 		}
 	}
 
@@ -249,24 +288,25 @@ namespace render::pass::world
 	}
 
 	template <VERTEX_FEATURE F>
-	using GetVertexBuffers = vector<VertexBuffer> (*) (const MeshBatch<F>&);
+	using GetVertexBuffers = vector<VertexBuffer>(*) (const MeshBatch<F>&);
 
-	template <VERTEX_FEATURE F> vector<VertexBuffer> batchGetVbPos   (const MeshBatch<F>& mesh) { return { mesh.vbPos }; }
+	template <VERTEX_FEATURE F> vector<VertexBuffer> batchGetVbPos(const MeshBatch<F>& mesh) { return { mesh.vbPos }; }
 	template <VERTEX_FEATURE F> vector<VertexBuffer> batchGetVbPosTex(const MeshBatch<F>& mesh) { return { mesh.vbPos, mesh.vbTexIndices }; }
-	template <VERTEX_FEATURE F> vector<VertexBuffer> batchGetVbAll   (const MeshBatch<F>& mesh) { return { mesh.vbPos, mesh.vbOther, mesh.vbTexIndices }; }
+	template <VERTEX_FEATURE F> vector<VertexBuffer> batchGetVbAll(const MeshBatch<F>& mesh) { return { mesh.vbPos, mesh.vbOther, mesh.vbTexIndices }; }
 
-	DrawStats draw(D3d d3d, uint32_t count, uint32_t start, bool indexed)
+	
+	DrawStats draw(D3d d3d, DrawRange range, bool indexed)
 	{
-		DrawStats stats; 
+		DrawStats stats;
 		if (!worldSettings.debugSingleDrawEnabled || worldSettings.debugSingleDrawIndex == currentDrawCall) {
 			if (indexed) {
-				d3d.deviceContext->DrawIndexed(count, start, 0);
+				d3d.deviceContext->DrawIndexed(range.count, range.start, 0);
 			}
 			else {
-				d3d.deviceContext->Draw(count, start);
+				d3d.deviceContext->Draw(range.count, range.start);
 			}
 
-			stats.verts += count;
+			stats.verts += range.count;
 			stats.draws++;
 		}
 
@@ -282,14 +322,30 @@ namespace render::pass::world
 		d3d::updateConstantBuf(d3d, lodRangeCb, cbLodRange);
 		d3d.deviceContext->PSSetConstantBuffers(CbLodRange::slot(), 1, &lodRangeCb.buffer);
 
-		return draw(d3d, drawCount, vertClusters.at(0).vertStartIndex, indexed);
+		return draw(d3d, { vertClusters.at(0).vertStartIndex, drawCount }, indexed);
 	}
 
-	DrawStats drawMeshClusters(D3d d3d, const vector<ChunkVertCluster>& vertClusters, uint32_t drawCount, bool indexed, bool isLodNear, bool ignoreLodRadius)
+	DrawStats draw(D3d d3d, const std::vector<DrawRange>& drawList, bool indexed)
 	{
-		// TODO select closest chunks (any that overlap a "min render box" around camera) and render them first for early-z discards
-		// TODO fix view-coordinate normal lighting and move to pixel shader so lighting can profit from early-z
 		DrawStats stats;
+
+		for (const DrawRange& drawRange : drawList) {
+			stats += draw(d3d, drawRange, indexed);
+		}
+
+		return stats;
+	}
+
+	void createMeshClusterDraws(
+		D3d d3d,
+		MergedDrawsBuilder& drawsBuilder,
+		MergedDrawsBuilder& drawsBuilderClose,
+		const vector<ChunkVertCluster>& vertClusters,
+		uint32_t drawCount,
+		bool isLodNear,
+		bool ignoreLodRadius)
+	{
+		// TODO fix view-coordinate normal lighting and move to pixel shader so lighting can profit from early-z
 
 		uint32_t drawOffset = vertClusters.at(0).vertStartIndex;
 
@@ -300,16 +356,10 @@ namespace render::pass::world
 		float lodRadiusBeginSq = std::pow(lodRadiusBegin, 2);
 		float lodRadiusEndSq = std::pow(lodRadiusEnd, 2);
 
-		uint32_t ignoreChunkVertThreshold = 500;// TODO
+		float closeRadiusSq = std::pow(worldSettings.renderCloseRadius, 2);
 
-		// TODO since max number of cells is known, we could probably re-use a single static vector for all meshes
-		vector<std::pair<uint32_t, uint32_t>> vertRanges;
-		vertRanges.reserve(vertClusters.size());
-
-		bool rangeActive = false;
-		uint32_t rangeStart = drawOffset;
-
-		// TODO chunks with very few verts should be allowed to be enabled if range is active currently, if that helps joining ranges (test!)
+		drawsBuilder.reinit(vertClusters.size());
+		drawsBuilderClose.reinit(0);
 
 		for (uint32_t i = 0; i < vertClusters.size(); i++) {
 			const GridPos& gridPos = vertClusters[i].gridPos;
@@ -340,33 +390,14 @@ namespace render::pass::world
 				currentChunkActive = currentChunkActive && gridPos.y == worldSettings.chunkFilterY;
 			}
 
-			if (!rangeActive && currentChunkActive) {
-				// range start
-				rangeStart = vertStartIndex;
-				rangeActive = true;
-			}
-			if (rangeActive && !currentChunkActive) {
-				// range end
-				rangeActive = false;
-				vertRanges.push_back({ rangeStart, vertStartIndex });
-			}
+			bool isClose = worldSettings.renderCloseFirst && camera.intersectsFrustumClose;
+
+			drawsBuilder.createOrFinalizeRange(currentChunkActive && !isClose, vertStartIndex);
+			drawsBuilderClose.createOrFinalizeRange(currentChunkActive && isClose, vertStartIndex);
 		}
 		// end last range
-		if (rangeActive) {
-			rangeActive = false;
-			vertRanges.push_back({ rangeStart, drawOffset + drawCount });
-		}
-
-		for (const auto [startIncl, endExcl] : vertRanges) {
-			uint32_t vertCount = endExcl - startIncl;
-
-			vertCount = (uint32_t)(vertCount * worldSettings.debugDrawVertAmount);
-			vertCount -= (vertCount % 3);
-
-			stats += draw(d3d, vertCount, startIncl, indexed);
-		}
-
-		return stats;
+		drawsBuilder.finalizeRange(drawOffset + drawCount);
+		drawsBuilderClose.finalizeRange(drawOffset + drawCount);
 	}
 
 	template<VERTEX_FEATURE F>
@@ -398,9 +429,15 @@ namespace render::pass::world
 			else {
 				bool drawLod = indexed && hasLod && worldSettings.enableLod;
 
+				// use two so we can render close geometry before far geometry for better early-z, re-used to prevent allocations
+				static MergedDrawsBuilder builder;
+				static MergedDrawsBuilder builderClose;
+
 				if (worldSettings.lodDisplayMode != LodMode::FAR) {
 					d3d.annotation->BeginEvent(L"LOD High");
-					stats += drawMeshClusters(d3d, mesh.vertClusters, mesh.drawCount, indexed, true, !drawLod);
+					createMeshClusterDraws(d3d, builder, builderClose, mesh.vertClusters, mesh.drawCount, true, !drawLod);
+					stats += draw(d3d, builderClose.draws, indexed);
+					stats += draw(d3d, builder.draws, indexed);
 					d3d.annotation->EndEvent();
 				}
 				if (drawLod && worldSettings.lodDisplayMode != LodMode::NEAR) {
@@ -409,7 +446,9 @@ namespace render::pass::world
 						stats.stateChanges++; 
 					}
 					d3d.annotation->BeginEvent(L"LOD Low");
-					stats += drawMeshClusters(d3d, mesh.vertClustersLod, mesh.drawLodCount, indexed, false, false);
+					createMeshClusterDraws(d3d, builder, builderClose, mesh.vertClustersLod, mesh.drawLodCount, false, false);
+					stats += draw(d3d, builderClose.draws, indexed);
+					stats += draw(d3d, builder.draws, indexed);
 					d3d.annotation->EndEvent();
 				}
 			}
@@ -462,7 +501,7 @@ namespace render::pass::world
 		d3d.deviceContext->VSSetShader(shader->getVertexShader(), 0, 0);
 		d3d.deviceContext->PSSetShader(shader->getPixelShader(), 0, 0);
 
-		d3d.deviceContext->PSSetSamplers(0, 1, &linearSamplerState);
+		d3d.deviceContext->PSSetSamplers(0, 1, &samplerState);
 
 		// lightmaps
 		d3d.deviceContext->PSSetShaderResources(1, 1, &world.lightmapTexArray);
@@ -483,7 +522,7 @@ namespace render::pass::world
 	{
 		sky::clean();
 		clearZenLevel();
-		release(linearSamplerState);
+		release(samplerState);
 		lodRangeCb.release();
 	}
 }

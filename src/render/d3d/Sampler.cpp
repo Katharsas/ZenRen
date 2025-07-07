@@ -1,10 +1,11 @@
-#pragma once
+#include "stdafx.h"
+#include "Sampler.h"
 
 #include "render/WinDx.h"
 
 namespace render::d3d
 {
-	static void createLinearSampler(D3d d3d, ID3D11SamplerState** target, uint16_t anisotropicLevel = 1)
+	void createSampler(D3d d3d, ID3D11SamplerState** target, uint16_t anisotropicLevel)
 	{
 		release(*target);
 		D3D11_SAMPLER_DESC samplerDesc = {};

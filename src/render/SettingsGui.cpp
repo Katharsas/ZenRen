@@ -96,13 +96,7 @@ namespace render::gui::settings {
 			[&]() -> void {
 				ImGui::PushItemWidth(120);
 				gui::combo("Filter", filterSettingsComboState, [&](uint32_t index) -> void {
-					if (index == 0) {
-						settings.anisotropicFilter = false;
-					}
-					else {
-						settings.anisotropicFilter = true;
-						settings.anisotropicLevel = 1 << index; // 2^index
-					}
+					settings.anisotropicLevel = 1 << index; // 2^index
 				});
 				ImGui::Checkbox("Cloud Blur", &settings.skyTexBlur);
 				ImGui::PopItemWidth();

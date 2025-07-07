@@ -74,12 +74,6 @@ namespace assets
         std::unordered_map<zenkit::MaterialGroup, uint32_t> materialGroups;
     } loadStats;
 
-    typedef std::monostate Unused;
-
-    // Either of type T if conditional is true, or of type std::monostate (which is essentially usable void type)
-    template<bool TEST, typename T>
-    using OPT_PARAM = std::conditional<TEST, T, Unused>::type;
-
     static_assert(XYZ<glm::vec3>);
     static_assert(XY<glm::vec2>);
 

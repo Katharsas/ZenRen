@@ -71,14 +71,14 @@ namespace render
 		bool forwardBlendState = false;
 		
 		bool diffuseTexSampler = false;
-		//bool staticVertexBuffer = false;
-		bool shaderSettingsGlobal = false;// TODO remove
+
+		bool cameraProjection = false;
 
 		void onInit() {
 			backBuffer = true, backBufferQuadVerts = true,
 				renderBuffer = true, renderBufferSampler = true,
 				depthBuffer = true, forwardRasterizer = true, forwardBlendState = true,
-				diffuseTexSampler = true; shaderSettingsGlobal = true;
+				diffuseTexSampler = true; cameraProjection = true;
 		}
 		void onChangeRenderSize() {
 			renderBuffer = true;
@@ -87,6 +87,7 @@ namespace render
 		void onChangeClientSize() {
 			onChangeRenderSize();
 			backBuffer = true;
+			cameraProjection = true;
 		}
 		void onChangeMultisampling() {
 			renderBuffer = true;
@@ -100,6 +101,7 @@ namespace render
 		void onChangeReverseZ() {
 			backBufferQuadVerts = true;
 			depthBuffer = true;
+			cameraProjection = true;
 		}
 	};
 
@@ -131,9 +133,9 @@ namespace render
 		if (flags.diffuseTexSampler) {
 			world::initLinearSampler(d3d, settings);
 		}
-		//if (flags.shaderSettingsGlobal) {
-		//	world::updateShaderSettings(d3d, settings);
-		//}
+		if (flags.cameraProjection) {
+			camera::initProjection(settings.reverseZ, renderSize, settings.viewDistance);
+		}
 	}
 
 	void initD3D(void* hWnd, const BufferSize& startSize)
@@ -284,15 +286,15 @@ namespace render
 		if (settings.reverseZ != settingsPrevious.reverseZ) {
 			renderState.onChangeReverseZ();
 		}
-		if (settings.anisotropicFilter != settingsPrevious.anisotropicFilter || settings.anisotropicLevel != settingsPrevious.anisotropicLevel) {
+		if (settings.anisotropicLevel != settingsPrevious.anisotropicLevel) {
 			renderState.diffuseTexSampler = true;
 		}
-		//if (settings.shader.ambientLight != settingsPrevious.shader.ambientLight || settings.shader.mode != settingsPrevious.shader.mode) {
-		//	renderState.shaderSettingsGlobal = true;
-		//}
+		if (settings.viewDistance != settingsPrevious.viewDistance) {
+			renderState.cameraProjection = true;
+		}
 		reinitRenderer(d3d, renderState);
 
-		bool hasCameraChanged = camera::updateCamera(settings.reverseZ, renderSize, settings.viewDistance);
+		bool hasCameraChanged = camera::updateCamera();
 
 		// foward pipeline renders scene to linear backbuffer
 		forward::draw(d3d, shaders, settings, hasCameraChanged);

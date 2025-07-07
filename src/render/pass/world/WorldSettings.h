@@ -21,6 +21,9 @@ namespace render::pass::world
 
 		bool chunkedRendering = true;
 
+		bool renderCloseFirst = true;
+		float renderCloseRadius = 70;
+
 		LodMode lodDisplayMode = LodMode::FULL;
 		bool enableLod = true;
 		float lodRadius = 300;
@@ -32,7 +35,7 @@ namespace render::pass::world
 		bool updateFrustumCulling = true;
 
 		bool debugWorldShaderEnabled = false;
-		float debugDrawVertAmount = 1.f;
+		//float debugDrawVertAmount = 1.f;
 
 		bool debugSingleDrawEnabled = false;
 		int32_t debugSingleDrawIndex = 0;

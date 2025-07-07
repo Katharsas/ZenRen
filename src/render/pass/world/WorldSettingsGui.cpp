@@ -45,10 +45,15 @@ namespace render::pass::world::gui
 				ImGui::Checkbox("Draw Sky", &worldSettings.drawSky);
 				ImGui::VerticalSpacing();
 				ImGui::Checkbox("Chunked Rendering", &worldSettings.chunkedRendering);
-				ImGui::PopStyleColor();
 
 				ImGui::VerticalSpacing();
 				ImGui::BeginDisabled(!worldSettings.chunkedRendering);
+
+				ImGui::Checkbox("Close chunks first", &worldSettings.renderCloseFirst);
+				ImGui::SliderFloat("##CloseRadius", &worldSettings.renderCloseRadius, 0, 400, "%.0f Close Radius", ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat);
+				ImGui::PopStyleColor();
+
+				ImGui::VerticalSpacing();
 				ImGui::Checkbox("LOD Enabled", &worldSettings.enableLod);
 				ImGui::BeginDisabled(!worldSettings.enableLod);
 				ImGui::SliderFloat("##LodCrossover", &worldSettings.lodRadius, 0, 1000, "%.0f LOD Radius", ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat);

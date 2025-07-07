@@ -4,6 +4,13 @@
 #include <concepts>
 #include <type_traits>
 
+typedef std::monostate Unused;
+
+// Either of type T if conditional is true, or of type std::monostate (which is essentially usable void type)
+template<bool TEST, typename T>
+using OPT_PARAM = std::conditional<TEST, T, Unused>::type;
+
+
 template <typename C> concept RGBA = requires(C color) {
 	{ color.r } -> std::convertible_to<uint32_t>;
 	{ color.g } -> std::convertible_to<uint32_t>;

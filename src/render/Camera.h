@@ -15,10 +15,11 @@ namespace render::camera
 	DirectX::XMMATRIX getProjectionMatrix();
 
 	DirectX::BoundingFrustum getFrustum();
+	DirectX::XMVECTOR getCameraPosition();
 
 	void init();
-	DirectX::XMVECTOR getCameraPosition();
-	bool updateCamera(bool reverseZ, BufferSize& viewportSize, float viewDistance);
+	void initProjection(bool reverseZ, BufferSize& viewportSize, float viewDistance);
+	bool updateCamera();
 	void moveCameraDepth(float amount);
 	void moveCameraHorizontal(float amount);
 	void moveCameraVertical(float amount);

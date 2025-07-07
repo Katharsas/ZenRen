@@ -12,7 +12,8 @@ namespace render::camera {
 	{
 		XMMATRIX view;
 		XMMATRIX projection;
-		BoundingFrustum frustum;
+		BoundingFrustum frustumProjection;
+		BoundingFrustum frustumViewProjection;
 	};
 
 	struct CameraLocation
@@ -54,7 +55,11 @@ namespace render::camera {
 	}
 	BoundingFrustum getFrustum()
 	{
-		return matrices.frustum;
+		return matrices.frustumViewProjection;
+	}
+	XMVECTOR getCameraPosition()
+	{
+		return location.position;
 	}
 
 	void init()
@@ -62,33 +67,35 @@ namespace render::camera {
 		location = g2NewWorldCity;
 	}
 
-	XMVECTOR getCameraPosition()
+	void initProjection(bool reverseZ, BufferSize& viewportSize, float viewDistance)
 	{
-		return location.position;
-	}
-
-	bool updateCamera(bool reverseZ, BufferSize& viewportSize, float viewDistance)
-	{
-		if (!hasChanged) {
-			return false;
-		}
-
-		// Set view & projection matrix
-		matrices.view = XMMatrixLookAtLH(location.position, location.target, location.up);
-
 		const float aspectRatio = static_cast<float>(viewportSize.width) / viewportSize.height;
 		const float nearZ = 0.1f;
 		const float farZ = viewDistance;
 		// we use LH (Y-up) instead of RH (Z-up) for now
 		matrices.projection = XMMatrixPerspectiveFovLH(0.4f * 3.14f, aspectRatio, reverseZ ? farZ : nearZ, reverseZ ? nearZ : farZ);
-		
+
 		// BoundingFrustum does not support z-reversed or RH
 		XMMATRIX projectionForFrustum = reverseZ ? XMMatrixPerspectiveFovLH(0.4f * 3.14f, aspectRatio, nearZ, farZ) : matrices.projection;
 
-		// update frustum
-		BoundingFrustum::CreateFromMatrix(matrices.frustum, projectionForFrustum);
+		// set frustum in projection space
+		BoundingFrustum::CreateFromMatrix(matrices.frustumProjection, projectionForFrustum);
+
+		hasChanged = true;
+	}
+
+	bool updateCamera()
+	{
+		if (!hasChanged) {
+			return false;
+		}
+
+		// update view
+		matrices.view = XMMatrixLookAtLH(location.position, location.target, location.up);
+		
+		// update frustum from projection to view-projection space
 		XMVECTOR determinant;
-		matrices.frustum.Transform(matrices.frustum, XMMatrixInverse(&determinant, matrices.view));
+		matrices.frustumProjection.Transform(matrices.frustumViewProjection, XMMatrixInverse(&determinant, matrices.view));
 
 		hasChanged = false;
 		return true;
