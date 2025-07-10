@@ -343,7 +343,8 @@ namespace render::pass::world
 		const vector<ChunkVertCluster>& vertClusters,
 		uint32_t drawCount,
 		bool isLodNear,
-		bool ignoreLodRadius)
+		bool ignoreLodRadius,
+		bool splitCloseCells)
 	{
 		// TODO fix view-coordinate normal lighting and move to pixel shader so lighting can profit from early-z
 
@@ -390,7 +391,7 @@ namespace render::pass::world
 				currentChunkActive = currentChunkActive && gridPos.y == worldSettings.chunkFilterY;
 			}
 
-			bool isClose = worldSettings.renderCloseFirst && camera.intersectsFrustumClose;
+			bool isClose = splitCloseCells && worldSettings.renderCloseFirst && camera.intersectsFrustumClose;
 
 			drawsBuilder.createOrFinalizeRange(currentChunkActive && !isClose, vertStartIndex);
 			drawsBuilderClose.createOrFinalizeRange(currentChunkActive && isClose, vertStartIndex);
@@ -401,7 +402,7 @@ namespace render::pass::world
 	}
 
 	template<VERTEX_FEATURE F>
-	DrawStats drawMeshBatches(D3d d3d, const vector<MeshBatch<F>>& meshes, bool bindTexColor, bool hasLod, GetVertexBuffers<F> getVertexBuffers)
+	DrawStats drawMeshBatches(D3d d3d, const vector<MeshBatch<F>>& meshes, bool bindTexColor, bool hasLod, bool hasOccluders, GetVertexBuffers<F> getVertexBuffers)
 	{
 		DrawStats stats;
 		for (auto& mesh : meshes) {
@@ -435,7 +436,7 @@ namespace render::pass::world
 
 				if (worldSettings.lodDisplayMode != LodMode::FAR) {
 					d3d.annotation->BeginEvent(L"LOD High");
-					createMeshClusterDraws(d3d, builder, builderClose, mesh.vertClusters, mesh.drawCount, true, !drawLod);
+					createMeshClusterDraws(d3d, builder, builderClose, mesh.vertClusters, mesh.drawCount, true, !drawLod, hasOccluders);
 					stats += draw(d3d, builderClose.draws, indexed);
 					stats += draw(d3d, builder.draws, indexed);
 					d3d.annotation->EndEvent();
@@ -446,7 +447,7 @@ namespace render::pass::world
 						stats.stateChanges++; 
 					}
 					d3d.annotation->BeginEvent(L"LOD Low");
-					createMeshClusterDraws(d3d, builder, builderClose, mesh.vertClustersLod, mesh.drawLodCount, false, false);
+					createMeshClusterDraws(d3d, builder, builderClose, mesh.vertClustersLod, mesh.drawLodCount, false, false, hasOccluders);
 					stats += draw(d3d, builderClose.draws, indexed);
 					stats += draw(d3d, builder.draws, indexed);
 					d3d.annotation->EndEvent();
@@ -462,13 +463,13 @@ namespace render::pass::world
 		if (worldSettings.drawWorld) {
 			d3d.annotation->BeginEvent(L"Worldmesh");
 			auto& batches = world.meshBatchesWorld.getBatches(pass);
-			stats += drawMeshBatches(d3d, batches, bindTexColor, false, getVbsWorld);
+			stats += drawMeshBatches(d3d, batches, bindTexColor, false, true, getVbsWorld);
 			d3d.annotation->EndEvent();
 		}
 		if (worldSettings.drawStaticObjects) {
 			d3d.annotation->BeginEvent(L"Objects");
 			auto& batches = world.meshBatchesObjects.getBatches(pass);
-			stats += drawMeshBatches(d3d, batches, bindTexColor, true, getVbsObject);
+			stats += drawMeshBatches(d3d, batches, bindTexColor, true, false, getVbsObject);
 			d3d.annotation->EndEvent();
 		}
 		return stats;
