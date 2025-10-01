@@ -48,6 +48,7 @@ namespace render::gui::settings {
 				ImGui::PopItemWidth();
 				ImGui::Checkbox("Wireframe Mode", &settings.wireframe);
 				ImGui::Checkbox("Enable Alpha", &settings.outputAlpha);
+				ImGui::SliderFloat("##AlphaCutoff", &settings.alphaCutoff, 0.01, 0.99, "%.2f Alpha Cutoff");
 
 				ImGui::VerticalSpacing();
 				//ImGui::Checkbox("Depth Prepass", &settings.depthPrepass);

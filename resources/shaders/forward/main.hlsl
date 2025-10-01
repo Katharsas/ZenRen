@@ -215,10 +215,6 @@ float CalcDistantAlphaDensityFactor(Texture2DArray<float4> sourceTex, float2 tex
 
 float AlphaTestAndSharpening(float alpha)
 {
-    // Alpha Cutoff - lower values will result in thinner coverage
-    // TODO make configurable
-    float alphaCutoff = 0.4;
-
     // Alpha to Coverage Sharpening
     // sharpen the multisampled alpha to remove banding and interior transparency; outputs close to 1 or 0
     if (multisampleTransparency) {

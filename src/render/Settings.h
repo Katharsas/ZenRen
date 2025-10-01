@@ -35,6 +35,7 @@ namespace render
 			ShaderMode::Full,
 		};
 		bool outputAlpha = true;
+		float alphaCutoff = 0.55f;
 
 		float resolutionScaling = 1.0f;
 		bool resolutionUpscaleSmooth = true;

@@ -27,6 +27,7 @@ cbuffer cbSettings : register(b0)
     bool reverseZ;
     uint outputType;
     bool outputAlpha;
+    float alphaCutoff;
 
     float timeOfDay;
     bool skyTexBlur;

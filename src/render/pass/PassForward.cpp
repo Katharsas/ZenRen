@@ -31,6 +31,7 @@ namespace render::pass::forward
 		int32_t reverseZ;
 		uint32_t outputType;
 		int32_t outputAlpha;
+		float alphaCutoff;
 		float timeOfDay;
 		int32_t skyTexBlurEnabled;
 	};
@@ -119,6 +120,7 @@ namespace render::pass::forward
 		cbGlobalSettings.reverseZ = settings.reverseZ;
 		cbGlobalSettings.outputType = settings.shader.mode;
 		cbGlobalSettings.outputAlpha = settings.outputAlpha;
+		cbGlobalSettings.alphaCutoff = settings.alphaCutoff;
 
 		cbGlobalSettings.skyTexBlurEnabled = settings.skyTexBlur;
 

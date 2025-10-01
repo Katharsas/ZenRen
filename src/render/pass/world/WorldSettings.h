@@ -26,9 +26,9 @@ namespace render::pass::world
 
 		LodMode lodDisplayMode = LodMode::FULL;
 		bool enableLod = true;
-		float lodRadius = 300;
-		bool enablePerPixelLod = false;
-		bool enableLodDithering = false;
+		float lodRadius = 110;
+		bool enablePerPixelLod = true;
+		bool enableLodDithering = true;
 		float lodRadiusDitherWidth = 20;
 
 		bool enableFrustumCulling = true;
