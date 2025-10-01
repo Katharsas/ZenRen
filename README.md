@@ -111,9 +111,7 @@ Requires a DirectX 11 capable GPU.
 
 ## License
 
-**Copyright (c) 2024 - Jan Mothes**
-
-This project's first-party code is "source available" for now.
+This software is licensed under AGPLv3 (see [LICENSE.TXT](LICENSE.TXT)), excluding third party code & libraries which are distributed under their own terms:
 
 ### Third-Party
 - lib/DirectXMath - MIT
