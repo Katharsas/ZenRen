@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.25)
 project(zenren)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -20,19 +20,12 @@ else()
     set(ARCHITECTURE 32bit)
 endif()
 
-if (CMAKE_GENERATOR MATCHES "Visual Studio")
-    if (CMAKE_CONFIGURATION_TYPES STREQUAL "Debug")
-        set(BUILD_MODE Debug)
-    elseif (CMAKE_CONFIGURATION_TYPES STREQUAL "Release")
-        set(BUILD_MODE Release)
-    endif ()
-else()
-    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        set(BUILD_MODE Debug)
-    elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
-        set(BUILD_MODE Release)
-    endif ()
-endif()
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(BUILD_MODE Debug)
+elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
+    set(BUILD_MODE Release)
+endif ()
+
 if (BUILD_MODE STREQUAL Debug)
     message(STATUS "BuildMode: Debug" )
 elseif (BUILD_MODE STREQUAL Release)
@@ -44,8 +37,6 @@ endif()
 ####### General options
 
 if(MSVC)
-    # TODO is this the way to do it for MSVC?
-    # TODO make sure DirectXMath uses its AVX2 implementation
     add_compile_options(/arch:AVX2)
 else()
     #set(CMAKE_EXE_LINKER_FLAGS "-Wl,--large-address-aware")
@@ -68,17 +59,17 @@ message(STATUS "############## THIRDPARTY LIBRARIES ##############")
 option(G3_SHARED_LIB "" OFF)
 option(ADD_FATAL_EXAMPLE "" OFF)
 option(ADD_G3LOG_UNIT_TEST "" OFF)
-add_subdirectory(lib/g3log)
+add_subdirectory(lib/g3log EXCLUDE_FROM_ALL)
 
 #add_subdirectory(lib/DirectXMath) # TODO this is header only so we don't need this right?
-add_subdirectory(lib/DirectXTex)
+add_subdirectory(lib/DirectXTex EXCLUDE_FROM_ALL)
 
-add_subdirectory(lib/meshoptimizer)
+add_subdirectory(lib/meshoptimizer EXCLUDE_FROM_ALL)
 
 #set(ZK_ENABLE_MMAP OFF)
 set(ZK_BUILD_TESTS OFF)
 set(ZK_ENABLE_ASAN OFF)
-add_subdirectory(lib/ZenKit)
+add_subdirectory(lib/ZenKit EXCLUDE_FROM_ALL)
 
 ####### ZenRen Executable
 message(STATUS "############## EXECUTABLE ##############")
@@ -88,14 +79,6 @@ link_directories(${DXSDK_LIB_DIR})
 file(GLOB_RECURSE PROJECT_SRC CONFIGURE_DEPENDS "src/*.h" "src/*.cpp" "src/*.rc" "src/viewer/win_resources/app.manifest")
 add_executable(${PROJECT_NAME} WIN32 ${PROJECT_SRC})
 
-# Fix some cases of macro pollution from win32 header files
-#target_compile_definitions(${GAME_TARGET} PRIVATE
-#	WIN32_LEAN_AND_MEAN
-#	NOGDI
-#	NOUSER
-#	_CRT_SECURE_NO_WARNINGS
-#)
-
  if (MSVC)
     # Advanced -> Character Set -> Use Unicode
     target_compile_definitions(${PROJECT_NAME} PUBLIC UNICODE _UNICODE)
@@ -104,11 +87,17 @@ add_executable(${PROJECT_NAME} WIN32 ${PROJECT_SRC})
     set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "/LARGEADDRESSAWARE")
 
     if (BUILD_MODE STREQUAL Release)
-            # Advanced -> Whole Program Optimization -> Use Link Time Code Generation
-            # (see https://stackoverflow.com/questions/48431918/wholeprogramoptimization-in-cmake)
-            # Not using generator expression here since it does not work with ninja ($ has to be replaced with $$)
-            set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS "/GL")
-            set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "/LTCG")
+        # Advanced -> Whole Program Optimization -> Use Link Time Code Generation
+        # (see https://stackoverflow.com/questions/48431918/wholeprogramoptimization-in-cmake)
+        # Not using generator expression here since it does not work with ninja ($ has to be replaced with $$)
+        set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS "/GL")
+        set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "/LTCG")
+
+        # Enable debug information in release mode
+        # In theory it would be better to use set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT ProgramDatabase) than to directly
+        # apply /Zi to CXX flags, however that does not work for Ninja generator (creates much smaller PDB, not picked up by VS)
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi")
+        set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF")
     else()
         # speed up debug builds by disabling basic runtime checks and enabling limited inlining
         # (see https://dirtyhandscoding.github.io/posts/fast-debug-in-visual-c.html)
@@ -163,5 +152,11 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 target_link_libraries(${PROJECT_NAME} PRIVATE
     d3d11.lib d3dcompiler.lib
 )
+
+message(STATUS "############## INSTALL ##############")
+
+# Allow users to create ready-to-use program in bin folder with install command
+install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION .)
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/resources/ DESTINATION . FILES_MATCHING PATTERN "*")
 
 message(STATUS "############## CMAKE END ##############")

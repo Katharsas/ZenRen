@@ -1,0 +1,135 @@
+{
+  "version": 4,
+  "configurePresets": [
+    {
+      "name": "ninja-x64-debug",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"
+      },
+      "environment": {
+        "VSCMD_ARG_TGT_ARCH": "x64"
+      }
+    },
+    {
+      "name": "ninja-x64-release",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"
+      },
+      "environment": {
+        "VSCMD_ARG_TGT_ARCH": "x64"
+      }
+    },
+    {
+      "name": "ninja-x86-debug",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"
+      },
+      "environment": {
+        "VSCMD_ARG_TGT_ARCH": "x86"
+      }
+    },
+    {
+      "name": "ninja-x86-release",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"
+      },
+      "environment": {
+        "VSCMD_ARG_TGT_ARCH": "x86"
+      }
+    },
+    {
+      "name": "vs-x64-debug",
+      "generator": "Visual Studio 17 2022",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"
+      },
+      "environment": {
+        "VSCMD_ARG_TGT_ARCH": "x64"
+      }
+    },
+    {
+      "name": "vs-x64-release",
+      "generator": "Visual Studio 17 2022",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"
+      },
+      "environment": {
+        "VSCMD_ARG_TGT_ARCH": "x64"
+      }
+    },
+    {
+      "name": "vs-x86-debug",
+      "generator": "Visual Studio 17 2022",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"
+      },
+      "environment": {
+        "VSCMD_ARG_TGT_ARCH": "x86"
+      }
+    },
+    {
+      "name": "vs-x86-release",
+      "generator": "Visual Studio 17 2022",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"
+      },
+      "environment": {
+        "VSCMD_ARG_TGT_ARCH": "x86"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "ninja-x64-debug",
+      "configurePreset": "ninja-x64-debug"
+    },
+    {
+      "name": "ninja-x64-release",
+      "configurePreset": "ninja-x64-release"
+    },
+    {
+      "name": "ninja-x86-debug",
+      "configurePreset": "ninja-x86-debug"
+    },
+    {
+      "name": "ninja-x86-release",
+      "configurePreset": "ninja-x86-release"
+    },
+    {
+      "name": "vs-x64-debug",
+      "configurePreset": "vs-x64-debug"
+    },
+    {
+      "name": "vs-x64-release",
+      "configurePreset": "vs-x64-release"
+    },
+    {
+      "name": "vs-x86-debug",
+      "configurePreset": "vs-x86-debug"
+    },
+    {
+      "name": "vs-x86-release",
+      "configurePreset": "vs-x86-release"
+    }
+  ]
+}
