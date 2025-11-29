@@ -18,15 +18,29 @@ namespace render::gui::settings {
 
 	std::function<void()> notifyGameSwitch;
 
+	void advanced(RenderSettings& settings, const std::function<void()> gui)
+	{
+		ImGui::PushStyleColorDebugText();
+		if (settings.showAdvancedSettings) {
+			gui();
+		}
+		ImGui::PopStyleColor();
+	}
+
 	void init(
 		RenderSettings& settings,
 		const std::function<void()>& notifyGameSwitchParam)
 	{
 		notifyGameSwitch = notifyGameSwitchParam;
 
+		addSettings("", {
+			[&]() -> void {
+				ImGui::Checkbox("Show Advanced", &settings.showAdvancedSettings);
+			}
+		});
+
 		addSettings("Renderer", {
 			[&]() -> void {
-				ImGui::PushItemWidth(constants().elementWidth);
 				if (ImGui::Checkbox("Gothic 2", &settings.isG2)) {
 					notifyGameSwitch();
 				}
@@ -38,33 +52,31 @@ namespace render::gui::settings {
 				ImGui::Checkbox("Fog", &settings.distanceFog);
 				ImGui::SliderFloat("##FogStart", &settings.distanceFogStart, 1, 200, "%.0f Fog Start");
 				ImGui::SliderFloat("##FogEnd", &settings.distanceFogEnd, 1, 2000, "%.0f Fog End");
-				ImGui::SliderFloat("##FogSky", &settings.distanceFogSkyFactor, 0, 20, "%.2f Fog Sky");
-				ImGui::SliderFloat("##FogEaseOut", &settings.distanceFogEaseOut, -0.5, 2, "%.2f Fog EaseOut");
-
-				ImGui::VerticalSpacing();
-				ImGui::PushStyleColorDebugText();
-
-				ImGui::PushItemWidth(120);
-				gui::comboEnum("Shader Mode", shaderModeComboState, settings.shader.mode);
-				ImGui::PopItemWidth();
-				ImGui::Checkbox("Wireframe Mode", &settings.wireframe);
-				ImGui::Checkbox("Enable Alpha", &settings.outputAlpha);
-				ImGui::SliderFloat("##AlphaCutoff", &settings.alphaCutoff, 0.01, 0.99, "%.2f Alpha Cutoff");
-
-				ImGui::VerticalSpacing();
-				//ImGui::Checkbox("Depth Prepass", &settings.depthPrepass);
-				ImGui::Checkbox("Opaque Passes", &settings.passesOpaque);
-				ImGui::Checkbox("Blend Passes", &settings.passesBlend);
-
-				ImGui::VerticalSpacing();
-				ImGui::SliderFloat("##Debug1", &settings.debugFloat1, -1.f, 1.f, "%.2f Debug 1");
-				ImGui::SliderFloat("##Debug2", &settings.debugFloat2, -1.f, 1.f, "%.2f Debug 2");
 				
-				ImGui::VerticalSpacing();
-				ImGui::Checkbox("Reverse Z", &settings.reverseZ);
+				advanced(settings, [&]() -> void {
+					ImGui::SliderFloat("##FogSky", &settings.distanceFogSkyFactor, 0, 20, "%.2f Fog Sky");
+					ImGui::SliderFloat("##FogEaseOut", &settings.distanceFogEaseOut, -0.5, 2, "%.2f Fog EaseOut");
+					ImGui::VerticalSpacing();
 
-				ImGui::PopStyleColor();
-				ImGui::PopItemWidth();
+					ImGui::PushItemWidth(120);
+					gui::comboEnum("Shader Mode", shaderModeComboState, settings.shader.mode);
+					ImGui::PopItemWidth();
+					ImGui::Checkbox("Wireframe Mode", &settings.wireframe);
+					ImGui::Checkbox("Enable Alpha", &settings.outputAlpha);
+					ImGui::SliderFloat("##AlphaCutoff", &settings.alphaCutoff, 0.01, 0.99, "%.2f Alpha Cutoff");
+
+					ImGui::VerticalSpacing();
+					//ImGui::Checkbox("Depth Prepass", &settings.depthPrepass);
+					ImGui::Checkbox("Opaque Passes", &settings.passesOpaque);
+					ImGui::Checkbox("Blend Passes", &settings.passesBlend);
+
+					ImGui::VerticalSpacing();
+					ImGui::SliderFloat("##Debug1", &settings.debugFloat1, -1.f, 1.f, "%.2f Debug 1");
+					ImGui::SliderFloat("##Debug2", &settings.debugFloat2, -1.f, 1.f, "%.2f Debug 2");
+
+					ImGui::VerticalSpacing();
+					ImGui::Checkbox("Reverse Z", &settings.reverseZ);
+				});
 			}
 		});
 
@@ -73,10 +85,10 @@ namespace render::gui::settings {
 				ImGui::PushItemWidth(constants().inputFloatWidth);
 				ImGui::InputFloat("Resolution Scaling", &settings.resolutionScaling, 0, 0, "%.2f");
 				ImGui::PopItemWidth();
-				ImGui::PushStyleColorDebugText();
-				ImGui::Checkbox("Smooth Scaling", &settings.resolutionUpscaleSmooth);
-				//ImGui::Checkbox("Downsampling", &settings.downsampling);
-				ImGui::PopStyleColor();
+				advanced(settings, [&]() -> void {
+					ImGui::Checkbox("Smooth Scaling", &settings.resolutionUpscaleSmooth);
+					//ImGui::Checkbox("Downsampling", &settings.downsampling);
+				});
 			}
 		});
 
@@ -86,11 +98,11 @@ namespace render::gui::settings {
 				gui::combo("MSAA", msaaSettingsComboState, [&](uint32_t index) -> void {
 					settings.multisampleCount = 1 << index; // 2^index
 				});
-				ImGui::PushStyleColorDebugText();
-				ImGui::Checkbox("Transparency", &settings.multisampleTransparency);
-				ImGui::Checkbox("Distant Alpha", &settings.distantAlphaDensityFix);
-				ImGui::PopStyleColor();
 				ImGui::PopItemWidth();
+				advanced(settings, [&]() -> void {
+					ImGui::Checkbox("Transparency", &settings.multisampleTransparency);
+					ImGui::Checkbox("Distant Alpha", &settings.distantAlphaDensityFix);
+				});
 			}
 		});
 
@@ -100,21 +112,25 @@ namespace render::gui::settings {
 				gui::combo("Filter", filterSettingsComboState, [&](uint32_t index) -> void {
 					settings.anisotropicLevel = 1 << index; // 2^index
 				});
-				ImGui::Checkbox("Cloud Blur", &settings.skyTexBlur);
 				ImGui::PopItemWidth();
+				ImGui::Checkbox("Cloud Blur", &settings.skyTexBlur);
 			}
 		});
 
 		addSettings("Image", {
 			[&]() -> void {
-				ImGui::PushItemWidth(constants().elementWidth);
 				ImGui::SliderFloat("##Gamma", &settings.gamma, 0.5, 1.5, "%.3f Gamma");
 				float f = settings.brightness * 100;
 				if (ImGui::SliderFloat("##Min", &f, -1, 1, "%.2f Min Brightness")) {
 					settings.brightness = f / 100;
 				}
 				ImGui::SliderFloat("##Max", &settings.contrast, 0, 5, "%.2f Max Brightness");
-				ImGui::PopItemWidth();
+			}
+		});
+
+		addSettings("Camera", {
+			[&]() -> void {
+				ImGui::SliderFloat("##FOV", &settings.fovVertical, 50, 100, "%.0f FOV (Vertical)");
 			}
 		});
 	}

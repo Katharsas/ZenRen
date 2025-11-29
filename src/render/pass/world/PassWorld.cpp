@@ -199,6 +199,10 @@ namespace render::pass::world
 		updateTimeOfDay(worldSettings.timeOfDay + (worldSettings.timeOfDayChangeSpeed * deltaTime));
 	}
 
+	void updateSettings(bool showAdvancedSettings) {
+		worldSettings.showAdvancedSettings = showAdvancedSettings;
+	}
+
 	void updatePrepareDraws(D3d d3d, const BoundingFrustum& cameraFrustum, bool hasCameraChanged)
 	{
 		if (worldSettings.chunkedRendering) {

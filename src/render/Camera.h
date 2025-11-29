@@ -18,7 +18,7 @@ namespace render::camera
 	DirectX::XMVECTOR getCameraPosition();
 
 	void init();
-	void initProjection(bool reverseZ, BufferSize& viewportSize, float viewDistance);
+	void initProjection(bool reverseZ, BufferSize& viewportSize, float viewDistance, float fovVertical);
 	bool updateCamera();
 	void moveCameraDepth(float amount);
 	void moveCameraHorizontal(float amount);

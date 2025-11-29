@@ -13,6 +13,7 @@ namespace render::pass::world
 {
 	LoadWorldResult loadWorld(D3d d3d, const std::string& level);
 	void updateObjects(float deltaTime);
+	void updateSettings(bool showAdvancedSettings);
 	void updatePrepareDraws(D3d d3d, const DirectX::BoundingFrustum& cameraFrustum, bool hasCameraChanged);
 	WorldSettings& getWorldSettings();
 	void notifyGameSwitch(RenderSettings& settings);

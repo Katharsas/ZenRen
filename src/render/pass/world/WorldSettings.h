@@ -12,6 +12,8 @@ namespace render::pass::world
 	};
 
 	struct WorldSettings {
+		bool showAdvancedSettings = true;
+
 		float timeOfDay = 0.f;// range 0 to 1 (midday to midday)
 		float timeOfDayChangeSpeed = 0.f;// good showcase value: 0.03
 

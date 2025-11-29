@@ -122,7 +122,9 @@ namespace render::gui
 				ImGui::SetCursorPos({ ImGui::GetCursorPos().x + constants().panelPadding, ImGui::GetCursorPos().y });
 				ImGui::BeginGroup();
 				for (const auto& command : commands) {
+					ImGui::PushItemWidth(constants().elementWidth);
 					command.buildGui();
+					ImGui::PopItemWidth();
 				}
 				ImGui::EndGroup();
 				ImGui::VerticalSpacing(groupPadding * currentScaleFactor);

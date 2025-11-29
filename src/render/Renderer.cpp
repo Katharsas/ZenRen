@@ -134,7 +134,7 @@ namespace render
 			world::initLinearSampler(d3d, settings);
 		}
 		if (flags.cameraProjection) {
-			camera::initProjection(settings.reverseZ, renderSize, settings.viewDistance);
+			camera::initProjection(settings.reverseZ, renderSize, settings.viewDistance, settings.fovVertical);
 		}
 	}
 
@@ -292,6 +292,9 @@ namespace render
 		if (settings.viewDistance != settingsPrevious.viewDistance) {
 			renderState.cameraProjection = true;
 		}
+		if (settings.fovVertical != settingsPrevious.fovVertical) {
+			renderState.cameraProjection = true;
+		}
 		reinitRenderer(d3d, renderState);
 
 		bool hasCameraChanged = camera::updateCamera();
@@ -305,6 +308,7 @@ namespace render
 		// gui does not output shading information so it goes to real sRGB backbuffer as well
 		settingsPrevious = settings;
 		d3d.annotation->BeginEvent(L"imgui");
+		world::updateSettings(settings.showAdvancedSettings);
 		gui::draw();
 		d3d.annotation->EndEvent();
 	}

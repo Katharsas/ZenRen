@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "Camera.h"
 
+#include <math.h>
+
 #include "Settings.h"
 #include "Util.h"
 
@@ -67,16 +69,17 @@ namespace render::camera {
 		location = g2NewWorldCity;
 	}
 
-	void initProjection(bool reverseZ, BufferSize& viewportSize, float viewDistance)
+	void initProjection(bool reverseZ, BufferSize& viewportSize, float viewDistance, float fovVertical)
 	{
 		const float aspectRatio = static_cast<float>(viewportSize.width) / viewportSize.height;
 		const float nearZ = 0.1f;
 		const float farZ = viewDistance;
+		constexpr float degToRadians = XM_PI / 180;
 		// we use LH (Y-up) instead of RH (Z-up) for now
-		matrices.projection = XMMatrixPerspectiveFovLH(0.4f * 3.14f, aspectRatio, reverseZ ? farZ : nearZ, reverseZ ? nearZ : farZ);
+		matrices.projection = XMMatrixPerspectiveFovLH(fovVertical * degToRadians, aspectRatio, reverseZ ? farZ : nearZ, reverseZ ? nearZ : farZ);
 
 		// BoundingFrustum does not support z-reversed or RH
-		XMMATRIX projectionForFrustum = reverseZ ? XMMatrixPerspectiveFovLH(0.4f * 3.14f, aspectRatio, nearZ, farZ) : matrices.projection;
+		XMMATRIX projectionForFrustum = reverseZ ? XMMatrixPerspectiveFovLH(fovVertical * degToRadians, aspectRatio, nearZ, farZ) : matrices.projection;
 
 		// set frustum in projection space
 		BoundingFrustum::CreateFromMatrix(matrices.frustumProjection, projectionForFrustum);

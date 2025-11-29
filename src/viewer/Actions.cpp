@@ -39,7 +39,7 @@ namespace viewer
 
 	// input actions
 	const float cameraMoveSpeed = 7.f;
-	const float cameraMoveSpeedFast = cameraMoveSpeed * 10;
+	const float cameraMoveSpeedFast = cameraMoveSpeed * 12;
 
 	const float cameraTurnSpeed = 2.f;
 	const float cameraSensitivity = 0.003f;

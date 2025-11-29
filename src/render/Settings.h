@@ -17,6 +17,8 @@ namespace render
 	};
 
 	struct RenderSettings {
+		bool showAdvancedSettings = true;
+
 		bool isG2 = false;
 
 		float viewDistance = 800;
@@ -38,7 +40,8 @@ namespace render
 		bool outputAlpha = true;
 		float alphaCutoff = 0.55f;
 
-		float resolutionScaling = 1.0f;
+		float fovVertical = 72;
+		float resolutionScaling = 1;
 		bool resolutionUpscaleSmooth = true;
 		bool downsampling = false;// does not work currently, TODO implement mipmap generation for linear BB
 
