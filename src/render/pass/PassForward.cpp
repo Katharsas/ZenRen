@@ -26,6 +26,7 @@ namespace render::pass::forward
 		float distanceFogStart;
 		float distanceFogEnd;
 		float distanceFogSkyFactor;
+		float distanceFogEaseOut;
 		int32_t multisampleTransparency;
 		int32_t distantAlphaDensityFix;
 		int32_t reverseZ;
@@ -114,6 +115,7 @@ namespace render::pass::forward
 		cbGlobalSettings.distanceFogStart = settings.distanceFogStart;
 		cbGlobalSettings.distanceFogEnd = settings.distanceFogEnd;
 		cbGlobalSettings.distanceFogSkyFactor = settings.distanceFogSkyFactor;
+		cbGlobalSettings.distanceFogEaseOut = settings.distanceFogEaseOut;
 
 		cbGlobalSettings.multisampleTransparency = settings.multisampleTransparency && settings.multisampleCount > 1;
 		cbGlobalSettings.distantAlphaDensityFix = settings.distantAlphaDensityFix;

@@ -38,7 +38,8 @@ namespace render::gui::settings {
 				ImGui::Checkbox("Fog", &settings.distanceFog);
 				ImGui::SliderFloat("##FogStart", &settings.distanceFogStart, 1, 200, "%.0f Fog Start");
 				ImGui::SliderFloat("##FogEnd", &settings.distanceFogEnd, 1, 2000, "%.0f Fog End");
-				ImGui::SliderFloat("##FogSky", &settings.distanceFogSkyFactor, 1, 10, "%.2f Fog Sky");
+				ImGui::SliderFloat("##FogSky", &settings.distanceFogSkyFactor, 0, 20, "%.2f Fog Sky");
+				ImGui::SliderFloat("##FogEaseOut", &settings.distanceFogEaseOut, -0.5, 2, "%.2f Fog EaseOut");
 
 				ImGui::VerticalSpacing();
 				ImGui::PushStyleColorDebugText();

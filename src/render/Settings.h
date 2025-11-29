@@ -24,7 +24,8 @@ namespace render
 		// fog settings about match 300% view distance in G1 
 		float distanceFogStart = 120;
 		float distanceFogEnd = 600;
-		float distanceFogSkyFactor = 3;
+		float distanceFogSkyFactor = 5;
+		float distanceFogEaseOut = 0;
 
 		bool wireframe = false;
 		bool reverseZ = true;

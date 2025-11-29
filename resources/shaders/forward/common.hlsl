@@ -20,6 +20,7 @@ cbuffer cbSettings : register(b0)
     float distanceFogStart;
     float distanceFogEnd;
     float distanceFogSkyFactor;
+    float distanceFogEaseOut;
     
     bool multisampleTransparency;
     bool distantAlphaDensityFix;
@@ -32,9 +33,6 @@ cbuffer cbSettings : register(b0)
     float timeOfDay;
     bool skyTexBlur;
 };
-
-static const float distanceFogBalanceWorld = 1.2;
-static const float distanceFogBalanceSky = 0.9;// TODO we might need a more complex easing function here for softer sky transition
 
 cbuffer cbCamera : register(b1)
 {
@@ -110,12 +108,17 @@ float4 SwitchDiffuseByOutputMode(float4 texColor, float3 normalColor, float dept
 
 float4 ApplyFog(float4 shadedColor, float depthDistance, bool isSky = false)
 {
+    static const float easeOutFogWorld = 0.85;
+    static const float easeOutFogSky = 2.8;
+    
     if (distanceFog && outputType == OUTPUT_FULL) {
         
         if (depthDistance > distanceFogStart) /* dynamic branch */ {
-            float fogStart = min(distanceFogEnd - 0.0001, distanceFogStart);
+            float fogStart = min(distanceFogEnd - 0.00001, distanceFogStart);
             float weight = saturate((depthDistance - fogStart) / (distanceFogEnd - fogStart));
-            weight = pow(weight, isSky ? distanceFogBalanceSky : distanceFogBalanceWorld);
+            // ease out
+            float easeOutFactor = isSky ? easeOutFogSky + distanceFogEaseOut * 2 : easeOutFogWorld + distanceFogEaseOut;
+            weight = 1 - pow(1.f - weight, easeOutFactor);
             
             if (blendType == BLEND_ADD) {
                 // ADD blending must not add additional fog on top of already added fog in background,
