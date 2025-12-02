@@ -1,10 +1,10 @@
 #pragma once
 
-#include "render/Dx.h"
-#include "render/d3d/Buffer.h"
-#include "render/Primitives.h"
-
 #include <dxgiformat.h>
+
+#include "render/Dx.h"
+#include "render/Graphics.h"
+#include "render/Primitives.h"
 
 namespace render::d3d
 {

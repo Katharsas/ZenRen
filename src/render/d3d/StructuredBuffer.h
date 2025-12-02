@@ -2,7 +2,6 @@
 
 #include "render/Primitives.h"
 #include "render/Dx.h"
-#include "render/d3d/Buffer.h"
 #include "render/WinDx.h" // TODO remove
 
 #include <dxgiformat.h>

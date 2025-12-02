@@ -1,6 +1,6 @@
 #pragma once
 
-#include "render/WinDx.h"
+#include "render/Dx.h"
 #include "render/Renderer.h"
 
 namespace render::pass::world
@@ -26,7 +26,6 @@ namespace render::pass::world
 
 	struct World {
 		bool isOutdoorLevel = true;
-		std::vector<PrepassMeshes> prepassMeshes;
 		MeshBatches<VertexBasic> meshBatchesWorld;
 		MeshBatches<VertexBasic> meshBatchesObjects;
 

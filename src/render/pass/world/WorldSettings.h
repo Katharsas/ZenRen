@@ -2,9 +2,6 @@
 
 namespace render::pass::world
 {
-	// windows things :(
-#undef NEAR
-#undef FAR
 	enum LodMode {
 		FULL,
 		NEAR,

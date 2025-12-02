@@ -31,7 +31,7 @@ struct VS_IN
     float4 colLight : COLOR;
     float3 dirLight : NORMAL1;
     float sunLight : TEXCOORD2;
-    uint1 iTexColor : TEXCOORD3;
+    uint iTexColor : TEXCOORD3;
 };
 
 struct VS_OUT

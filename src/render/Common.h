@@ -10,15 +10,45 @@
 
 #include "magic_enum.hpp"
 
-//enum DXGI_FORMAT : int;
-
 namespace render
 {
 	// TODO move to MeshUtil
 	constexpr float G_ASSET_RESCALE = 0.01f;
 
 	using TexId = uint16_t;
+
 	using VertexPos = Vec3;
+	template <> inline VertexAttributes inputLayout<VertexPos>() {
+		return {
+			{  Type::FLOAT_3, Semantic::POSITION }
+		};
+	}
+
+	// TODO create union of uvLightmap + colLight with single bit flag to differentiate
+	// TODO move uvDiffuse into TexIndex
+	// TODO define input layout in structs
+	struct VertexBasic {
+		Vec3 normal;
+		Uv uvDiffuse;
+		Uvi uvLightmap;
+		Color colLight;
+		Vec3 dirLight;
+		float lightSun;
+	};
+	inline std::ostream& operator <<(std::ostream& os, const VertexBasic& that)
+	{
+		return os << "[NOR:" << that.normal << " COL_LIGHT:" << that.colLight << " DIR_LIGHT:" << that.dirLight << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
+	}
+	template <> inline VertexAttributes inputLayout<VertexBasic>() {
+		return {
+			{ Type::FLOAT_3, Semantic::NORMAL },
+			{ Type::FLOAT_2, Semantic::TEXCOORD },
+			{ Type::FLOAT_3, Semantic::TEXCOORD },
+			{ Type::FLOAT_4, Semantic::COLOR },
+			{ Type::FLOAT_3, Semantic::NORMAL },
+			{ Type::FLOAT, Semantic::TEXCOORD },// TODO use OTHER
+		};
+	}
 
 	struct TexInfo {
 		// TODO make width/height of type BufferSize?

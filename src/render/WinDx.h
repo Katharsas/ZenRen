@@ -28,6 +28,11 @@
 #include <d3d11.h>
 //#include <d3dx11.h>
 
+// windows things :(
+// conflicts with render::pass::world::LodMode members
+#undef NEAR
+#undef FAR
+
 namespace render
 {
 	void release(IUnknown* const dx11object);

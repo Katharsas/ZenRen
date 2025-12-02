@@ -2,40 +2,13 @@
 
 #include "Dx.h"
 #include "Common.h"
-#include "render/d3d/Buffer.h"
+#include "render/d3d/Shader.h";
+#include "render/d3d/GeometryBuffer.h"
 #include "Texture.h"
 
 namespace render
 {
-	struct DecalMesh
-	{
-		ID3D11Buffer* vertexBuffer = nullptr;
-		int32_t vertexCount;
-
-		void release()
-		{
-			render::release(vertexBuffer);
-		}
-	};
-
-	struct Mesh
-	{
-		uint32_t vertexCount = 0;
-		VertexBuffer vbPos = { sizeof(VertexPos) };
-		VertexBuffer vbOther = { sizeof(VertexBasic) };
-
-		// Ideally, we could not create one mesh per texture, but instead have a single mesh for whole world.
-		// This would require us to map every texture used for the mesh to an offset into the vertex buffer.
-		// Then we could make one draw per offset and switch texture in between.
-		Texture* baseColor = nullptr;
-
-		void release()
-		{
-			render::release(vbPos.buffer);
-			render::release(vbOther.buffer);
-		}
-	};
-
+	// TODO rename to MeshBatchBuffers?
 	template <VERTEX_FEATURE F>
 	struct MeshBatch {
 		// we could wrap this in a normal Texture object to make it more similar to unbatched meshes
@@ -61,22 +34,14 @@ namespace render
 			render::release(vbOther.buffer);
 			render::release(vbTexIndices.buffer);
 		}
-	};
 
-	struct PrepassMeshes
-	{
-		std::vector<ChunkVertCluster> vertClusters;
-		uint32_t vertexCount = 0;
-
-		bool useIndices = false;
-		VertexBuffer vbIndices = { sizeof(VertexIndex) };// meh
-
-		VertexBuffer vbPos = { sizeof(VertexPos) };
-
-		void release()
+		static std::vector<d3d::VertexAttributeDesc> shaderLayout()
 		{
-			render::release(vbIndices.buffer);
-			render::release(vbPos.buffer);
+			return d3d::buildInputLayoutDesc({
+				inputLayout<VertexPos>(),
+				inputLayout<F>(),
+				inputLayout<TexIndex>(),
+			});
 		}
 	};
 
@@ -86,7 +51,7 @@ namespace render
 		bool isOutdoorLevel = false;
 	};
 
-	void initD3D(void* hWnd, const BufferSize& changedSize);
+	void initD3D(WindowHandle hWnd, const BufferSize& changedSize);
 	bool loadLevel(const std::optional<std::string>& level, bool defaultSky = true);
 	void onWindowResize(const BufferSize& changedSize);
 	void onWindowDpiChange(float dpiScale);
@@ -95,4 +60,5 @@ namespace render
 	void update(float deltaTime);
 	void renderFrame();
 	void presentFrameBlocking();
+	void reloadShaders();
 }

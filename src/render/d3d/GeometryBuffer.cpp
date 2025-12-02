@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "GeometryBuffer.h"
 
+#include "render/WinDx.h"
+
 namespace render::d3d
 {
 	void createGeometryBufUnsafe(D3d d3d, ID3D11Buffer** target, const void* data, uint32_t byteSize, BufferUsage usage, bool isIndexBuffer)

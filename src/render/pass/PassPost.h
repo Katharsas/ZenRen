@@ -3,13 +3,13 @@
 #include "../Common.h"
 #include "../Settings.h"
 #include "../Dx.h"
-#include "../ShaderManager.h"
 
 namespace render::pass::post
 {
 	void clean();
-	void draw(D3d d3d, ID3D11ShaderResourceView* linearBackBuffer, ShaderManager* shaders, const RenderSettings& settings);
+	void draw(D3d d3d, ID3D11ShaderResourceView* linearBackBuffer, const RenderSettings& settings);
 	void resolveAndPresent(D3d d3d, IDXGISwapChain1* swapchain);
+	void reinitShaders(D3d d3d);
 	void initDownsampleBuffers(D3d d3d, BufferSize& size);
 	void initDepthBuffer(D3d d3d, BufferSize& size);
 	void initBackBuffer(D3d d3d, IDXGISwapChain1* swapchain);

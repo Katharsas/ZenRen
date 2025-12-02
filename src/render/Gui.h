@@ -1,6 +1,6 @@
 #pragma once
 
-#include "WinDx.h"
+#include "Dx.h"
 
 namespace render::gui
 {
@@ -30,8 +30,8 @@ namespace render::gui
 	void addWindow(const std::string& windowName, GuiComponent guiComponent);
 	void addSettings(const std::string& groupName, GuiComponent guiComponent);
 	void addInfo(const std::string& groupName, GuiComponent guiComponent);
-	void init(HWND hWnd, D3d d3d);
-	void onWindowDpiChange(HWND hWnd);
+	void init(WindowHandle hWnd, D3d d3d);
+	void onWindowDpiChange(WindowHandle hWnd);
 	void draw();
 	void clean();
 }
