@@ -17,8 +17,15 @@ struct ID3D11UnorderedAccessView;
 struct ID3D11SamplerState;
 struct ID3D11BlendState;
 
+struct ID3D11InputLayout;
+struct ID3D11VertexShader;
+struct ID3D11PixelShader;
+struct ID3D11ComputeShader;
+
 namespace render
 {
+	using WindowHandle = void*;
+
 	struct D3d {
 		ID3D11Device* device;
 		ID3D11DeviceContext* deviceContext;

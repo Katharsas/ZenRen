@@ -11,10 +11,12 @@
 #include "render/Camera.h"
 #include "render/Sky.h"
 #include "render/PerfStats.h"
+#include "render/d3d/Shader.h"
 #include "render/d3d/ConstantBuffer.h"
 #include "render/d3d/GeometryBuffer.h"
 #include "render/d3d/Sampler.h"
 #include "render/pass/PassSky.h"
+#include "render/WinDx.h"
 
 #include "Util.h"
 
@@ -36,6 +38,9 @@ namespace render::pass::world
 
 	ID3D11SamplerState* samplerState = nullptr;
 
+	d3d::Shader mainShader;
+	d3d::Shader debugShader;
+	d3d::Shader wireframeShader;
 
 	enum CbLodRangeType {
 		NONE,
@@ -246,6 +251,21 @@ namespace render::pass::world
 		sky::initConstantBuffers(d3d);
 	}
 
+	void reinitShaders(D3d d3d)
+	{
+		// TODO templating vertex attributes on MeshBatch never made sense, which becomes quite obvious here
+		auto inputLayout = MeshBatch<VertexBasic>::shaderLayout();
+		d3d::createShader(d3d, mainShader, "forward/main", inputLayout);
+		d3d::createShader(d3d, debugShader, "forward/mainTexColorOnly", inputLayout);
+
+		std::vector<d3d::VertexAttributeDesc> wireframeLayoutDesc = d3d::buildInputLayoutDesc({
+			{ { Type::FLOAT_3, Semantic::POSITION } }
+		});
+		d3d::createShader(d3d, wireframeShader, "forward/wireframe", wireframeLayoutDesc);
+
+		sky::reinitShaders(d3d);
+	}
+
 	Color getBackgroundColor() {
 		if (world.isOutdoorLevel) {
 			return getSkyColor(worldSettings.timeOfDay);
@@ -255,13 +275,13 @@ namespace render::pass::world
 		}
 	}
 
-	void drawSky(D3d d3d, ShaderManager* shaders)
+	void drawSky(D3d d3d)
 	{
 		if (world.isOutdoorLevel && worldSettings.drawSky) {
 			const auto layers = getSkyLayers(worldSettings.timeOfDay);
 			bool swapLayers = getSwapLayers(worldSettings.timeOfDay);
 			sky::updateSkyLayers(d3d, layers, getSkyColor(worldSettings.timeOfDay), worldSettings.timeOfDay, swapLayers);
-			sky::drawSky(d3d, shaders, samplerState);
+			sky::drawSky(d3d, samplerState);
 		}
 	}
 
@@ -479,36 +499,31 @@ namespace render::pass::world
 		return stats;
 	};
 
-	void drawWireframe(D3d d3d, ShaderManager* shaders, BlendType pass)
+	void drawWireframe(D3d d3d, BlendType pass)
 	{
-		Shader* shader = shaders->getShader("forward/wireframe");
-		d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
-		d3d.deviceContext->VSSetShader(shader->getVertexShader(), 0, 0);
-		d3d.deviceContext->PSSetShader(shader->getPixelShader(), 0, 0);
+		d3d::Shader& shader = wireframeShader;
+		d3d.deviceContext->IASetInputLayout(shader.vertexLayout);
+		d3d.deviceContext->VSSetShader(shader.vertexShader, 0, 0);
+		d3d.deviceContext->PSSetShader(shader.pixelShader, 0, 0);
 
 		drawVertexBuffersWorld(d3d, false, pass, batchGetVbPos<VertexBasic>, batchGetVbPos<VertexBasic>);
 	}
 
-	void drawWorld(D3d d3d, ShaderManager* shaders, BlendType pass)
+	void drawWorld(D3d d3d, BlendType pass)
 	{
 		d3d.annotation->BeginEvent(L"Main");
 
-		// set the shader objects avtive
-		Shader* shader;
+		d3d::Shader shader = mainShader;
 		if (pass == BlendType::MULTIPLY || worldSettings.debugWorldShaderEnabled) {
-			shader = shaders->getShader("forward/mainTexColorOnly");
-		}
-		else {
-			shader = shaders->getShader("forward/main");
+			shader = debugShader;
 		}
 		
-		d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
-		d3d.deviceContext->VSSetShader(shader->getVertexShader(), 0, 0);
-		d3d.deviceContext->PSSetShader(shader->getPixelShader(), 0, 0);
+		d3d.deviceContext->IASetInputLayout(shader.vertexLayout);
+		d3d.deviceContext->VSSetShader(shader.vertexShader, 0, 0);
+		d3d.deviceContext->PSSetShader(shader.pixelShader, 0, 0);
 
 		d3d.deviceContext->PSSetSamplers(0, 1, &samplerState);
 
-		// lightmaps
 		d3d.deviceContext->PSSetShaderResources(1, 1, &world.lightmapTexArray);
 
 		maxDrawCalls = currentDrawCall;
@@ -529,5 +544,8 @@ namespace render::pass::world
 		clearZenLevel();
 		release(samplerState);
 		lodRangeCb.release();
+		mainShader.release();
+		debugShader.release();
+		wireframeShader.release();
 	}
 }

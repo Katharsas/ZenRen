@@ -58,7 +58,7 @@ namespace render::gui
 		components.push_back(guiComponent);
 	}
 
-	void init(HWND hWnd, D3d d3d)
+	void init(WindowHandle hWnd, D3d d3d)
 	{
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
@@ -69,7 +69,7 @@ namespace render::gui
 		onWindowDpiChange(hWnd);
 	}
 
-	void onWindowDpiChange(HWND hWnd) {
+	void onWindowDpiChange(WindowHandle hWnd) {
 		float dpiScale = ImGui_ImplWin32_GetDpiScaleForHwnd(hWnd);
 
 		// scale font

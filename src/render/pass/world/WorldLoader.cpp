@@ -7,7 +7,7 @@
 #include "render/d3d/GeometryBuffer.h"
 #include "render/PerfStats.h"
 #include "render/Loader.h"
-#include "render/d3d/Buffer.h"
+#include "render/WinDx.h"
 
 #include "assets/AssetCache.h"
 #include "assets/AssetFinder.h"
@@ -16,7 +16,6 @@
 
 #include "Logger.h"
 #include "Util.h"
-#include "Win.h"
 
 namespace render::pass::world
 {
@@ -375,15 +374,10 @@ namespace render::pass::world
 	{
 		world.meshBatchesWorld.release();
 		world.meshBatchesObjects.release();
-		for (auto& mesh : world.prepassMeshes) {
-			mesh.release();
-		}
 		for (auto& tex : world.debugTextures) {
 			delete tex;
 		}
-		world.prepassMeshes.clear();
 		world.debugTextures.clear();
-
 		release(world.lightmapTexArray);
 	}
 

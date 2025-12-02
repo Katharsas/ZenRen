@@ -4,6 +4,8 @@
 #include <concepts>
 #include <type_traits>
 
+#include "render/Graphics.h"
+
 typedef std::monostate Unused;
 
 // Either of type T if conditional is true, or of type std::monostate (which is essentially usable void type)
@@ -114,42 +116,22 @@ inline std::ostream& operator <<(std::ostream& os, const PosUv& that)
 	return os << "[POS: " << that.pos << " UV:" << that.uv << "]";
 }
 
-
-// TODO create union of uvLightmap + colLight with single bit flag ti differentiate
-// TODO move uvDiffuse into TexIndex
-// TODO define input layout in structs
-struct VertexBasic {
-	Vec3 normal;
-	Uv uvDiffuse;
-	Uvi uvLightmap;
-	Color colLight;
-	Vec3 dirLight;
-	float lightSun;
-};
-inline std::ostream& operator <<(std::ostream& os, const VertexBasic& that)
-{
-	return os << "[NOR:" << that.normal << " COL_LIGHT:" << that.colLight << " DIR_LIGHT:" << that.dirLight << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
-}
-
-//struct VertexBlend {
-//	Vec3 normal;
-//	Uv uvDiffuse;
-//	Uvi uvLightmap;
-//	Color colLight;
-//	Vec3 dirLight;
-//	float lightSun;
-//	BlendType blendType;
-//};
-//inline std::ostream& operator <<(std::ostream& os, const VertexBlend& that)
-//{
-//	return os << "[NOR:" << that.normal << " COL_LIGHT:" << that.colLight << " DIR_LIGHT:" << that.dirLight << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
-//}
-
 using VertexIndex = uint32_t;
 
 using TexIndex = uint32_t;
 
-namespace render {
+namespace render
+{
+	// TODO EVERYTHING SHOULD BE INSIDE THIS NAMESPACE!!!!!
+
+	template <typename ATTR>
+	VertexAttributes inputLayout();
+
+	template <> inline VertexAttributes inputLayout<TexIndex>() {
+		return {
+			{  Type::UINT, Semantic::TEXCOORD }
+		};
+	}
 
 	struct BufferSize {
 		uint16_t width;

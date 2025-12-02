@@ -3,9 +3,9 @@
 
 #include "render/WinDx.h"
 #include "render/Renderer.h"
-#include "render/Shader.h"
 #include "render/RenderUtil.h"
 #include "render/MeshPrimitives.h"
+#include "render/d3d/Shader.h"
 #include "render/d3d/ConstantBuffer.h"
 #include "render/d3d/GeometryBuffer.h"
 
@@ -39,7 +39,20 @@ namespace render::pass::post
 
 	uint32_t downsamplingSamples = 8;
 
-	DecalMesh toneMappingQuad;
+	d3d::Shader toneMappingShader;
+	d3d::Shader renderToTexShader;
+
+	struct QuadMesh
+	{
+		ID3D11Buffer* vertexBuffer = nullptr;
+		int32_t vertexCount;
+
+		void release()
+		{
+			render::release(vertexBuffer);
+		}
+	};
+	QuadMesh toneMappingQuad;
 
 	void clean()
 	{
@@ -61,6 +74,8 @@ namespace render::pass::post
 			rasterizer,
 		});
 		settingsCb.release();
+		toneMappingShader.release();
+		renderToTexShader.release();
 	}
 
 	void updatePostSettingsCb(D3d d3d, const RenderSettings& settings) {
@@ -70,13 +85,13 @@ namespace render::pass::post
 		d3d::updateConstantBuf(d3d, settingsCb, postSettings);
 	}
 
-	void renderToTexure(D3d d3d, Shader* shader, ID3D11ShaderResourceView* srv, ID3D11RenderTargetView* rtv, ID3D11DepthStencilView* depth) {
+	void renderToTexure(D3d d3d, d3d::Shader shader, ID3D11ShaderResourceView* srv, ID3D11RenderTargetView* rtv, ID3D11DepthStencilView* depth) {
 		d3d.deviceContext->OMSetRenderTargets(1, &rtv, depth);
 		d3d.deviceContext->RSSetViewports(1, &viewport);
 
-		d3d.deviceContext->VSSetShader(shader->getVertexShader(), 0, 0);
-		d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
-		d3d.deviceContext->PSSetShader(shader->getPixelShader(), 0, 0);
+		d3d.deviceContext->VSSetShader(shader.vertexShader, 0, 0);
+		d3d.deviceContext->IASetInputLayout(shader.vertexLayout);
+		d3d.deviceContext->PSSetShader(shader.pixelShader, 0, 0);
 		d3d.deviceContext->PSSetShaderResources(0, 1, &srv);
 		d3d.deviceContext->PSSetSamplers(0, 1, &samplerState);
 
@@ -89,7 +104,7 @@ namespace render::pass::post
 		//deviceContext->DrawIndexed(toneMappingQuad.indexCount, 0, 0);
 	}
 
-	void draw(D3d d3d, ID3D11ShaderResourceView* linearBackBuffer, ShaderManager* shaders, const RenderSettings& settings)
+	void draw(D3d d3d, ID3D11ShaderResourceView* linearBackBuffer, const RenderSettings& settings)
 	{
 		// default blend state
 		d3d.deviceContext->OMSetBlendState(nullptr, nullptr, 0xffffffff);
@@ -106,7 +121,6 @@ namespace render::pass::post
 		ID3D11RenderTargetView* rtv = renderDirectlyToBackBuffer ? backBufferRtv : multisampleRtv;
 		ID3D11DepthStencilView* depth = renderDirectlyToBackBuffer ? nullptr : multisampleDepthView;
 
-		Shader* toneMappingShader = shaders->getShader("toneMapping");
 		updatePostSettingsCb(d3d, settings);
 		d3d.deviceContext->PSSetConstantBuffers(0, 1, &settingsCb.buffer);
 		renderToTexure(d3d, toneMappingShader, linearBackBuffer, rtv, depth);
@@ -118,7 +132,6 @@ namespace render::pass::post
 				multisampleTex, D3D11CalcSubresource(0, 0, 1),
 				format);
 
-			Shader* renderToTexShader = shaders->getShader("renderToTexture");
 			renderToTexure(d3d, renderToTexShader, resolvedSrv, backBufferRtv, nullptr);
 		}
 
@@ -134,6 +147,18 @@ namespace render::pass::post
 
 		// switch the back buffer and the front buffer
 		swapchain->Present(0, 0);
+	}
+
+	void reinitShaders(D3d d3d)
+	{
+		std::vector<d3d::VertexAttributeDesc> layoutDesc = d3d::buildInputLayoutDesc({
+			{
+				{ Type::FLOAT_3, Semantic::POSITION },
+				{ Type::FLOAT_2, Semantic::TEXCOORD },
+			}
+		});
+		d3d::createShader(d3d, toneMappingShader, "toneMapping", layoutDesc);
+		d3d::createShader(d3d, renderToTexShader, "renderToTexture", layoutDesc);
 	}
 
 	void initDownsampleBuffers(D3d d3d, BufferSize& size)

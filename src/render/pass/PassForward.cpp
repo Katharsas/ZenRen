@@ -164,7 +164,7 @@ namespace render::pass::forward
 		return ::util::utf8ToWide(prefix + std::string(magic_enum::enum_name(blendType)));
 	}
 
-	void draw(D3d d3d, ShaderManager* shaders, const RenderSettings& settings, bool hasCameraChanged) {
+	void draw(D3d d3d, const RenderSettings& settings, bool hasCameraChanged) {
 		d3d.annotation->BeginEvent(L"Pass Foward");
 
 		// set the linear back buffer as rtv
@@ -210,10 +210,10 @@ namespace render::pass::forward
 			d3d.annotation->BeginEvent(toWString("Pass Blend: ", blendType).c_str());
 			updateBlendMode(d3d, blendType);
 			d3d.deviceContext->OMSetBlendState(blendStates.at(blendTypeIndex), nullptr, 0xffffffff);
-			world::drawWorld(d3d, shaders, (BlendType)blendType);
+			world::drawWorld(d3d, (BlendType)blendType);
 			if (settings.wireframe) {
 				d3d.deviceContext->RSSetState(rasterizerWf);
-				world::drawWireframe(d3d, shaders, (BlendType)blendType);
+				world::drawWireframe(d3d, (BlendType)blendType);
 				d3d.deviceContext->RSSetState(rasterizer);
 			}
 			d3d.annotation->EndEvent();
@@ -221,7 +221,7 @@ namespace render::pass::forward
 			// draw sky (depth disabled, camera at origin)
 			d3d.deviceContext->OMSetBlendState(blendStateNoAtc, NULL, 0xffffffff);
 			updateCamera(d3d, true);
-			world::drawSky(d3d, shaders);
+			world::drawSky(d3d);
 			updateCamera(d3d);
 		}
 		blendTypeIndex++;
@@ -235,10 +235,10 @@ namespace render::pass::forward
 				d3d.annotation->BeginEvent(toWString("Pass Blend: ", blendType).c_str());
 				updateBlendMode(d3d, blendType);
 				d3d.deviceContext->OMSetBlendState(blendStates.at(blendTypeIndex), blendFactorCol.vec, 0xffffffff);
-				world::drawWorld(d3d, shaders, blendType);
+				world::drawWorld(d3d, blendType);
 				if (settings.wireframe) {
 					d3d.deviceContext->RSSetState(rasterizerWf);
-					world::drawWireframe(d3d, shaders, blendType);
+					world::drawWireframe(d3d, blendType);
 					d3d.deviceContext->RSSetState(rasterizer);
 				}
 				d3d.annotation->EndEvent();
@@ -256,6 +256,11 @@ namespace render::pass::forward
 		}
 
 		d3d.annotation->EndEvent();
+	}
+
+	void reinitShaders(D3d d3d)
+	{
+		world::reinitShaders(d3d);
 	}
 
 	ID3D11ShaderResourceView* initRenderBuffer(D3d d3d, BufferSize& size, uint32_t multisampleCount)

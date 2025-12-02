@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "Buffer.h"
+#include "ConstantBuffer.h"
 
 #include "render/WinDx.h"
 
@@ -17,9 +17,15 @@ namespace render::d3d
 		d3d.device->CreateBuffer(&bufferDesc, nullptr, target);
 	}
 
-	void updateConstantBufUnsafe(D3d d3d, ID3D11Buffer* buffer, BufferUsage usage, const void* alignedData)
+	void updateConstantBufUnsafe(D3d d3d, ID3D11Buffer* buffer, uint32_t byteSize, const void* alignedData)
 	{
+		D3D11_BUFFER_DESC bufferDesc;
+		buffer->GetDesc(&bufferDesc);
+		assert(bufferDesc.ByteWidth == byteSize);
+
+		BufferUsage usage = (BufferUsage)bufferDesc.Usage;
 		assert(usage != BufferUsage::IMMUTABLE);
+
 		if (usage == BufferUsage::WRITE_CPU) {
 			// TODO map/unmap for CPU write buffers
 			assert(false);

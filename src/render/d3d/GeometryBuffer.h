@@ -1,10 +1,15 @@
 #pragma once
 
-// TODO think about maybe getting rid of windows headers here (like in ConstantBuffer.h?), but maybe code that creates geo buffers will use win.h anyway?
-//      -> this would allow moving struct VertexBuffer here from Buffer.h
-#include "render/WinDx.h"
-#include "render/d3d/Buffer.h"
+#include "render/Dx.h"
+#include "render/Graphics.h"
 
+namespace render
+{
+	struct VertexBuffer {
+		uint32_t stride = -1;
+		ID3D11Buffer* buffer = nullptr;
+	};
+}
 namespace render::d3d
 {
 	void createGeometryBufUnsafe(D3d d3d, ID3D11Buffer** target, const void* data, uint32_t byteSize, BufferUsage usage, bool isIndexBuffer);

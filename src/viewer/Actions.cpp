@@ -4,6 +4,7 @@
 
 #include "Input.h"
 #include "Util.h"
+#include "render/Renderer.h"
 #include "render/Camera.h"
 #include "render/Gui.h"
 #include <imgui.h>
@@ -103,6 +104,11 @@ namespace viewer
 				render::gui::onToggleVisible();
 			}
 		} },
+		ActionDigitalOnToggle { "RELOAD_SHADERS", [](bool isActive) -> void {
+;			if (!isActive) {
+				render::reloadShaders();
+			}
+		} },
 	};
 	std::array actionsAnalog{
 		ActionAnalog {
@@ -137,6 +143,7 @@ namespace viewer
 		bindActionToKey(ACTION_GUI_SEPARATOR + "General");
 		bindActionToKey(ACTION_GUI_SEPARATOR);
 		bindActionToKey("GUI_TOGGLE_VISIBLE", { InputDevice::KEYBOARD, VK_F11 });
+		bindActionToKey("RELOAD_SHADERS", { InputDevice::KEYBOARD, VK_F9 });// F10 and F12 are hooked by VS during debugging which sucks
 		bindActionToKey(ACTION_GUI_SEPARATOR);
 		bindActionToKey(ACTION_GUI_SEPARATOR + "Camera");
 		bindActionToKey(ACTION_GUI_SEPARATOR);

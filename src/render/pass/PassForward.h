@@ -2,13 +2,13 @@
 
 #include "../WinDx.h"
 #include "../Common.h"
-#include "../ShaderManager.h"
 #include "../Settings.h"
 
 namespace render::pass::forward
 {
 	void clean();
-	void draw(D3d d3d, ShaderManager* shaders, const RenderSettings& settings, bool hasCameraChanged);
+	void draw(D3d d3d, const RenderSettings& settings, bool hasCameraChanged);
+	void reinitShaders(D3d d3d);
 	ID3D11ShaderResourceView* initRenderBuffer(D3d d3d, BufferSize& size, uint32_t multisampleCount);
 	void initViewport(BufferSize& size);
 	void initDepthBuffer(D3d d3d, BufferSize& size, uint32_t multisampleCount, bool reverseZ);

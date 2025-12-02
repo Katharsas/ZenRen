@@ -1,9 +1,7 @@
 #pragma once
 
-#include "render/Dx.h"
-
-// TODO maybe move file to render since that is the namespace used?
-namespace render {
+namespace render
+{
 	enum class BufferUsage // castable to D3D11_USAGE
 	{
 		IMMUTABLE = 1,// D3D11_USAGE_IMMUTABLE -> in GPU VRAM, TODO rename to GPU_IMMUTABLE
@@ -12,8 +10,23 @@ namespace render {
 		READBACK = 3  // D3D11_USAGE_STAGING -> in CPU VRAM, for explicit synchronization (copied to/from other usage types with copy functions), TODO rename to CPU_READ_WRITE or CPU_FOR_COPY
 	};
 
-	struct VertexBuffer {
-		uint32_t stride = -1;
-		ID3D11Buffer* buffer = nullptr;
+	enum class Type { // equivalent to DXGI_FORMAT
+		FLOAT,
+		FLOAT_2,
+		FLOAT_3,
+		FLOAT_4,
+		UINT,
+		UINT_2,
 	};
+
+	enum class Semantic {
+		POSITION,
+		NORMAL,
+		TEXCOORD,
+		COLOR,
+		OTHER
+	};
+
+	using VertexAttribute = std::pair<Type, Semantic>;
+	using VertexAttributes = std::vector<VertexAttribute>;
 }

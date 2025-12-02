@@ -14,8 +14,6 @@ using namespace Microsoft::WRL;
 #include "render/pass/PassPost.h"
 #include "render/pass/world/PassWorld.h"
 #include "render/pass/PassSky.h"
-#include "render/ShaderManager.h"
-#include "render/Shader.h"
 #include "render/RenderUtil.h"
 #include "Util.h"
 #include "Gui.h"
@@ -39,8 +37,6 @@ namespace render
 	
 	IDXGISwapChain1* swapchain;
 	ID3D11ShaderResourceView* linearBackBufferResource = nullptr; // owned by RendererForward
-
-	ShaderManager* shaders;
 
 	RenderSettings settingsPrevious;
 	RenderSettings settings;
@@ -138,7 +134,7 @@ namespace render
 		}
 	}
 
-	void initD3D(void* hWnd, const BufferSize& startSize)
+	void initD3D(WindowHandle hWnd, const BufferSize& startSize)
 	{
 		auto& d3d = dx11;
 
@@ -156,6 +152,7 @@ namespace render
 		});
 
 		initDeviceAndSwapChain(windowHandle);
+		reloadShaders();
 
 		RenderDirtyFlags flags;
 		flags.onInit();
@@ -168,7 +165,6 @@ namespace render
 
 		camera::init();
 		forward::initConstantBuffers(d3d);
-		shaders = new ShaderManager(d3d);
 
 		world::init(d3d);
 
@@ -234,8 +230,6 @@ namespace render
 
 		gui::clean();
 
-		delete shaders;
-
 		world::clean();
 		
 		post::clean();
@@ -300,10 +294,10 @@ namespace render
 		bool hasCameraChanged = camera::updateCamera();
 
 		// foward pipeline renders scene to linear backbuffer
-		forward::draw(d3d, shaders, settings, hasCameraChanged);
+		forward::draw(d3d, settings, hasCameraChanged);
 		
 		// postprocessing pipeline renders linear backbuffer to real backbuffer
-		post::draw(d3d, linearBackBufferResource, shaders, settings);
+		post::draw(d3d, linearBackBufferResource, settings);
 
 		// gui does not output shading information so it goes to real sRGB backbuffer as well
 		settingsPrevious = settings;
@@ -317,6 +311,13 @@ namespace render
 	{
 		auto& d3d = dx11;
 		post::resolveAndPresent(d3d, swapchain);
+	}
+
+	void reloadShaders()
+	{
+		auto& d3d = dx11;
+		forward::reinitShaders(d3d);
+		post::reinitShaders(d3d);
 	}
 
 	void initDeviceAndSwapChain(HWND hWnd)

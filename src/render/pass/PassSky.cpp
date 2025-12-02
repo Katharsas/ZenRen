@@ -2,6 +2,7 @@
 #include "PassSky.h"
 
 #include "render/WinDx.h"
+#include "render/d3d/Shader.h"
 #include "render/d3d/ConstantBuffer.h"
 #include "render/d3d/GeometryBuffer.h"
 #include "render/Renderer.h"
@@ -23,15 +24,19 @@ namespace render::pass::sky
     using std::unordered_map;
     using DirectX::XMVECTOR;
 
-    struct LAYER_UVS {
+    struct LayerUvs {
         Uv uvBase;
         Uv uvOverlay;
     };
+    VertexAttributes layerUvAttributes = {
+        { Type::FLOAT_2, Semantic::TEXCOORD },
+        { Type::FLOAT_2, Semantic::TEXCOORD },
+    };
 
     typedef Vec3 VertexPos;
-    struct VEC_VERTEX_DATA {
+    struct VEC_VERTEX_DATA {// TODO uppercase is reserved for template parameters!!!
         std::vector<VertexPos> vecPos;
-        std::vector<LAYER_UVS> vecOther;
+        std::vector<LayerUvs> vecOther;
     };
 
     __declspec(align(16)) struct CbSkyLayer {
@@ -60,12 +65,19 @@ namespace render::pass::sky
     {
         int32_t vertexCount = 0;
         VertexBuffer vbPos = { sizeof(VertexPos) };
-        VertexBuffer vbUvs = { sizeof(LAYER_UVS) };
+        VertexBuffer vbUvs = { sizeof(LayerUvs) };
 
         void release()
         {
             render::release(vbPos.buffer);
             render::release(vbUvs.buffer);
+        }
+        static std::vector<d3d::VertexAttributeDesc> shaderLayout()
+        {
+            return d3d::buildInputLayoutDesc({
+                inputLayout<VertexPos>(),
+                layerUvAttributes,
+            });
         }
     } mesh;
 
@@ -77,6 +89,7 @@ namespace render::pass::sky
 
     ID3D11SamplerState* linearSamplerState = nullptr;
     d3d::ConstantBuffer<CbSkyLayerSettings> skyLayerSettingsCb = {};
+    d3d::Shader shader;
 
     vector<array<XMVECTOR, 3>> createSkyVerts()
     {
@@ -138,7 +151,7 @@ namespace render::pass::sky
 
     void updateSkyUvs(D3d d3d)
     {
-        vector<LAYER_UVS> facesOther;
+        vector<LayerUvs> facesOther;
         const auto& baseUvs = createSkyUvs(lastUvMin[0], lastUvMax[0]);
         const auto& overlayUvs = createSkyUvs(lastUvMin[1], lastUvMax[1]);
         auto it = overlayUvs.begin();
@@ -203,15 +216,14 @@ namespace render::pass::sky
         d3d::updateConstantBuf(d3d, skyLayerSettingsCb, layerSettings);
     }
 
-    void drawSky(D3d d3d, ShaderManager* shaders, ID3D11SamplerState* layerSampler)
+    void drawSky(D3d d3d, ID3D11SamplerState* layerSampler)
     {
         d3d.annotation->BeginEvent(L"sky");
 
-        // set the shader objects avtive
-        Shader* shader = shaders->getShader("forward/sky");
-        d3d.deviceContext->IASetInputLayout(shader->getVertexLayout());
-        d3d.deviceContext->VSSetShader(shader->getVertexShader(), 0, 0);
-        d3d.deviceContext->PSSetShader(shader->getPixelShader(), 0, 0);
+        // shader
+        d3d.deviceContext->IASetInputLayout(shader.vertexLayout);
+        d3d.deviceContext->VSSetShader(shader.vertexShader, 0, 0);
+        d3d.deviceContext->PSSetShader(shader.pixelShader, 0, 0);
 
         // constant buffer
         d3d.deviceContext->VSSetConstantBuffers(CbSkyLayerSettings::slot(), 1, &skyLayerSettingsCb.buffer);
@@ -231,6 +243,11 @@ namespace render::pass::sky
         d3d.annotation->EndEvent();
     }
 
+    void reinitShaders(D3d d3d)
+    {
+        d3d::createShader(d3d, shader, "forward/sky", SkyMesh::shaderLayout());
+    }
+
     void initConstantBuffers(D3d d3d)
     {
         // TODO this should probably be dynamic, see https://www.gamedev.net/forums/topic/673486-difference-between-d3d11-usage-default-and-d3d11-usage-dynamic/
@@ -245,5 +262,6 @@ namespace render::pass::sky
         }
         release(linearSamplerState);
         skyLayerSettingsCb.release();
+        shader.release();
     }
 }
