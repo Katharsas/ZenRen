@@ -78,31 +78,45 @@ namespace render
         return result;
     }
 
-    template <typename C1, typename C2>
-    void insert(MatToVertsBasic& target, const Material& material, const C1& positions, const C2& normalsAndUvs)
+    template<typename Container, typename T>
+    concept RANGE_OF = std::ranges::range<Container> &&
+        std::same_as<std::ranges::range_value_t<Container>, T>;
+
+    template <
+        RANGE_OF<VertexPos> C1,
+        RANGE_OF<VertexNorUv> C2,
+        RANGE_OF<VertexBasic> C3>
+    void insert(MatToVertsBasic& target, const Material& material, const C1& pos, const C2& normalUv, const C3& other)
     {
         auto& meshData = ::util::getOrCreateDefault(target, material);
 
-        meshData.vecPos.insert(meshData.vecPos.end(), positions.begin(), positions.end());
-        meshData.vecOther.insert(meshData.vecOther.end(), normalsAndUvs.begin(), normalsAndUvs.end());
+        meshData.vecPos.insert(meshData.vecPos.end(), pos.begin(), pos.end());
+        meshData.vecNormalUv.insert(meshData.vecPos.end(), normalUv.begin(), normalUv.end());
+        meshData.vecOther.insert(meshData.vecOther.end(), other.begin(), other.end());
     }
 
-    template <typename C1, typename C2>
-    void insert(MatToChunksToVertsBasic& target, const Material& material, const C1& positions, const C2& normalsAndUvs)
+    template <
+        RANGE_OF<VertexPos> C1,
+        RANGE_OF<VertexNorUv> C2,
+        RANGE_OF<VertexBasic> C3>
+    void insert(MatToChunksToVertsBasic& target, const Material& material, const C1& pos, const C2& normalUv, const C3& other)
     {
         std::unordered_map<GridPos, VertsBasic>& meshData = ::util::getOrCreateDefault(target, material);
         
-        for (uint32_t i = 0; i < positions.size(); i += 3) {
+        for (uint32_t i = 0; i < pos.size(); i += 3) {
             const GridPos gridPos = { 0, 0 };// TODO this is kinda bad
             VertsBasic& chunkData = ::util::getOrCreateDefault(meshData, gridPos);
 
             // TODO copied from MeshFromVdfLoader for now, clean up
-            chunkData.vecPos.push_back(positions[i]);
-            chunkData.vecPos.push_back(positions[i + 1]);
-            chunkData.vecPos.push_back(positions[i + 2]);
-            chunkData.vecOther.push_back(normalsAndUvs[i]);
-            chunkData.vecOther.push_back(normalsAndUvs[i + 1]);
-            chunkData.vecOther.push_back(normalsAndUvs[i + 2]);
+            chunkData.vecPos.push_back(pos[i]);
+            chunkData.vecPos.push_back(pos[i + 1]);
+            chunkData.vecPos.push_back(pos[i + 2]);
+            chunkData.vecNormalUv.push_back(normalUv[i]);
+            chunkData.vecNormalUv.push_back(normalUv[i + 1]);
+            chunkData.vecNormalUv.push_back(normalUv[i + 2]);
+            chunkData.vecOther.push_back(other[i]);
+            chunkData.vecOther.push_back(other[i + 1]);
+            chunkData.vecOther.push_back(other[i + 2]);
         }
     }
 

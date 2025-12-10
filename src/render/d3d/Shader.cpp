@@ -112,7 +112,7 @@ namespace render::d3d
 		Vertex, Pixel, Compute
 	};
 
-	ID3D10Blob* compile(D3d d3d, const std::string& source, ShaderType type, const D3D_SHADER_MACRO* defines = 0)
+	ID3D10Blob* compile(D3d d3d, const std::string& source, ShaderType type, bool isVertexInputPacked)
 	{
 		LPCSTR profile = type == ShaderType::Vertex ? "vs_5_0" : type == ShaderType::Pixel ? "ps_5_0" : "cs_5_0";
 		LPCSTR entry = type == ShaderType::Vertex ? "VS_Main" : type == ShaderType::Pixel ? "PS_Main" : "CS_Main";
@@ -120,6 +120,10 @@ namespace render::d3d
 		ID3D10Blob* result = nullptr;
 		ID3D10Blob* error = nullptr;
 
+		const D3D_SHADER_MACRO defines[] = {
+			{"VERTEX_INPUT_RAW", isVertexInputPacked ? "0" : "1" },
+			{nullptr, nullptr},
+		};
 		auto hr = D3DCompileFromFile(
 			sourceW.c_str(), defines, includeHandling, entry, profile, compileFlags, 0, &result, &error);
 
@@ -139,11 +143,11 @@ namespace render::d3d
 
 		// compile both shaders
 		std::wstring sourceFileW = util::utf8ToWide(sourceFile);
-		ID3D10Blob* VS = compile(d3d, sourceFile, ShaderType::Vertex);
+		ID3D10Blob* VS = compile(d3d, sourceFile, ShaderType::Vertex, PACK_VERTEX_ATTRIBUTES);
 		success = VS != nullptr && success;
 		ID3D10Blob* PS = nullptr;
 		if (!vsOnly) {
-			PS = compile(d3d, sourceFile, ShaderType::Pixel);
+			PS = compile(d3d, sourceFile, ShaderType::Pixel, PACK_VERTEX_ATTRIBUTES);
 			success = PS != nullptr && success;
 		}
 

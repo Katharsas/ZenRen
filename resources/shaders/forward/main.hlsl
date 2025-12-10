@@ -1,4 +1,5 @@
 #include "common.hlsl"
+#include "worldVertexInput.hlsl"
 
 //cbuffer cbWorldSettings : register(b5)
 //{
@@ -21,18 +22,6 @@ cbuffer cbLodRange : register(b5)
 //--------------------------------------------------------------------------------------
 // Vertex Shader
 //--------------------------------------------------------------------------------------
-
-struct VS_IN
-{
-    float4 position : POSITION;
-    float4 normal : NORMAL0;
-    float2 uvTexColor : TEXCOORD0;
-    float3 uviTexLightmap : TEXCOORD1;
-    float4 colLight : COLOR;
-    float3 dirLight : NORMAL1;
-    float sunLight : TEXCOORD2;
-    uint iTexColor : TEXCOORD3;
-};
 
 struct VS_OUT
 {
@@ -71,7 +60,6 @@ float CalcLightDirectional(float3 dirLight, float3 dirNormal, float lightRatioAt
 float3 RescaleOntoAmbient(float3 light, float3 ambientLight, float max = 1)
 {
     return ambientLight + (((float3) max - ambientLight) * light);
-
 }
 
 VS_OUT VS_Main(VS_IN input)
@@ -82,7 +70,8 @@ VS_OUT VS_Main(VS_IN input)
     // TODO doing light calculation in view space results in flickering,
     // so until we know whats going wrong just do it in world space.
 
-    float3 viewNormal3 = normalize((float3) input.normal);
+    float3 normal = unpackNormal(input);
+    float3 viewNormal3 = normalize(normal);
     //float3 viewNormal3 = normalize((float3) mul(input.normal, worldViewMatrixInverseTranposed));
     //float3 viewNormal3 = normalize(mul((float3) input.normal, (float3x3) worldViewMatrixInverseTranposed));
 
@@ -116,7 +105,7 @@ VS_OUT VS_Main(VS_IN input)
         output.light = light * skyLight.rgb;
     }
     else if (outputType == OUTPUT_NORMAL) {
-        output.light = input.normal.xyz;
+        output.light = normal;
     }
     else {
         output.light = (float3) 1;
@@ -131,7 +120,7 @@ VS_OUT VS_Main(VS_IN input)
     // See: https://developer.download.nvidia.com/assets/gamedev/docs/Fog2.pdf
     output.distance = length(viewPosition);
     
-    output.uvTexColor = input.uvTexColor;
+    output.uvTexColor = unpackUvTexColor(input);
     output.iTexColor = input.iTexColor;
     output.uvTexLightmap = input.uviTexLightmap.xy;
     output.iTexLightmap = input.uviTexLightmap.z;

@@ -1,20 +1,9 @@
 #include "common.hlsl"
+#include "worldVertexInput.hlsl"
 
 //--------------------------------------------------------------------------------------
 // Vertex Shader
 //--------------------------------------------------------------------------------------
-
-struct VS_IN
-{
-    float4 position : POSITION;
-    float4 normal : NORMAL0;
-    float2 uvBaseColor : TEXCOORD0; // TODO should be called uvTexColor
-    float3 uvLightmap : TEXCOORD1; // TODO should be called uviTexLightmap
-    float4 colLight : COLOR;
-    float3 dirLight : NORMAL1;
-    float sunLight : TEXCOORD2;
-    uint1 iTexColor : TEXCOORD3;
-};
 
 struct VS_OUT
 {
@@ -26,14 +15,13 @@ struct VS_OUT
     float4 position : SV_POSITION;
 };
 
-
 VS_OUT VS_Main(VS_IN input)
 {
     VS_OUT output;
     float4 viewPosition = mul(input.position, worldViewMatrix);
     output.position = mul(viewPosition, projectionMatrix);
     output.distance = length(viewPosition);
-    output.uvTexColor = input.uvBaseColor;
+    output.uvTexColor = unpackUvTexColor(input);
     output.iTexColor = input.iTexColor;
 	return output;
 }

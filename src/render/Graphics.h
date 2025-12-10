@@ -2,6 +2,8 @@
 
 namespace render
 {
+	constexpr bool PACK_VERTEX_ATTRIBUTES = false;
+
 	enum class BufferUsage // castable to D3D11_USAGE
 	{
 		IMMUTABLE = 1,// D3D11_USAGE_IMMUTABLE -> in GPU VRAM, TODO rename to GPU_IMMUTABLE
