@@ -8,7 +8,7 @@ struct VS_IN
 {
     float4 position : POSITION;
     float4 normal : NORMAL0;
-    float2 uvBaseColor : TEXCOORD0; // TODO should be called uvTexColor
+    uint uvTexColor : TEXCOORD0;
     float3 uvLightmap : TEXCOORD1; // TODO should be called uviTexLightmap
     float4 colLight : COLOR;
     float3 dirLight : NORMAL1;
@@ -26,6 +26,11 @@ struct VS_OUT
     float4 position : SV_POSITION;
 };
 
+float2 unpackUv(uint uv)
+{
+    return float2(uv, uv);
+}
+
 
 VS_OUT VS_Main(VS_IN input)
 {
@@ -33,7 +38,7 @@ VS_OUT VS_Main(VS_IN input)
     float4 viewPosition = mul(input.position, worldViewMatrix);
     output.position = mul(viewPosition, projectionMatrix);
     output.distance = length(viewPosition);
-    output.uvTexColor = input.uvBaseColor;
+    output.uvTexColor = unpackUv(input.uvTexColor);
     output.iTexColor = input.iTexColor;
 	return output;
 }

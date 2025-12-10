@@ -316,7 +316,7 @@ namespace render::pass::world
 
 	template <VERTEX_FEATURE F> vector<VertexBuffer> batchGetVbPos(const MeshBatch<F>& mesh) { return { mesh.vbPos }; }
 	template <VERTEX_FEATURE F> vector<VertexBuffer> batchGetVbPosTex(const MeshBatch<F>& mesh) { return { mesh.vbPos, mesh.vbTexIndices }; }
-	template <VERTEX_FEATURE F> vector<VertexBuffer> batchGetVbAll(const MeshBatch<F>& mesh) { return { mesh.vbPos, mesh.vbOther, mesh.vbTexIndices }; }
+	template <VERTEX_FEATURE F> vector<VertexBuffer> batchGetVbAll(const MeshBatch<F>& mesh) { return { mesh.vbPos, mesh.vbNormaluv, mesh.vbOther, mesh.vbTexIndices }; }
 
 	
 	DrawStats draw(D3d d3d, DrawRange range, bool indexed)

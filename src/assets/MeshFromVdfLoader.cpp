@@ -85,6 +85,7 @@ namespace assets
 
     struct Face {
         array<VertexPos, 3> pos;
+        array<VertexNorUv, 3> normalUv;
         array<VertexBasic, 3> features;
         GridPos gridPos;
     };
@@ -275,7 +276,7 @@ namespace assets
     // ###########################################################################
 
     template <VERTEX_FEATURE F>
-    void insertFace(Verts<F>& target, const array<VertexPos, 3>& facePos, const array<F, 3>& faceOther) {
+    void insertFace(Verts<F>& target, const array<VertexPos, 3>& facePos, const array<VertexNorUv, 3>& faceNormalUv, const array<F, 3>& faceOther) {
         // manual reservation strategy helps with big vectors
         // TODO find out what our actual memory problem is, we should be able to allocate 3.2G!! does DX11 driver take a lot?
         if constexpr (manualReservation) {
@@ -284,6 +285,7 @@ namespace assets
             size_t currentSize = target.vecPos.size();
             if (currentSize == 0) {
                 target.vecPos.reserve(vertReserveCount);
+                target.vecNormalUv.reserve(vertReserveCount);
                 target.vecOther.reserve(vertReserveCount);
             }
             else if (currentSize >= (vertReserveCount * 128)) {
@@ -301,12 +303,16 @@ namespace assets
             if (currentSize != 0 && currentSize % vertReserveCount == 0) {
                 uint32_t blocks = (currentSize / blockSize) + 1;
                 target.vecPos.reserve(blocks * blockSize);
+                target.vecNormalUv.reserve(blocks * blockSize);
                 target.vecOther.reserve(blocks * blockSize);
             }
         }
         target.vecPos.push_back(facePos[0]);
         target.vecPos.push_back(facePos[1]);
         target.vecPos.push_back(facePos[2]);
+        target.vecNormalUv.push_back(faceNormalUv[0]);
+        target.vecNormalUv.push_back(faceNormalUv[1]);
+        target.vecNormalUv.push_back(faceNormalUv[2]);
         target.vecOther.push_back(faceOther[0]);
         target.vecOther.push_back(faceOther[1]);
         target.vecOther.push_back(faceOther[2]);
@@ -446,15 +452,18 @@ namespace assets
     {
         uint32_t vertexCount = verts.vecPos.size();
         assert(verts.vecIndex.empty());
+        assert(verts.vecNormalUv.size() == vertexCount);
         assert(verts.vecOther.size() == vertexCount);
 
         array streams = {
             meshopt::createStream(verts.vecPos),
+            meshopt::createStream(verts.vecNormalUv),
             meshopt::createStream(verts.vecOther)
         };
         auto remap = meshopt::generateIndicesRemap(vertexCount, streams);
         verts.vecIndex = meshopt::createIndexBuffer(remap);
         meshopt::remapVertexBuffer(verts.vecPos, remap);
+        meshopt::remapVertexBuffer(verts.vecNormalUv, remap);
         meshopt::remapVertexBuffer(verts.vecOther, remap);
 
         return remap.vertCountRemapped;
@@ -465,6 +474,7 @@ namespace assets
     {
         uint32_t vertexCount = verts.vecPos.size();
         assert(verts.vecIndex.size() >= vertexCount);
+        assert(verts.vecNormalUv.size() == vertexCount);
         assert(verts.vecOther.size() == vertexCount);
 
         meshopt::optimizeVertexCache(verts.vecIndex, vertexCount);
@@ -473,6 +483,7 @@ namespace assets
         auto remap = meshopt::optimizeVertexFetchRemap(verts.vecIndex, vertexCount);
         meshopt::remapIndexBuffer(verts.vecIndex, remap);
         meshopt::remapVertexBuffer(verts.vecPos, remap);
+        meshopt::remapVertexBuffer(verts.vecNormalUv, remap);
         meshopt::remapVertexBuffer(verts.vecOther, remap);
     }
 
@@ -506,17 +517,21 @@ namespace assets
 
         // other
         array<VertexPos, 3> facePos;
+        array<VertexNorUv, 3> faceNormalUv;
         array<VertexBasic, 3> faceOther;
 
         for (uint32_t i = 0; i < 3; i++) {
             VertexPos& pos = facePos.at(i);
             pos = toVec3(facePosXm[i]);
 
-            VertexBasic& other = faceOther.at(i);
-            other.normal = toVec3(faceNormalsXm[i]);
             const auto& featureZkit = mesh.features.at(mesh.polygons.feature_indices.at(vertIndex));
-            const auto& glmUvDiffuse = featureZkit.texture;
-            other.uvDiffuse = toUv(glmUvDiffuse);
+
+            faceNormalUv.at(i) = {
+                toVec3(faceNormalsXm[i]),
+                toUv(featureZkit.texture)
+            };
+
+            VertexBasic& other = faceOther.at(i);
             other.colLight = fromSRGB(Color(featureZkit.light));
             other.dirLight = { -100.f, -100.f, -100.f };// value that is easy to check as not normalized in shader
             other.lightSun = 1.0f;
@@ -525,7 +540,7 @@ namespace assets
             vertIndex++;
         }
         GridPos gridPos = toGridPos(grid, centroidPos(facePosXm));
-        return { facePos, faceOther, gridPos };
+        return { facePos, faceNormalUv, faceOther, gridPos };
     }
 
     array<Vec2, 2> calculateBbox2d(const vector<glm::vec3>& verts)
@@ -611,9 +626,10 @@ namespace assets
                     // initialize with space relative to full material data to hopefully keep resizing reallocations low
                     uint32_t estimatedPerChunkSize = vertexCountMat * .25f + 1;
                     vertsTemp.vecPos.reserve(estimatedPerChunkSize);
+                    vertsTemp.vecNormalUv.reserve(estimatedPerChunkSize);
                     vertsTemp.vecOther.reserve(estimatedPerChunkSize);
                 }
-                insertFace(vertsTemp, face.pos, face.features);// maybe use struct Face as parameter directly?
+                insertFace(vertsTemp, face.pos, face.normalUv, face.features);// maybe use struct Face as parameter directly?
             }
 
             // Per material and chunkIndex: generate indices and optimize vertex and index data with meshoptimizer
@@ -643,6 +659,7 @@ namespace assets
                 }
                 // we copy vertex data so we don't have to shrink_to_fit (since initial capacity was just a guess)
                 verts.vecPos = vertsTemp.vecPos;
+                verts.vecNormalUv = vertsTemp.vecNormalUv;
                 verts.vecOther = vertsTemp.vecOther;
             }
         }
@@ -844,8 +861,14 @@ namespace assets
     // VOB LOADING
     // ###########################################################################
 
+    struct Vertex {
+        VertexPos pos;
+        VertexNorUv normalUv;
+        VertexBasic other;
+    };
+
     template <bool transform>
-    pair<VertexPos, VertexBasic> finalizeCompressVertex(
+    Vertex finalizeCompressVertex(
         const VertexPrecomp& vert,
         const StaticInstance& instance,
         bool isDecal,
@@ -853,7 +876,7 @@ namespace assets
         OPT_PARAM<transform, const XMMATRIX&> normalTransform)
     {
         // TODO compress further by quantizing to necessary bits
-        pair<VertexPos, VertexBasic> result;
+        Vertex result;
 
         XMFLOAT4 pos = vert.pos;
         if constexpr (transform) {
@@ -867,18 +890,21 @@ namespace assets
             XMStoreFloat4(&normal, normalXm);
         }
 
-        result.first = toVec3(pos);
-        result.second = {
-            .normal = toVec3(normal),
-            .uvDiffuse = vert.uvColor,
+        result.pos = toVec3(pos);
+        auto normalVec3 = toVec3(normal);
+        result.normalUv = {
+            normalVec3,
+            vert.uvColor,
+        };
+        result.other = {
             .uvLightmap = { -1, -1, -1 },
             .colLight = instance.lighting.color,
             .lightSun = instance.lighting.receiveLightSun ? 1.f : 0.f,
         };
         if (!isDecal) {
-            result.second.dirLight = toVec3(XMVector3Normalize(instance.lighting.direction));
+            result.other.dirLight = toVec3(XMVector3Normalize(instance.lighting.direction));
         } else {
-            result.second.dirLight = result.second.normal;// TODO does the original game do this??
+            result.other.dirLight = normalVec3;// TODO does the original game do this??
         }
         return result;
     }
@@ -905,6 +931,7 @@ namespace assets
                     targetVerts.vecIndexLod.reserve(minReserve * 0.8f);
                 }
                 targetVerts.vecPos.reserve(minReserve * 0.7f);
+                targetVerts.vecNormalUv.reserve(minReserve * 0.7f);
                 targetVerts.vecOther.reserve(minReserve * 0.7f);
             }
             assert(targetVerts.useIndices == indexed);
@@ -921,8 +948,9 @@ namespace assets
 
             uint32_t vertCount = packed.vertsPacked.size();
             for (const VertexPrecomp& vert : packed.vertsPacked) {
-                auto [pos, other] = finalizeCompressVertex<true>(vert, instance, isDecal, instance.transform, instance.transform);
+                auto [pos, normalUv, other] = finalizeCompressVertex<true>(vert, instance, isDecal, instance.transform, instance.transform);
                 targetVerts.vecPos.push_back(pos);
+                targetVerts.vecNormalUv.push_back(normalUv);
                 targetVerts.vecOther.push_back(other);
             }
         }

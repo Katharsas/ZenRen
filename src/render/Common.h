@@ -15,6 +15,8 @@ namespace render
 	// TODO move to MeshUtil
 	constexpr float G_ASSET_RESCALE = 0.01f;
 
+	constexpr bool COMPRESS_VERTEX_ATTRIBUTES = true;
+
 	using TexId = uint16_t;
 
 	using VertexPos = Vec3;
@@ -24,12 +26,100 @@ namespace render
 		};
 	}
 
+	// TODO maybe we can have a constexpr bool QUANTIZE that dynamically changes VertexPos struct to be quantized or not
+	// and use if constexpr to assign to it (or have a setter function that takes unquantized always)
+	// -> do we need to turn VertexPos from typedef into actual struct?? maybe not necessary?
+	// maybe try with normalUv first
+	struct VertexPosQuantized {
+		uint64_t pos;
+	};
+	template <> inline VertexAttributes inputLayout<VertexPosQuantized>() {
+		return {
+			{  Type::UINT_2, Semantic::POSITION }
+		};
+	}
+
+	template <bool IS_COMPRESSED>
+	struct VertexNorUvTemplate {};
+
+	template <> struct VertexNorUvTemplate<false> {
+	private:
+		Vec3 m_normal;// quantize to 3 signs + 2*14 bit x/y, reconstruct z
+		Uv m_uvDiffuse;// 12 bit per component? -> 24 bit, remaining: 8 bit for scaling factor (sign + 7), assert max values fit
+	public:
+		VertexNorUvTemplate() {};
+		VertexNorUvTemplate(Vec3 normal, Uv uvDiffuse) : m_normal(normal), m_uvDiffuse(uvDiffuse) {};
+		Vec3 normal() const { return m_normal; }
+		Uv uvDiffuse() const { return m_uvDiffuse; }
+	};
+	template <> inline VertexAttributes inputLayout<VertexNorUvTemplate<false>>() {
+		return {
+			{ Type::FLOAT_3, Semantic::NORMAL },
+			{ Type::FLOAT_2, Semantic::TEXCOORD },
+		};
+	}
+
+	template <> struct VertexNorUvTemplate<true> {
+	private:
+		constexpr static uint32_t uvExponentBits = 4;
+		constexpr static uint32_t uvComponentBits = 14;
+		constexpr static uint32_t uvExponentMask = (1 << uvExponentBits) - 1;
+		constexpr static uint32_t uvComponentMask = (1 << uvComponentBits) - 1;
+		constexpr static uint32_t scale = (1 << (uvComponentBits - 1));
+
+		Vec3 m_normal;// quantize to 3 signs + 2*14 bit x/y, reconstruct z
+		uint32_t m_uvDiffuse;
+	public:
+		VertexNorUvTemplate() {};
+		VertexNorUvTemplate(Vec3 normal, Uv uvDiffuse) : m_normal(normal)
+		{
+			uint32_t uCeil = (uint32_t) std::ceil(std::abs(uvDiffuse.u));
+			uint32_t vCeil = (uint32_t) std::ceil(std::abs(uvDiffuse.v));
+			uint32_t ceil = std::max(uCeil, vCeil);
+			uint32_t exponent = std::max(std::bit_width(ceil), 0);
+			if (exponent > uvExponentMask) {
+				LOG(WARNING) << "Failed to compress UV, value too large! Max magnitude allowed: " << (1 << uvExponentMask);
+			}
+			uint32_t factor = 1 << exponent;
+			Uv uvNorm = mul(uvDiffuse, 1.f * scale / factor);
+			// cast to int preserves sign bit, but it is extended into all high bits (2's complement), so we must clear those with mask
+			m_uvDiffuse = exponent << (uvComponentBits * 2)
+				| ((int32_t)std::lround(uvNorm.u) & uvComponentMask) << uvComponentBits
+				| ((int32_t)std::lround(uvNorm.v) & uvComponentMask);
+		};
+		Vec3 normal() const { return m_normal; }
+		Uv uvDiffuse() const
+		{
+			uint32_t exponent = ((m_uvDiffuse >> (uvComponentBits * 2)) & uvExponentMask);
+			uint32_t uBits = (m_uvDiffuse >> uvComponentBits) & uvComponentMask;
+			uint32_t vBits = m_uvDiffuse & uvComponentMask;
+			constexpr uint32_t signMask = 1 << (uvComponentBits - 1);
+			constexpr uint32_t signExtend = ~uvComponentMask;
+			// extend sign (1 in highest bit) to all higher bits (2's complement)
+			Uv uvNorm = {
+				(int32_t)(uBits & signMask ? uBits | signExtend : uBits),
+				(int32_t)(vBits & signMask ? vBits | signExtend : vBits),
+			};
+			float factor = 1 << exponent;
+			return mul(uvNorm, factor / scale);
+		}
+	};
+	template <> inline VertexAttributes inputLayout<VertexNorUvTemplate<true>>() {
+		return {
+			{ Type::FLOAT_3, Semantic::NORMAL },
+			{ Type::UINT, Semantic::TEXCOORD },
+		};
+	}
+
+	using VertexNorUv = VertexNorUvTemplate<COMPRESS_VERTEX_ATTRIBUTES>;
+	inline std::ostream& operator <<(std::ostream& os, const VertexNorUv& that)
+	{
+		return os << "[NOR:" << that.normal() << " UV_DIFF:" << that.uvDiffuse() << "]";
+	}
+
 	// TODO create union of uvLightmap + colLight with single bit flag to differentiate
 	// TODO move uvDiffuse into TexIndex
-	// TODO define input layout in structs
 	struct VertexBasic {
-		Vec3 normal;
-		Uv uvDiffuse;
 		Uvi uvLightmap;
 		Color colLight;
 		Vec3 dirLight;
@@ -37,12 +127,10 @@ namespace render
 	};
 	inline std::ostream& operator <<(std::ostream& os, const VertexBasic& that)
 	{
-		return os << "[NOR:" << that.normal << " COL_LIGHT:" << that.colLight << " DIR_LIGHT:" << that.dirLight << " UV_DIFF:" << that.uvDiffuse << " UV_LM:" << that.uvLightmap << "]";
+		return os << "[COL_LIGHT:" << that.colLight << " DIR_LIGHT:" << that.dirLight << " UV_LM:" << that.uvLightmap << "]";
 	}
 	template <> inline VertexAttributes inputLayout<VertexBasic>() {
 		return {
-			{ Type::FLOAT_3, Semantic::NORMAL },
-			{ Type::FLOAT_2, Semantic::TEXCOORD },
 			{ Type::FLOAT_3, Semantic::TEXCOORD },
 			{ Type::FLOAT_4, Semantic::COLOR },
 			{ Type::FLOAT_3, Semantic::NORMAL },
@@ -145,6 +233,7 @@ namespace render
 		std::vector<VertexIndex> vecIndex;
 		std::vector<VertexIndex> vecIndexLod;
 		std::vector<VertexPos> vecPos;
+		std::vector<VertexNorUv> vecNormalUv;
 		std::vector<F> vecOther;
 	};
 
@@ -216,6 +305,7 @@ namespace render
 
 		//std::vector<VertexIndex> vecIndexLod;
 		std::vector<VertexPos> vecPos;
+		std::vector<VertexNorUv> vecNormalUv;
 		std::vector<F> vecOther;
 		// TODO either remove vec prefix everywhere and use plural or not consistently
 		std::vector<TexIndex> texIndices;

@@ -26,7 +26,7 @@ struct VS_IN
 {
     float4 position : POSITION;
     float4 normal : NORMAL0;
-    float2 uvTexColor : TEXCOORD0;
+    uint uvTexColor : TEXCOORD0;
     float3 uviTexLightmap : TEXCOORD1;
     float4 colLight : COLOR;
     float3 dirLight : NORMAL1;
@@ -71,7 +71,29 @@ float CalcLightDirectional(float3 dirLight, float3 dirNormal, float lightRatioAt
 float3 RescaleOntoAmbient(float3 light, float3 ambientLight, float max = 1)
 {
     return ambientLight + (((float3) max - ambientLight) * light);
+}
 
+float2 unpackUv(uint uv)
+{
+    static const uint uvExponentBits = 4;
+    static const uint uvComponentBits = 14;
+    static const uint uvExponentMask = (1 << uvExponentBits) - 1;
+    static const uint uvComponentMask = (1 << uvComponentBits) - 1;
+    static const uint scale = (1 << (uvComponentBits - 1));
+    
+    uint exponent = ((uv >> (uvComponentBits * 2)) & uvExponentMask);
+    uint uBits = (uv >> uvComponentBits) & uvComponentMask;
+    uint vBits = uv & uvComponentMask;
+    static const uint signMask = 1 << (uvComponentBits - 1);
+    static const uint signExtend = ~uvComponentMask;
+	// extend sign (1 in highest bit) to all higher bits (2's complement)
+    float2 uvNorm =
+    {
+        (int) (uBits & signMask ? uBits | signExtend : uBits),
+	    (int) (vBits & signMask ? vBits | signExtend : vBits),
+    };
+    float factor = 1 << exponent;
+    return uvNorm * (factor / scale);
 }
 
 VS_OUT VS_Main(VS_IN input)
@@ -131,7 +153,7 @@ VS_OUT VS_Main(VS_IN input)
     // See: https://developer.download.nvidia.com/assets/gamedev/docs/Fog2.pdf
     output.distance = length(viewPosition);
     
-    output.uvTexColor = input.uvTexColor;
+    output.uvTexColor = unpackUv(input.uvTexColor);
     output.iTexColor = input.iTexColor;
     output.uvTexLightmap = input.uviTexLightmap.xy;
     output.iTexLightmap = input.uviTexLightmap.z;

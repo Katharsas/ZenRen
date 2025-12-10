@@ -98,6 +98,7 @@ namespace render::pass::world
 			batch.drawCount = batchData.vecPos.size();
 		}
 		d3d::createVertexBuf(d3d, batch.vbPos, batchData.vecPos);
+		d3d::createVertexBuf(d3d, batch.vbNormaluv, batchData.vecNormalUv);
 		d3d::createVertexBuf(d3d, batch.vbOther, batchData.vecOther);
 		d3d::createVertexBuf(d3d, batch.vbTexIndices, batchData.texIndices);
 		createTexArray(d3d, &batch.texColorArray, batchInfo, batchData.texIndexedIds);
@@ -260,6 +261,7 @@ namespace render::pass::world
 		lodIndices.reserve(indexLodCount);
 
 		target.vecPos.reserve(vertCount);
+		target.vecNormalUv.reserve(vertCount);
 		target.vecOther.reserve(vertCount);
 		target.texIndices.reserve(vertCount);
 
@@ -286,6 +288,7 @@ namespace render::pass::world
 
 				// copy vertex data
 				::util::insert(target.vecPos, vertData.vecPos);
+				::util::insert(target.vecNormalUv, vertData.vecNormalUv);
 				::util::insert(target.vecOther, vertData.vecOther);
 
 				// set batch-dependent vertex data

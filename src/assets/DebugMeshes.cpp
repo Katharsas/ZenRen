@@ -56,22 +56,25 @@ namespace assets
     void loadInstanceMeshBboxDebugVisual(MatToChunksToVertsBasic& target, const StaticInstance& instance)
     {
         vector<VertexPos> facesPos;
+        vector<VertexNorUv> facesNormalUv;
         vector<VertexBasic> facesOther;
         const auto& bboxFacesXm = createBboxVerts(toVec3(instance.bbox[0]), toVec3(instance.bbox[1]), instance.transform);
         for (auto& posXm : bboxFacesXm) {
             const auto faceNormal = toVec3(calcFlatFaceNormal(posXm));
             for (int32_t i = 0; i < 3; i++) {
                 facesPos.push_back(toVec3(posXm[i]));
-                facesOther.push_back({
+                facesNormalUv.push_back({
                     faceNormal,
                     Uv { 0, 0 },
+                });
+                facesOther.push_back({
                     Uvi { 0, 0, -1 },
                     Color(1, 0, 0, 1)
-                    });
+                });
             }
         }
         const Material defaultMat = { getTexId("bbox.tga") };
-        insert(target, defaultMat, facesPos, facesOther);
+        insert(target, defaultMat, facesPos, facesNormalUv, facesOther);
     }
 
     vector<array<XMVECTOR, 3>> createDebugPointVerts(const Vec3& pos, const Vec3& scale)
@@ -99,22 +102,25 @@ namespace assets
     void loadPointDebugVisual(MatToChunksToVertsBasic& target, const Vec3& pos, const Vec3& scale, const Color& color)
     {
         vector<VertexPos> facesPos;
+        vector<VertexNorUv> facesNormalUv;
         vector<VertexBasic> facesOther;
         const auto& bboxFacesXm = createDebugPointVerts(pos, scale);
         for (auto& posXm : bboxFacesXm) {
             const auto faceNormal = toVec3(calcFlatFaceNormal(posXm));
             for (int32_t i = 0; i < 3; i++) {
                 facesPos.push_back(toVec3(posXm[i]));
-                facesOther.push_back({
+                facesNormalUv.push_back({
                     faceNormal,
                     Uv { 0, 0 },
+                });
+                facesOther.push_back({
                     Uvi { 0, 0, -1 },
                     color
-                    });
+                });
             }
         }
         const Material defaultMat = { getTexId("point.tga") };
-        insert(target, defaultMat, facesPos, facesOther);
+        insert(target, defaultMat, facesPos, facesNormalUv, facesOther);
     }
 
     vector<array<XMVECTOR, 3>> createDebugLineVerts(const Vec3& posStart, const Vec3& posEnd, const float width)
@@ -137,21 +143,24 @@ namespace assets
     void loadLineDebugVisual(MatToChunksToVertsBasic& target, const Vec3& posStart, Vec3& posEnd, const Color& color)
     {
         vector<VertexPos> facesPos;
+        vector<VertexNorUv> facesNormalUv;
         vector<VertexBasic> facesOther;
         const auto& bboxFacesXm = createDebugLineVerts(posStart, posEnd, 0.02f);
         for (auto& posXm : bboxFacesXm) {
             const auto faceNormal = toVec3(calcFlatFaceNormal(posXm));
             for (int32_t i = 0; i < 3; i++) {
                 facesPos.push_back(toVec3(posXm[i]));
-                facesOther.push_back({
+                facesNormalUv.push_back({
                     faceNormal,
                     Uv { 0, 0 },
+                });
+                facesOther.push_back({
                     Uvi { 0, 0, -1 },
                     color
-                    });
+                });
             }
         }
         const Material defaultMat = { getTexId("line.tga") };
-        insert(target, defaultMat, facesPos, facesOther);
+        insert(target, defaultMat, facesPos, facesNormalUv, facesOther);
     }
 }

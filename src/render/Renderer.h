@@ -23,6 +23,7 @@ namespace render
 		VertexBuffer vbIndices = { sizeof(VertexIndex) };
 
 		VertexBuffer vbPos = { sizeof(VertexPos) };
+		VertexBuffer vbNormaluv = { sizeof(VertexNorUv) };
 		VertexBuffer vbOther = { sizeof(F) };
 		VertexBuffer vbTexIndices = { sizeof(TexIndex) };// indices into texture array (base color textures)
 
@@ -39,6 +40,7 @@ namespace render
 		{
 			return d3d::buildInputLayoutDesc({
 				inputLayout<VertexPos>(),
+				inputLayout<VertexNorUv>(),
 				inputLayout<F>(),
 				inputLayout<TexIndex>(),
 			});
