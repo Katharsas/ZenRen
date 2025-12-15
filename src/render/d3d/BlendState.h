@@ -1,7 +1,7 @@
 #pragma once
 
 #include "render/Dx.h"
-#include "render/Common.h"
+#include "render/basic/Graphics.h"
 
 // TODO rename d3d global variable (local variables are unaffected)
 namespace render::d3d

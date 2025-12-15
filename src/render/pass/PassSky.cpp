@@ -6,7 +6,7 @@
 #include "render/d3d/ConstantBuffer.h"
 #include "render/d3d/GeometryBuffer.h"
 #include "render/Renderer.h"
-#include "render/MeshUtil.h"
+#include "render/basic/MeshUtil.h"
 #include "render/Camera.h"
 
 #include "assets/AssetFinder.h"

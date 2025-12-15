@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "DebugTextures.h"
 
-#include "../Util.h"
+#include "Util.h"
 
 namespace fs = std::filesystem;
 

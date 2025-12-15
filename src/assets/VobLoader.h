@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Util.h"
-#include "render/Common.h"
+#include "render/basic/Common.h"
 #include "render/Loader.h"
 #include "assets/LookupTrees.h"
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Util.h"
-#include "render/Common.h"
+#include "render/basic/Common.h"
 
 #include "zenkit/Mmap.hh" 
 #include "zenkit/Material.hh"
@@ -59,6 +59,8 @@ namespace assets
 //}
 namespace render
 {
+	constexpr float G_ASSET_RESCALE = 0.01f;
+
 	enum class VisualType : std::uint8_t {
 		DECAL = 0,
 		MESH = 1,

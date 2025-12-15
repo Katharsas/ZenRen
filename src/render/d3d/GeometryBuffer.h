@@ -1,7 +1,7 @@
 #pragma once
 
 #include "render/Dx.h"
-#include "render/Graphics.h"
+#include "render/basic/Graphics.h"
 
 namespace render
 {

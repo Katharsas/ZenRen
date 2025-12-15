@@ -1,6 +1,6 @@
 #pragma once
 
-#include "render/Primitives.h"
+#include "render/basic/Primitives.h"
 
 namespace render
 {

@@ -2,7 +2,7 @@
 #include "WorldGrid.h"
 
 #include "Util.h"
-#include "render/MeshUtil.h"
+#include "render/basic/MeshUtil.h"
 #include "render/PerfStats.h"
 #include "render/Gui.h"
 

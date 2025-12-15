@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "MeshFromVdfLoader.h"
+#include "MeshLoader.h"
 
 #include <type_traits>
 #include <filesystem>
@@ -9,11 +9,9 @@
 
 #include "AssetCache.h"
 #include "MeshOpt.h"
-#include "render/MeshPrimitives.h"
-#include "render/MeshUtil.h"
-#include "../Util.h"
-
-#include "../lib/meshoptimizer/src/meshoptimizer.h"// TODO remove
+#include "render/basic/MeshPrimitives.h"
+#include "render/basic/MeshUtil.h"
+#include "Util.h"
 
 #include "magic_enum.hpp"
 #include "glm/gtc/type_ptr.hpp"

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "render/Primitives.h"
+#include "render/basic/Primitives.h"
 #include "render/Dx.h"
 #include "render/WinDx.h" // TODO remove
 

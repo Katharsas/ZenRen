@@ -1,6 +1,8 @@
 #pragma once
 
-#include "../lib/meshoptimizer/src/meshoptimizer.h"// TODO wtf??
+#include "render/basic/Primitives.h"
+
+#include "meshoptimizer.h"
 
 /**
  * @brief Wrap meshopt's C-API for in-place std::vector modification.
@@ -28,7 +30,7 @@ namespace assets::meshopt
         verts.resize(remap.vertCountRemapped);
     }
 
-    void remapIndexBuffer(std::vector<VertexIndex>& indices, const Remap& remap)
+    void remapIndexBuffer(std::vector<render::VertexIndex>& indices, const Remap& remap)
     {
         assert(indices.size() >= remap.vertMap.size());
         meshopt_remapIndexBuffer(indices.data(), indices.data(), indices.size(), remap.vertMap.data());
@@ -37,9 +39,9 @@ namespace assets::meshopt
     /**
      * @param remap - size must be equal to number of indices / unindexed verts
      */
-    std::vector<VertexIndex> createIndexBuffer(const Remap& remap)
+    std::vector<render::VertexIndex> createIndexBuffer(const Remap& remap)
     {
-        std::vector<VertexIndex> indices(remap.vertMap.size());
+        std::vector<render::VertexIndex> indices(remap.vertMap.size());
         meshopt_remapIndexBuffer(indices.data(), nullptr, remap.vertMap.size(), remap.vertMap.data());
         return indices;
     }
@@ -62,14 +64,14 @@ namespace assets::meshopt
         return meshopt_Stream{ vec.data(), sizeof(T), sizeof(T) };
     }
 
-    void optimizeVertexCache(std::vector<VertexIndex>& indices, uint32_t vertexCount)
+    void optimizeVertexCache(std::vector<render::VertexIndex>& indices, uint32_t vertexCount)
     {
         meshopt_optimizeVertexCache(
             indices.data(), indices.data(), indices.size(), vertexCount);
     }
 
     template<typename T>
-    void optimizeOverdraw(std::vector<VertexIndex>& indices, const std::vector<T>& vertsWithPosAtStart)
+    void optimizeOverdraw(std::vector<render::VertexIndex>& indices, const std::vector<T>& vertsWithPosAtStart)
     {
         assert(sizeof(T) >= 12);
         const float* vertPosStart = (float*)vertsWithPosAtStart.data();
@@ -77,7 +79,7 @@ namespace assets::meshopt
             indices.data(), indices.data(), indices.size(), vertPosStart, vertsWithPosAtStart.size(), sizeof(T), 1.05f);
     }
 
-    Remap optimizeVertexFetchRemap(std::vector<VertexIndex>& indices, uint32_t vertexCount)
+    Remap optimizeVertexFetchRemap(std::vector<render::VertexIndex>& indices, uint32_t vertexCount)
     {
         Remap remap{
             .vertMap = std::vector<uint32_t>(vertexCount),
@@ -91,12 +93,12 @@ namespace assets::meshopt
     }
 
     template<typename T>
-    std::vector<VertexIndex> generateIndicesLod(const std::vector<VertexIndex>& indices, const std::vector<T>& vertsWithPosAtStart, float targetError)
+    std::vector<render::VertexIndex> generateIndicesLod(const std::vector<render::VertexIndex>& indices, const std::vector<T>& vertsWithPosAtStart, float targetError)
     {
         uint32_t flags = meshopt_SimplifyErrorAbsolute | meshopt_SimplifyLockBorder;
         const float* vertPosStart = (float*)vertsWithPosAtStart.data();
 
-        std::vector<VertexIndex> result(indices.size());
+        std::vector<render::VertexIndex> result(indices.size());
         float actualError = 0.f;
         uint32_t indexCountLod = meshopt_simplify(
             result.data(), indices.data(), indices.size(), vertPosStart, vertsWithPosAtStart.size(), sizeof(T), 0, targetError, flags, &actualError);

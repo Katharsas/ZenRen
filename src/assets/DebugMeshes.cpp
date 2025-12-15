@@ -2,7 +2,7 @@
 #include "DebugMeshes.h"
 
 #include "AssetCache.h"
-#include "render/MeshUtil.h"
+#include "render/basic/MeshUtil.h"
 
 namespace assets
 {

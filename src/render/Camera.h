@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Primitives.h"
+#include "render/basic/Common.h"
 
 namespace render::camera
 {

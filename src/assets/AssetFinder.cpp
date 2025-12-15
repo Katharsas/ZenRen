@@ -2,7 +2,7 @@
 #include "AssetFinder.h"
 
 #include "DebugTextures.h"
-#include "../Util.h"
+#include "Util.h"
 
 #include "zenkit/Logger.hh"
 #include "magic_enum.hpp"

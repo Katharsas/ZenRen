@@ -5,7 +5,7 @@
 #include "assets/FindGroundFace.h"
 #include "assets/StaticLightFromVobLights.h"
 
-#include "render/MeshUtil.h"
+#include "render/basic/MeshUtil.h"
 
 namespace assets
 {

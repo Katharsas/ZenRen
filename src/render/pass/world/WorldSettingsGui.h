@@ -1,7 +1,7 @@
 #pragma once
 
 #include "render/pass/world/WorldSettings.h"
-#include "render/Grid.h"
+#include "render/basic/Grid.h"
 
 namespace render::pass::world::gui
 {

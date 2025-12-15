@@ -5,92 +5,16 @@
 #include <vector>
 
 #include "Util.h"
-#include "render/Primitives.h"
-#include "render/VertexPacker.h"
-#include "render/Grid.h"
+#include "render/basic/Primitives.h"
+#include "render/basic/VertexAttributes.h"
+#include "render/basic/VertexPacker.h"
+#include "render/basic/Grid.h"
 
 #include "magic_enum.hpp"
 
 namespace render
 {
-	// TODO move to MeshUtil
-	constexpr float G_ASSET_RESCALE = 0.01f;
-
-	using TexId = uint16_t;
-
-	// TODO how to quantize VertexPos? do we need separate struct wrapper?
-	using VertexPos = Vec3;
-	template <> inline VertexAttributes inputLayout<VertexPos>() {
-		return {
-			{  Type::FLOAT_3, Semantic::POSITION }
-		};
-	}
-
-	template <bool IS_PACKED>
-	struct VertexNorUvTemplate {};
-
-	template <> struct VertexNorUvTemplate<false> {
-	private:
-		Vec3 m_normal;
-		Uv m_uvDiffuse;
-	public:
-		VertexNorUvTemplate() {};
-		VertexNorUvTemplate(Vec3 normal, Uv uvDiffuse) : m_normal(normal), m_uvDiffuse(uvDiffuse) {};
-		Vec3 normal() const { return m_normal; }
-		Uv uvDiffuse() const { return m_uvDiffuse; }
-	};
-	template <> inline VertexAttributes inputLayout<VertexNorUvTemplate<false>>() {
-		return {
-			{ Type::FLOAT_3, Semantic::NORMAL },
-			{ Type::FLOAT_2, Semantic::TEXCOORD },
-		};
-	}
-
-	template <> struct VertexNorUvTemplate<true> {
-	private:
-		uint32_t m_normal;
-		uint32_t m_uvDiffuse;
-	public:
-		VertexNorUvTemplate() {};
-		VertexNorUvTemplate(Vec3 normal, Uv uvDiffuse)
-			: m_normal(packNormal(normal)), m_uvDiffuse(packUv(uvDiffuse)) {};
-		Vec3 normal() const { return unpackNormal(m_normal); }
-		Uv uvDiffuse() const { return unpackUv(m_uvDiffuse); }
-	};
-	template <> inline VertexAttributes inputLayout<VertexNorUvTemplate<true>>() {
-		return {
-			{ Type::UINT, Semantic::NORMAL },
-			{ Type::UINT, Semantic::TEXCOORD },
-		};
-	}
-
-	using VertexNorUv = VertexNorUvTemplate<PACK_VERTEX_ATTRIBUTES>;
-	inline std::ostream& operator <<(std::ostream& os, const VertexNorUv& that)
-	{
-		return os << "[NOR:" << that.normal() << " UV_DIFF:" << that.uvDiffuse() << "]";
-	}
-
-	// TODO create union of uvLightmap + colLight with single bit flag to differentiate
-	// TODO move uvDiffuse into TexIndex
-	// TODO rename to VertexLight
-	struct VertexBasic {
-		Uvi uvLightmap;
-		Color colLight;
-		Vec3 dirLight;
-		float lightSun;
-	};
-	inline std::ostream& operator <<(std::ostream& os, const VertexBasic& that)
-	{
-		return os << "[COL_LIGHT:" << that.colLight << " DIR_LIGHT:" << that.dirLight << " UV_LM:" << that.uvLightmap << "]";
-	}
-	template <> inline VertexAttributes inputLayout<VertexBasic>() {
-		return {
-			{ Type::FLOAT_3, Semantic::TEXCOORD },
-			{ Type::FLOAT_4, Semantic::COLOR },
-			{ Type::FLOAT_3, Semantic::NORMAL },
-			{ Type::FLOAT, Semantic::TEXCOORD },// TODO use OTHER
-		};
-	}
+	constexpr uint8_t BLEND_TYPE_COUNT = magic_enum::enum_count<BlendType>();
 
 	struct TexInfo {
 		// TODO make width/height of type BufferSize?
@@ -194,21 +118,7 @@ namespace render
 	typedef Verts<VertexBasic> VertsBasic;
 	//typedef Verts<VertexBlend> VertsBlend;
 
-	
-	// TODO disable depth writing
-	// TODO if face order can result in different outcome, we would need to sort BLEND_ALPHA and BLEND_FACTOR faces
-	// by distance to camera theoretically (see waterfall near G2 start)
-	// To prevent having to sort all water faces:
-	// While above water, render water before (sorted) alpha/factor blenjd faces, while below last
-	enum class BlendType : uint8_t {
-		NONE = 0,         // normal opaque or alpha-tested, shaded
-		ADD = 1,          // alpha channel additive blending
-		MULTIPLY = 2,     // color multiplication, linear color textures, no shading
-		BLEND_ALPHA = 3,  // alpha channel blending, ??
-		BLEND_FACTOR = 4, // fixed factor blending (water), shaded (?)
-	};
-	
-	constexpr uint8_t BLEND_TYPE_COUNT = magic_enum::enum_count<BlendType>();
+	using TexId = uint16_t;
 
 	// TODO rename to Encoding / Compression or something, since color is always SRGB, even if linear
 	enum class ColorSpace {

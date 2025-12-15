@@ -1,6 +1,6 @@
 #pragma once
 
-#include "render/Common.h"
+#include "render/basic/Common.h"
 #include "assets/AssetFinder.h"
 
 #include "zenkit/MultiResolutionMesh.hh"

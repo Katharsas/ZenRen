@@ -3,12 +3,12 @@
 
 #include "Util.h"
 #include "render/PerfStats.h"
-#include "render/MeshUtil.h"
+#include "render/basic/MeshUtil.h"
 
 #include "assets/VobLoader.h"
 #include "assets/LookupTrees.h"
 #include "assets/AssetCache.h"
-#include "assets/MeshFromVdfLoader.h";
+#include "assets/MeshLoader.h";
 #include "assets/TexLoader.h"
 
 #include "zenkit/World.hh"

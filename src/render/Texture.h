@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Dx.h"
-#include "Common.h"
+#include "render/basic/Common.h"
 #include "assets/AssetFinder.h"
 
 #include <string>

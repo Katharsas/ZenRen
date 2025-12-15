@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Dx.h"
-#include "Common.h"
+#include "render/basic/Common.h"
 #include "render/d3d/Shader.h";
 #include "render/d3d/GeometryBuffer.h"
 #include "Texture.h"

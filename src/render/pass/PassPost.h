@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Common.h"
+#include "render/basic/Common.h"
 #include "../Settings.h"
 #include "../Dx.h"
 

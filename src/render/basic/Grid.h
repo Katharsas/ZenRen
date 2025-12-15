@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Util.h"
-#include "render/Primitives.h"
+#include "render/basic/Primitives.h"
 
 #include <span>
 

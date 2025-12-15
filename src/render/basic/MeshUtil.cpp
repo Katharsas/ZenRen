@@ -1,9 +1,9 @@
 #include "stdafx.h"
-#include "render/MeshUtil.h"
+#include "render/basic/MeshUtil.h"
 
 #include <filesystem>
 
-#include "../Util.h"
+#include "Util.h"
 
 namespace render
 {

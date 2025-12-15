@@ -4,7 +4,7 @@
 #include <concepts>
 #include <type_traits>
 
-#include "render/Graphics.h"
+#include "render/basic/Graphics.h"
 
 typedef std::monostate Unused;
 
@@ -116,22 +116,9 @@ inline std::ostream& operator <<(std::ostream& os, const PosUv& that)
 	return os << "[POS: " << that.pos << " UV:" << that.uv << "]";
 }
 
-using VertexIndex = uint32_t;
-
-using TexIndex = uint32_t;
-
 namespace render
 {
-	// TODO EVERYTHING SHOULD BE INSIDE THIS NAMESPACE!!!!!
-
-	template <typename ATTR>
-	VertexAttributes inputLayout();
-
-	template <> inline VertexAttributes inputLayout<TexIndex>() {
-		return {
-			{  Type::UINT, Semantic::TEXCOORD }
-		};
-	}
+	using VertexIndex = uint32_t;
 
 	struct BufferSize {
 		uint16_t width;

@@ -3,7 +3,7 @@
 #include "assets/AssetCache.h"
 
 #include "render/Loader.h"
-#include "render/Grid.h"
+#include "render/basic/Grid.h"
 
 #include "zenkit/World.hh"
 #include "zenkit/MultiResolutionMesh.hh"

@@ -2,7 +2,6 @@
 #include "TextureBuffer.h"
 
 #include "render/WinDx.h";
-#include "render/Primitives.h"
 
 namespace render::d3d
 {

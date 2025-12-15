@@ -2,7 +2,7 @@
 #include "Texture.h"
 
 #include <comdef.h>
-#include "../Util.h"
+#include "Util.h"
 #include <magic_enum.hpp>
 
 #include "WinDx.h"

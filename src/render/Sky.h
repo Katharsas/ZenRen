@@ -1,7 +1,7 @@
 #pragma once
 
 #include <magic_enum.hpp>
-#include "Common.h"
+#include "render/basic/Common.h"
 
 namespace render
 {

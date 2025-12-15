@@ -2,8 +2,8 @@
 
 #include <DirectXMath.h>
 
-#include "Common.h"
-#include "../Util.h"
+#include "render/basic/Common.h"
+#include "Util.h"
 
 namespace render
 {

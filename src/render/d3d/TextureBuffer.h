@@ -3,8 +3,8 @@
 #include <dxgiformat.h>
 
 #include "render/Dx.h"
-#include "render/Graphics.h"
-#include "render/Primitives.h"
+#include "render/basic/Graphics.h"
+#include "render/basic/Primitives.h"
 
 namespace render::d3d
 {

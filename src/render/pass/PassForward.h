@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../WinDx.h"
-#include "../Common.h"
+#include "render/basic/Common.h"
 #include "../Settings.h"
 
 namespace render::pass::forward

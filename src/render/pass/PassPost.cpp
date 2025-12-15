@@ -4,7 +4,7 @@
 #include "render/WinDx.h"
 #include "render/Renderer.h"
 #include "render/RenderUtil.h"
-#include "render/MeshPrimitives.h"
+#include "render/basic/MeshPrimitives.h"
 #include "render/d3d/Shader.h"
 #include "render/d3d/ConstantBuffer.h"
 #include "render/d3d/GeometryBuffer.h"

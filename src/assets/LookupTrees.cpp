@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "LookupTrees.h"
 
-#include "render/MeshUtil.h"
+#include "render/basic/MeshUtil.h"
 
 namespace assets
 {
