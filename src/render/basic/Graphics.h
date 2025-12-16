@@ -23,6 +23,14 @@ namespace render
 		BLEND_FACTOR = 4, // fixed factor blending (water), shaded (?)
 	};
 
+	enum class VertexLightType
+	{
+		WORLD_COLOR = 0,
+		WORLD_LIGHTMAP = 1,
+		OBJECT_COLOR = 2,
+		OBJECT_DECAL = 3,
+	};
+
 	enum class Type { // equivalent to DXGI_FORMAT
 		FLOAT,
 		FLOAT_2,
@@ -43,5 +51,5 @@ namespace render
 	using VertexAttribute = std::pair<Type, Semantic>;
 	using VertexAttributes = std::vector<VertexAttribute>;
 
-	constexpr bool PACK_VERTEX_ATTRIBUTES = false;
+	constexpr bool PACK_VERTEX_ATTRIBUTES = true;
 }

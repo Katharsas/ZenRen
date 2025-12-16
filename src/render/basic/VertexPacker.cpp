@@ -16,6 +16,12 @@ namespace render
 	constexpr static uint32_t uvComponentMask = (1 << uvComponentBits) - 1;
 	constexpr static uint32_t scale = (1 << (uvComponentBits - 1));
 
+	// Packed light info:
+	constexpr static uint32_t instanceIdBits = 14;
+	constexpr static uint32_t instanceIdMask = (1 << instanceIdBits) - 1;
+	constexpr static uint32_t lightComponentBits = 16;
+	constexpr static uint32_t lightComponentMask = (1 << lightComponentBits) - 1;
+
 	uint32_t packNormal(Vec3 raw)
 	{
 		// TODO it should not be necessary to extract and pack x/z sign manually 
@@ -87,5 +93,61 @@ namespace render
 		};
 		float factor = 1 << exponent;
 		return mul(uvNorm, factor / scale);
+	}
+
+	std::pair<uint32_t, uint32_t> packLight(VertexLightType type, Color colLight, Uvi uviLightmap, uint16_t instanceId)
+	{
+		// TODO for now we ignore colLight alpha value
+
+		// TODO check max i in uvi
+
+		if (type == VertexLightType::WORLD_LIGHTMAP) {
+			return {
+				((uint32_t)type) << 30
+				| (instanceId & instanceIdMask) << 16
+				| ((uint32_t)(uviLightmap.i + 0.5f) & lightComponentMask),
+				packUv({ uviLightmap.u, uviLightmap.v })
+			};
+		}
+		else {
+			return {
+				((uint32_t)type) << 30
+				| (instanceId & instanceIdMask) << 16
+				| ((uint32_t)(colLight.r * lightComponentMask + 0.5f) & lightComponentMask),
+				((uint32_t)(colLight.g * lightComponentMask + 0.5f) & lightComponentMask) << 16
+				| ((uint32_t)(colLight.b * lightComponentMask + 0.5f) & lightComponentMask)
+			};
+		}
+	}
+
+	VertexLightType unpackLightType(std::pair<uint32_t, uint32_t> packed)
+	{
+		return (VertexLightType)(packed.first >> 30);
+	}
+
+	uint16_t unpackInstanceId(std::pair<uint32_t, uint32_t> packed)
+	{
+		return (packed.first >> 16) & instanceIdMask;
+	}
+
+	Color unpackLightColor(std::pair<uint32_t, uint32_t> packed)
+	{
+		constexpr float invMaxVal = 1.f / lightComponentMask;
+		return Color(
+			(float)(packed.first & lightComponentMask) * invMaxVal,
+			(float)((packed.second >> 16) & lightComponentMask) * invMaxVal,
+			(float)(packed.second & lightComponentMask) * invMaxVal,
+			1.f
+		);
+	}
+
+	Uvi unpackLightmap(std::pair<uint32_t, uint32_t> packed)
+	{
+		Uv unpackedUv = unpackUv(packed.second);
+		return {
+			.u = unpackedUv.u,
+			.v = unpackedUv.v,
+			.i = (float)(packed.first & lightComponentMask),
+		};
 	}
 }

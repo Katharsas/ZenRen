@@ -520,10 +520,10 @@ namespace render::pass::world
 		
 		d3d.deviceContext->IASetInputLayout(shader.vertexLayout);
 		d3d.deviceContext->VSSetShader(shader.vertexShader, 0, 0);
+		d3d.deviceContext->VSSetShaderResources(2, 1, &world.staticInstancesSb);
+
 		d3d.deviceContext->PSSetShader(shader.pixelShader, 0, 0);
-
 		d3d.deviceContext->PSSetSamplers(0, 1, &samplerState);
-
 		d3d.deviceContext->PSSetShaderResources(1, 1, &world.lightmapTexArray);
 
 		maxDrawCalls = currentDrawCall;

@@ -19,6 +19,12 @@ cbuffer cbLodRange : register(b5)
     float rangeEnd;
 }
 
+struct StaticInstanceFeatures
+{
+    float3 dirLight;
+};
+StructuredBuffer<StaticInstanceFeatures> staticInstances : register(t2); // TODO all SRV should use t register type, including PS SRVs
+
 //--------------------------------------------------------------------------------------
 // Vertex Shader
 //--------------------------------------------------------------------------------------
@@ -80,19 +86,32 @@ VS_OUT VS_Main(VS_IN input)
     //float3 viewLight3 = normalize((float3) mul(float4(0, 1, 0, 0), worldViewMatrixInverseTranposed));
     //float3 viewLight3 = normalize(mul(float3(0, 1, 0), (float3x3) worldViewMatrixInverseTranposed));
 
-    bool isVob = input.dirLight.x > -99;// world sets dirLight to -100
-    bool hasLightmap = input.uviTexLightmap.z >= 0;
-    bool hasVertexLight = !isVob && !hasLightmap;
+    uint lightType = unpackLightType(input);
+    uint instanceId = unpackInstanceId(input);
+    float3 colLight = unpackColLight(input);
+    float3 uviTexLightmap = unpackUviTexLightmap(input);
+    
+    bool isVob = lightType >= LIGHT_OBJECT_COLOR;
 
     if (outputType == OUTPUT_FULL || outputType == OUTPUT_SOLID || outputType == OUTPUT_LIGHT_SUN) {
         float3 light = (float3) 1.f;
-        float3 lightColor = input.colLight.rgb;
+        float3 lightColor = colLight;
         if (!isVob) {
             light = RescaleOntoAmbient(lightColor * .9f, (float3) .06f);
         }
         else {
-            float lightReceived = CalcLightDirectional(input.dirLight, viewNormal3, .0f);
+            float lightReceived;
+            if (lightType == LIGHT_OBJECT_DECAL)
+            {
+                // TODO we assume that decals do not have a light direction and are always directly lit, check how it actually works!
+                lightReceived = 1;
+            }
+            else {
+                float3 dirLight = staticInstances[instanceId].dirLight;
+                lightReceived = CalcLightDirectional(dirLight, viewNormal3, .0f);
+            }
             float3 directionalLight = lightColor * lightReceived;
+            
             if (blendType != BLEND_ADD) {
                 light = RescaleOntoAmbient(directionalLight, lightColor * .17f, 1.25f);
             }
@@ -122,8 +141,8 @@ VS_OUT VS_Main(VS_IN input)
     
     output.uvTexColor = unpackUvTexColor(input);
     output.iTexColor = input.iTexColor;
-    output.uvTexLightmap = input.uviTexLightmap.xy;
-    output.iTexLightmap = input.uviTexLightmap.z;
+    output.uvTexLightmap = uviTexLightmap.xy;
+    output.iTexLightmap = lightType == LIGHT_WORLD_LIGHTMAP ? uviTexLightmap.z : -1;
    
     return output;
 }

@@ -16,12 +16,23 @@ struct VS_IN
     uint uvTexColor : TEXCOORD0;
 #endif
     
+#if VERTEX_INPUT_RAW
+    float3 colLight : COLOR0;
+    uint instanceId : OTHER0;
     float3 uviTexLightmap : TEXCOORD1;
-    float4 colLight : COLOR;
-    float3 dirLight : NORMAL1;
-    float sunLight : TEXCOORD2;
-    uint iTexColor : TEXCOORD3;
+    uint lightType : OTHER1;
+#else
+    uint lightFirst : OTHER0;
+    uint lightSecond : OTHER1;
+#endif
+    
+    uint iTexColor : OTHER2;
 };
+
+static const uint LIGHT_WORLD_COLOR = 0;
+static const uint LIGHT_WORLD_LIGHTMAP = 1;
+static const uint LIGHT_OBJECT_COLOR = 2;
+static const uint LIGHT_OBJECT_DECAL = 3;
 
 float3 unpackNormal(VS_IN input)
 {
@@ -53,18 +64,14 @@ float3 unpackNormal(VS_IN input)
 #endif
 }
 
-float2 unpackUvTexColor(VS_IN input)
+float2 unpackUv(uint packed)
 {
-#if VERTEX_INPUT_RAW
-    return input.uvTexColor;
-#else
     static const uint uvExponentBits = 4;
     static const uint uvComponentBits = 14;
     static const uint uvExponentMask = (1 << uvExponentBits) - 1;
     static const uint uvComponentMask = (1 << uvComponentBits) - 1;
     static const uint scale = (1 << (uvComponentBits - 1));
     
-    uint packed = input.uvTexColor;
     uint exponent = ((packed >> (uvComponentBits * 2)) & uvExponentMask);
     uint uBits = (packed >> uvComponentBits) & uvComponentMask;
     uint vBits = packed & uvComponentMask;
@@ -78,5 +85,62 @@ float2 unpackUvTexColor(VS_IN input)
     };
     float factor = 1 << exponent;
     return uvNorm * (factor / scale);
+}
+
+float2 unpackUvTexColor(VS_IN input)
+{
+#if VERTEX_INPUT_RAW
+    return input.uvTexColor;
+#else
+    return unpackUv(input.uvTexColor);
+#endif
+}
+
+static const uint instanceIdBits = 14;
+static const uint instanceIdMask = (1 << instanceIdBits) - 1;
+static const uint lightComponentBits = 16;
+static const uint lightComponentMask = (1 << lightComponentBits) - 1;
+
+uint unpackLightType(VS_IN input)
+{
+#if VERTEX_INPUT_RAW
+    return input.lightType;
+#else
+    return (input.lightFirst >> 30);
+#endif
+}
+
+uint unpackInstanceId(VS_IN input)
+{
+#if VERTEX_INPUT_RAW
+    return input.instanceId;
+#else
+    return (input.lightFirst >> 16) & instanceIdMask;
+#endif
+}
+
+float3 unpackColLight(VS_IN input)
+{
+#if VERTEX_INPUT_RAW
+    return input.colLight;
+#else
+    static const float invMaxVal = 1.f / lightComponentMask;
+    return float3(
+		(float)(input.lightFirst & lightComponentMask) * invMaxVal,
+		(float)((input.lightSecond >> 16) & lightComponentMask) * invMaxVal,
+		(float)(input.lightSecond & lightComponentMask) * invMaxVal
+    );
+#endif
+}
+
+float3 unpackUviTexLightmap(VS_IN input)
+{
+#if VERTEX_INPUT_RAW
+    return input.uviTexLightmap;
+#else
+    return float3(
+        unpackUv(input.lightSecond),
+        input.lightFirst & lightComponentMask
+    );
 #endif
 }

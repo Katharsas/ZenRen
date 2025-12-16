@@ -32,9 +32,9 @@ namespace assets
         auto faceOther = vertKey.getOther(meshData);
         Color colorAverage = mul(
             add(add(
-                mul(faceOther[0].colLight, v0Contrib),
-                mul(faceOther[1].colLight, v1Contrib)),
-                mul(faceOther[2].colLight, v2Contrib)),
+                mul(faceOther[0].colLight(), v0Contrib),
+                mul(faceOther[1].colLight(), v1Contrib)),
+                mul(faceOther[2].colLight(), v2Contrib)),
             0.5f);
 
         return colorAverage;
@@ -56,7 +56,7 @@ namespace assets
         }
         else if (vertKey.has_value()) {
             const auto& other = vertKey.value().getOther(worldMesh.data);
-            if (other[0].uvLightmap.i != -1) {
+            if (other[0].type() == VertexLightType::WORLD_LIGHTMAP) {
                 hasLightmap = true;
             }
         }

@@ -89,7 +89,13 @@ namespace render
 		// Seems very likely that a texture is always used with the same alphafunc, so just pass it to shader when setting texture?
 	};
 
+	struct StaticInstanceFeatures {
+		Vec3 dirLight;
+	};
+
+	// TODO this should not be here?
 	struct StaticInstance {
+		uint32_t id;
 		VisualType type;
 		std::string visual_name;
 		DirectX::XMMATRIX transform;
@@ -150,6 +156,7 @@ namespace render
 		grid::Grid chunkGrid;
 		MatToChunksToVertsBasic worldMesh;
 		MatToChunksToVertsBasic staticMeshes;
+		std::vector<StaticInstanceFeatures> staticInstances;
 		std::vector<FileData> worldMeshLightmaps;
 	};
 }

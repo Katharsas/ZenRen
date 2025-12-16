@@ -29,6 +29,7 @@ namespace render::pass::world
 		MeshBatches<VertexBasic> meshBatchesWorld;
 		MeshBatches<VertexBasic> meshBatchesObjects;
 
+		ID3D11ShaderResourceView* staticInstancesSb = nullptr;
 		ID3D11ShaderResourceView* lightmapTexArray = nullptr;
 
 		std::vector<Texture*> debugTextures;

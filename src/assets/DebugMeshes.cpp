@@ -68,8 +68,9 @@ namespace assets
                     Uv { 0, 0 },
                 });
                 facesOther.push_back({
+                    VertexLightType::WORLD_COLOR,
+                    Color(1, 0, 0, 1),
                     Uvi { 0, 0, -1 },
-                    Color(1, 0, 0, 1)
                 });
             }
         }
@@ -114,8 +115,9 @@ namespace assets
                     Uv { 0, 0 },
                 });
                 facesOther.push_back({
+                    VertexLightType::WORLD_COLOR,
+                    color,
                     Uvi { 0, 0, -1 },
-                    color
                 });
             }
         }
@@ -155,8 +157,9 @@ namespace assets
                     Uv { 0, 0 },
                 });
                 facesOther.push_back({
+                    VertexLightType::WORLD_COLOR,
+                    color,
                     Uvi { 0, 0, -1 },
-                    color
                 });
             }
         }

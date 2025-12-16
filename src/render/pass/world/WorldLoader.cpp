@@ -5,6 +5,7 @@
 
 #include "render/d3d/TextureBuffer.h"
 #include "render/d3d/GeometryBuffer.h"
+#include "render/d3d/StructuredBuffer.h"
 #include "render/PerfStats.h"
 #include "render/Loader.h"
 #include "render/WinDx.h"
@@ -381,6 +382,7 @@ namespace render::pass::world
 			delete tex;
 		}
 		world.debugTextures.clear();
+		release(world.staticInstancesSb);
 		release(world.lightmapTexArray);
 	}
 
@@ -480,6 +482,12 @@ namespace render::pass::world
 		printLoadResult(loadResult);
 
 		loadResult = loadBatchVertexData(d3d, world.meshBatchesObjects, data.staticMeshes, texturesPerBatch);
+
+		ID3D11Buffer* staticInstancesBuf = nullptr;
+		d3d::createStructuredBuf(d3d, &staticInstancesBuf, data.staticInstances, BufferUsage::IMMUTABLE);
+		d3d::createStructuredSrv(d3d, &world.staticInstancesSb, staticInstancesBuf);
+		release(staticInstancesBuf);
+
 		sampler.logMillisAndRestart("Level: Uploaded static instances");
 		printLoadResult(loadResult);
 

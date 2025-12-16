@@ -257,14 +257,17 @@ namespace assets
                 return left.visual_name < right.visual_name;
             });
 
-            uint32_t instanceCount = 0;
+            uint32_t instanceId = 0;
             for (auto& instance : vobs) {
+                instance.id = instanceId;
                 bool success = loadInstanceVisual(out.staticMeshes, out.chunkGrid, instance, !debug.disableVertexIndices, debug.validateMeshData);
                 if (success) {
-                    instanceCount++;
+                    out.staticInstances.push_back({ toVec3(XMVector3Normalize(instance.lighting.direction)) });
+                    instanceId++;
+                    // TODO in shader take dir from normal instead of dir for decals
                 }
             }
-            LOG(INFO) << "VOBs: Loaded " << instanceCount << " instance visuals";
+            LOG(INFO) << "VOBs: Loaded " << instanceId << " instance visuals";
 
             sampler.logMillisAndRestart("Loader: VOB visuals loaded");
         }

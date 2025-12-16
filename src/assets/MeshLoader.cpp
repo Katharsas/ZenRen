@@ -529,11 +529,12 @@ namespace assets
                 toUv(featureZkit.texture)
             };
 
-            VertexBasic& other = faceOther.at(i);
-            other.colLight = fromSRGB(Color(featureZkit.light));
-            other.dirLight = { -100.f, -100.f, -100.f };// value that is easy to check as not normalized in shader
-            other.lightSun = 1.0f;
-            other.uvLightmap = getLightmapUvsZkit(mesh, faceIndex, facePosXm[i]);
+            Uvi lightmap = getLightmapUvsZkit(mesh, faceIndex, facePosXm[i]);
+            faceOther.at(i) = {
+                lightmap.i < 0 ? VertexLightType::WORLD_COLOR : VertexLightType::WORLD_LIGHTMAP,
+                fromSRGB(Color(featureZkit.light)),
+                lightmap,
+            };
 
             vertIndex++;
         }
@@ -895,15 +896,11 @@ namespace assets
             vert.uvColor,
         };
         result.other = {
-            .uvLightmap = { -1, -1, -1 },
-            .colLight = instance.lighting.color,
-            .lightSun = instance.lighting.receiveLightSun ? 1.f : 0.f,
+            isDecal ? VertexLightType::OBJECT_DECAL : VertexLightType::OBJECT_COLOR,
+            instance.lighting.color,
+            { 0, 0, -1 },
+            instance.id,
         };
-        if (!isDecal) {
-            result.other.dirLight = toVec3(XMVector3Normalize(instance.lighting.direction));
-        } else {
-            result.other.dirLight = normalVec3;// TODO does the original game do this??
-        }
         return result;
     }
 
