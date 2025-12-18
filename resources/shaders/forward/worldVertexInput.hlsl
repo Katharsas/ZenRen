@@ -15,7 +15,8 @@ struct VS_IN
 #else
     uint uvTexColor : TEXCOORD0;
 #endif
-    
+
+#if !VERTEX_INPUT_LIGHT_DISABLED
 #if VERTEX_INPUT_RAW
     float3 colLight : COLOR0;
     uint instanceId : OTHER0;
@@ -27,6 +28,9 @@ struct VS_IN
 #endif
     
     uint iTexColor : OTHER2;
+#else
+    uint iTexColor : OTHER0;
+#endif
 };
 
 static const uint LIGHT_WORLD_COLOR = 0;
@@ -96,6 +100,8 @@ float2 unpackUvTexColor(VS_IN input)
 #endif
 }
 
+#if !VERTEX_INPUT_LIGHT_DISABLED
+
 static const uint instanceIdBits = 14;
 static const uint instanceIdMask = (1 << instanceIdBits) - 1;
 static const uint lightComponentBits = 16;
@@ -144,3 +150,5 @@ float3 unpackUviTexLightmap(VS_IN input)
     );
 #endif
 }
+
+#endif

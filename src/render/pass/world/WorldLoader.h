@@ -5,11 +5,10 @@
 
 namespace render::pass::world
 {
-	template <VERTEX_FEATURE F>
 	struct MeshBatches {
-		std::array<std::vector<MeshBatch<F>>, BLEND_TYPE_COUNT> passes;
+		std::array<std::vector<MeshBatch>, BLEND_TYPE_COUNT> passes;
 
-		std::vector<MeshBatch<VertexBasic>>& getBatches(BlendType blendType)
+		std::vector<MeshBatch>& getBatches(BlendType blendType)
 		{
 			return passes.at((uint8_t) blendType);
 		}
@@ -26,8 +25,8 @@ namespace render::pass::world
 
 	struct World {
 		bool isOutdoorLevel = true;
-		MeshBatches<VertexBasic> meshBatchesWorld;
-		MeshBatches<VertexBasic> meshBatchesObjects;
+		MeshBatches meshBatchesWorld;
+		MeshBatches meshBatchesObjects;
 
 		ID3D11ShaderResourceView* staticInstancesSb = nullptr;
 		ID3D11ShaderResourceView* lightmapTexArray = nullptr;

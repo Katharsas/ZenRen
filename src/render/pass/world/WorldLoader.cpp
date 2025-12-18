@@ -84,9 +84,9 @@ namespace render::pass::world
 	}
 
 	template <VERTEX_FEATURE F>
-	void loadRenderBatch(D3d d3d, vector<MeshBatch<F>>& target, TexInfo batchInfo, const VertsBatch<F>& batchData)
+	void loadRenderBatch(D3d d3d, vector<MeshBatch>& target, TexInfo batchInfo, const VertsBatch<F>& batchData)
 	{
-		MeshBatch<F> batch;
+		MeshBatch batch;
 		batch.vertClusters = std::move(batchData.vertClusters);
 		batch.vertClustersLod = std::move(batchData.vertClustersLod);
 		batch.useIndices = !batchData.vecIndex.empty();
@@ -99,7 +99,7 @@ namespace render::pass::world
 			batch.drawCount = batchData.vecPos.size();
 		}
 		d3d::createVertexBuf(d3d, batch.vbPos, batchData.vecPos);
-		d3d::createVertexBuf(d3d, batch.vbNormaluv, batchData.vecNormalUv);
+		d3d::createVertexBuf(d3d, batch.vbNormalUv, batchData.vecNormalUv);
 		d3d::createVertexBuf(d3d, batch.vbOther, batchData.vecOther);
 		d3d::createVertexBuf(d3d, batch.vbTexIndices, batchData.texIndices);
 		createTexArray(d3d, &batch.texColorArray, batchInfo, batchData.texIndexedIds);
@@ -324,20 +324,18 @@ namespace render::pass::world
 		return result;
 	}
 
-	template <VERTEX_FEATURE F>
-	bool compareByVertCount(MeshBatch<F> const& lhs, MeshBatch<F> const& rhs) {
+	bool compareByVertCount(MeshBatch const& lhs, MeshBatch const& rhs) {
 		return lhs.drawCount > rhs.drawCount;
 	}
 
-	template <VERTEX_FEATURE F>
-	void sortByVertCount(vector<MeshBatch<F>>& target)
+	void sortByVertCount(vector<MeshBatch>& target)
 	{
-		std::sort(target.begin(), target.end(), &compareByVertCount<F>);
+		std::sort(target.begin(), target.end(), &compareByVertCount);
 	}
 
 	template <VERTEX_FEATURE F>
 	LoadResult loadBatchVertexData(
-		D3d d3d, MeshBatches<F>& targetAllPasses, const MatToChunksToVerts<F>& meshDataAllPasses, TexIndex maxTexturesPerBatch)
+		D3d d3d, MeshBatches& targetAllPasses, const MatToChunksToVerts<F>& meshDataAllPasses, TexIndex maxTexturesPerBatch)
 	{
 		LoadResult result;
 		array<unordered_map<Material, const ChunkToVerts<F>* >, BLEND_TYPE_COUNT> perPassMeshData = splitByPass(meshDataAllPasses);

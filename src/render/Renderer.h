@@ -9,7 +9,6 @@
 namespace render
 {
 	// TODO rename to MeshBatchBuffers?
-	template <VERTEX_FEATURE F>
 	struct MeshBatch {
 		// we could wrap this in a normal Texture object to make it more similar to unbatched meshes
 		ID3D11ShaderResourceView* texColorArray = nullptr;
@@ -23,8 +22,8 @@ namespace render
 		VertexBuffer vbIndices = { sizeof(VertexIndex) };
 
 		VertexBuffer vbPos = { sizeof(VertexPos) };
-		VertexBuffer vbNormaluv = { sizeof(VertexNorUv) };
-		VertexBuffer vbOther = { sizeof(F) };
+		VertexBuffer vbNormalUv = { sizeof(VertexNorUv) };
+		VertexBuffer vbOther = { sizeof(VertexBasic) };
 		VertexBuffer vbTexIndices = { sizeof(TexIndex) };// indices into texture array (base color textures)
 
 		void release()
@@ -32,19 +31,28 @@ namespace render
 			render::release(texColorArray);
 			render::release(vbIndices.buffer);
 			render::release(vbPos.buffer);
-			render::release(vbNormaluv.buffer);
+			render::release(vbNormalUv.buffer);
 			render::release(vbOther.buffer);
 			render::release(vbTexIndices.buffer);
 		}
+	};
 
-		static std::vector<d3d::VertexAttributeDesc> shaderLayout()
+	using GetVertexBuffers = std::vector<VertexBuffer> (*) (const MeshBatch&);
+
+	struct ShaderContext {
+		d3d::Shader shader;
+		GetVertexBuffers getVertexBuffers = nullptr;
+
+		static ShaderContext init(D3d d3d, const std::string& shaderName, const std::initializer_list<VertexAttributes>& attributes, GetVertexBuffers getVertexBuffers)
 		{
-			return d3d::buildInputLayoutDesc({
-				inputLayout<VertexPos>(),
-				inputLayout<VertexNorUv>(),
-				inputLayout<F>(),
-				inputLayout<TexIndex>(),
-			});
+			ShaderContext result;
+			result.getVertexBuffers = getVertexBuffers;
+			d3d::createShader(d3d, result.shader, shaderName, d3d::buildInputLayoutDesc(attributes));
+			return result;
+		}
+
+		void release() {
+			shader.release();
 		}
 	};
 

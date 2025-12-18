@@ -30,8 +30,8 @@ VS_OUT VS_Main(VS_IN input)
 // Pixel Shader
 //--------------------------------------------------------------------------------------
 
-Texture2DArray baseColor : register(s0);
-SamplerState SampleType : register(s0);
+Texture2DArray baseColor : register(t0);
+SamplerState samplerState : register(s0);
 
 struct PS_IN
 {
@@ -44,7 +44,7 @@ struct PS_IN
 
 float4 PS_Main(PS_IN input) : SV_TARGET
 {
-    float4 diffuseColor = baseColor.Sample(SampleType, float3(input.uvTexColor, input.iTexColor));
+    float4 diffuseColor = baseColor.Sample(samplerState, float3(input.uvTexColor, input.iTexColor));
     
     diffuseColor = SwitchDiffuseByOutputMode(diffuseColor, (float3) 0.5f, input.distance);
     diffuseColor = ApplyFog(diffuseColor, input.distance);

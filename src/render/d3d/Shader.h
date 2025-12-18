@@ -19,6 +19,8 @@ namespace render::d3d
 		ID3D11VertexShader* vertexShader = nullptr;
 		ID3D11PixelShader* pixelShader = nullptr;
 
+		void set(D3d d3d);
+
 		void release() {
 			render::release(vertexLayout);
 			render::release(vertexShader);

@@ -237,6 +237,7 @@ namespace render::pass::forward
 				d3d.deviceContext->OMSetBlendState(blendStates.at(blendTypeIndex), blendFactorCol.vec, 0xffffffff);
 				world::drawWorld(d3d, blendType);
 				if (settings.wireframe) {
+					d3d.deviceContext->OMSetBlendState(blendStates.at(0), nullptr, 0xffffffff);
 					d3d.deviceContext->RSSetState(rasterizerWf);
 					world::drawWireframe(d3d, blendType);
 					d3d.deviceContext->RSSetState(rasterizer);

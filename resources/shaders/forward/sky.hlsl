@@ -51,7 +51,7 @@ VS_OUT VS_Main(VS_IN input)
 //--------------------------------------------------------------------------------------
 
 Texture2D skyTexColor[2] : register(t0);
-SamplerState SampleType : register(s0);
+SamplerState samplerState : register(s0);
 
 struct PS_IN
 {
@@ -72,14 +72,14 @@ float4 FastGaussianBlur(Texture2D<float4> sourceTex, float2 uv)
     float Size = 2; // BLUR SIZE (Default 4.0 - Radius)
 
     float2 radius = Size / (float2) 500;// Size was meant be relative to tex resolution
-    float4 color = sourceTex.Sample(SampleType, uv);
+    float4 color = sourceTex.Sample(samplerState, uv);
 
     // blur
     for (float d = 0.0; d < Pi; d += Pi / Directions)
     {
         for (float i = 1.0 / Quality; i <= 1.0; i += 1.0 / Quality)
         {
-            color += sourceTex.Sample(SampleType, uv + float2(cos(d), sin(d)) * radius * i);
+            color += sourceTex.Sample(samplerState, uv + float2(cos(d), sin(d)) * radius * i);
         }
     }
 
@@ -110,7 +110,7 @@ float4 SkyTexColor(int layer, float2 uv)
         color = FastGaussianBlur(skyTexColor[layer], uv);
     }
     else {
-        color = skyTexColor[layer].Sample(SampleType, uv);
+        color = skyTexColor[layer].Sample(samplerState, uv);
     }
     float3 light = texLayers[layer].light.rgb;
     

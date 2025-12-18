@@ -83,7 +83,7 @@ float4 SwitchDiffuseByOutputMode(float4 texColor, float3 normalColor, float dept
         diffuseColor = texColor.rgb;
     }
     else if (outputType == OUTPUT_NORMAL) {
-        diffuseColor = normalColor;
+        diffuseColor = normalColor * 0.5f;
     }
     else if (outputType == OUTPUT_DEPTH) {
         // using distance instead of actual Z-Buffer value (input.position.z) 

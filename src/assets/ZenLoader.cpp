@@ -259,12 +259,12 @@ namespace assets
 
             uint32_t instanceId = 0;
             for (auto& instance : vobs) {
-                instance.id = instanceId;
+                // we skip decals from having per-instance data for now until we actually need it
+                instance.id = instance.decal.has_value() ? instanceIdNone : instanceId;
                 bool success = loadInstanceVisual(out.staticMeshes, out.chunkGrid, instance, !debug.disableVertexIndices, debug.validateMeshData);
-                if (success) {
+                if (success && instance.decal.has_value()) {
                     out.staticInstances.push_back({ toVec3(XMVector3Normalize(instance.lighting.direction)) });
                     instanceId++;
-                    // TODO in shader take dir from normal instead of dir for decals
                 }
             }
             LOG(INFO) << "VOBs: Loaded " << instanceId << " instance visuals";

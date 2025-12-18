@@ -22,6 +22,15 @@ namespace render::d3d
 	const std::string folder = "shaders";
 	const std::string extension = ".hlsl";
 
+	void Shader::set(D3d d3d)
+	{
+		d3d.deviceContext->IASetInputLayout(vertexLayout);
+		d3d.deviceContext->VSSetShader(vertexShader, 0, 0);
+		if (pixelShader != nullptr) {
+			d3d.deviceContext->PSSetShader(pixelShader, 0, 0);
+		}
+	}
+
 	constexpr std::array<DXGI_FORMAT, magic_enum::enum_count<render::Type>()> typeToFormat = { {
 			DXGI_FORMAT_R32_FLOAT,
 			DXGI_FORMAT_R32G32_FLOAT,

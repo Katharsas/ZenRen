@@ -38,9 +38,10 @@ namespace render::pass::world
 
 	ID3D11SamplerState* samplerState = nullptr;
 
-	d3d::Shader mainShader;
-	d3d::Shader debugShader;
-	d3d::Shader wireframeShader;
+	ShaderContext main;
+	ShaderContext diffuseOnly;
+	ShaderContext wireframe;
+	ShaderContext debug;
 
 	enum CbLodRangeType {
 		NONE,
@@ -253,15 +254,48 @@ namespace render::pass::world
 
 	void reinitShaders(D3d d3d)
 	{
-		// TODO templating vertex attributes on MeshBatch never made sense, which becomes quite obvious here
-		auto inputLayout = MeshBatch<VertexBasic>::shaderLayout();
-		d3d::createShader(d3d, mainShader, "forward/main", inputLayout);
-		d3d::createShader(d3d, debugShader, "forward/mainTexColorOnly", inputLayout);
+		std::initializer_list fullLayout = {
+			inputLayout<VertexPos>(),
+			inputLayout<VertexNorUv>(),
+			inputLayout<VertexBasic>(),
+			inputLayout<TexIndex>(),
+		};
+		GetVertexBuffers getFullBuffers = [](const MeshBatch& mesh) -> vector<VertexBuffer> {
+			return {
+				mesh.vbPos,
+				mesh.vbNormalUv,
+				mesh.vbOther,
+				mesh.vbTexIndices
+			};
+		};
+		main = ShaderContext::init(d3d, "forward/world", fullLayout, getFullBuffers);
+		debug = ShaderContext::init(d3d, "forward/worldDebug", fullLayout, getFullBuffers);
 
-		std::vector<d3d::VertexAttributeDesc> wireframeLayoutDesc = d3d::buildInputLayoutDesc({
-			{ { Type::FLOAT_3, Semantic::POSITION } }
-		});
-		d3d::createShader(d3d, wireframeShader, "forward/wireframe", wireframeLayoutDesc);
+		diffuseOnly = ShaderContext::init(d3d, "forward/worldDiffuseOnly",
+			{
+				inputLayout<VertexPos>(),
+				inputLayout<VertexNorUv>(),
+				inputLayout<TexIndex>(),
+			},
+			[](const MeshBatch& mesh) -> vector<VertexBuffer> {
+				return {
+					mesh.vbPos,
+					mesh.vbNormalUv,
+					mesh.vbTexIndices
+				};
+			}
+		);
+
+		wireframe = ShaderContext::init(d3d, "forward/wireframe",
+			{
+				inputLayout<VertexPos>(),
+			},
+			[](const MeshBatch& mesh) -> vector<VertexBuffer> {
+				return {
+					mesh.vbPos,
+				};
+			}
+		);
 
 		sky::reinitShaders(d3d);
 	}
@@ -311,14 +345,6 @@ namespace render::pass::world
 		return { cbLodRange.rangeBegin, cbLodRange.rangeEnd };
 	}
 
-	template <VERTEX_FEATURE F>
-	using GetVertexBuffers = vector<VertexBuffer>(*) (const MeshBatch<F>&);
-
-	template <VERTEX_FEATURE F> vector<VertexBuffer> batchGetVbPos(const MeshBatch<F>& mesh) { return { mesh.vbPos }; }
-	template <VERTEX_FEATURE F> vector<VertexBuffer> batchGetVbPosTex(const MeshBatch<F>& mesh) { return { mesh.vbPos, mesh.vbTexIndices }; }
-	template <VERTEX_FEATURE F> vector<VertexBuffer> batchGetVbAll(const MeshBatch<F>& mesh) { return { mesh.vbPos, mesh.vbNormaluv, mesh.vbOther, mesh.vbTexIndices }; }
-
-	
 	DrawStats draw(D3d d3d, DrawRange range, bool indexed)
 	{
 		DrawStats stats;
@@ -425,8 +451,7 @@ namespace render::pass::world
 		drawsBuilderClose.finalizeRange(drawOffset + drawCount);
 	}
 
-	template<VERTEX_FEATURE F>
-	DrawStats drawMeshBatches(D3d d3d, const vector<MeshBatch<F>>& meshes, bool bindTexColor, bool hasLod, bool hasOccluders, GetVertexBuffers<F> getVertexBuffers)
+	DrawStats drawMeshBatches(D3d d3d, const vector<MeshBatch>& meshes, bool bindTexColor, bool hasLod, bool hasOccluders, const ShaderContext& shaderContext)
 	{
 		DrawStats stats;
 		for (auto& mesh : meshes) {
@@ -435,7 +460,7 @@ namespace render::pass::world
 				d3d::setIndexBuffer(d3d, mesh.vbIndices);
 			}
 
-			d3d::setVertexBuffers(d3d, getVertexBuffers(mesh));
+			d3d::setVertexBuffers(d3d, shaderContext.getVertexBuffers(mesh));
 			if (bindTexColor) {
 				d3d.deviceContext->PSSetShaderResources(0, 1, &mesh.texColorArray);
 			}
@@ -481,19 +506,19 @@ namespace render::pass::world
 		return stats;
 	}
 
-	DrawStats drawVertexBuffersWorld(D3d d3d, bool bindTexColor, BlendType pass, GetVertexBuffers<VertexBasic> getVbsWorld, GetVertexBuffers<VertexBasic> getVbsObject)
+	DrawStats drawVertexBuffersWorld(D3d d3d, bool bindTexColor, BlendType pass, const ShaderContext& shaderContext)
 	{
 		DrawStats stats;
 		if (worldSettings.drawWorld) {
 			d3d.annotation->BeginEvent(L"Worldmesh");
 			auto& batches = world.meshBatchesWorld.getBatches(pass);
-			stats += drawMeshBatches(d3d, batches, bindTexColor, false, true, getVbsWorld);
+			stats += drawMeshBatches(d3d, batches, bindTexColor, false, true, shaderContext);
 			d3d.annotation->EndEvent();
 		}
 		if (worldSettings.drawStaticObjects) {
 			d3d.annotation->BeginEvent(L"Objects");
 			auto& batches = world.meshBatchesObjects.getBatches(pass);
-			stats += drawMeshBatches(d3d, batches, bindTexColor, true, false, getVbsObject);
+			stats += drawMeshBatches(d3d, batches, bindTexColor, true, false, shaderContext);
 			d3d.annotation->EndEvent();
 		}
 		return stats;
@@ -501,35 +526,31 @@ namespace render::pass::world
 
 	void drawWireframe(D3d d3d, BlendType pass)
 	{
-		d3d::Shader& shader = wireframeShader;
-		d3d.deviceContext->IASetInputLayout(shader.vertexLayout);
-		d3d.deviceContext->VSSetShader(shader.vertexShader, 0, 0);
-		d3d.deviceContext->PSSetShader(shader.pixelShader, 0, 0);
-
-		drawVertexBuffersWorld(d3d, false, pass, batchGetVbPos<VertexBasic>, batchGetVbPos<VertexBasic>);
+		wireframe.shader.set(d3d);
+		drawVertexBuffersWorld(d3d, false, pass, wireframe);
 	}
 
 	void drawWorld(D3d d3d, BlendType pass)
 	{
 		d3d.annotation->BeginEvent(L"Main");
 
-		d3d::Shader shader = mainShader;
-		if (pass == BlendType::MULTIPLY || worldSettings.debugWorldShaderEnabled) {
-			shader = debugShader;
+		auto shaderContext = main;
+		if (pass == BlendType::MULTIPLY) {
+			shaderContext = diffuseOnly;
 		}
-		
-		d3d.deviceContext->IASetInputLayout(shader.vertexLayout);
-		d3d.deviceContext->VSSetShader(shader.vertexShader, 0, 0);
-		d3d.deviceContext->VSSetShaderResources(2, 1, &world.staticInstancesSb);
+		if (worldSettings.debugWorldShaderEnabled) {
+			shaderContext = debug;
+		}
 
-		d3d.deviceContext->PSSetShader(shader.pixelShader, 0, 0);
+		shaderContext.shader.set(d3d);
+		d3d.deviceContext->VSSetShaderResources(2, 1, &world.staticInstancesSb);
 		d3d.deviceContext->PSSetSamplers(0, 1, &samplerState);
 		d3d.deviceContext->PSSetShaderResources(1, 1, &world.lightmapTexArray);
 
 		maxDrawCalls = currentDrawCall;
 		currentDrawCall = 0;
 
-		DrawStats stats = drawVertexBuffersWorld(d3d, true, pass, batchGetVbAll<VertexBasic>, batchGetVbAll<VertexBasic>);
+		DrawStats stats = drawVertexBuffersWorld(d3d, true, pass, shaderContext);
 
 		stats::takeSample(samplers.stateChanges, stats.stateChanges);
 		stats::takeSample(samplers.draws, stats.draws);
@@ -544,8 +565,10 @@ namespace render::pass::world
 		clearZenLevel();
 		release(samplerState);
 		lodRangeCb.release();
-		mainShader.release();
-		debugShader.release();
-		wireframeShader.release();
+
+		main.release();
+		diffuseOnly.release();
+		wireframe.release();
+		debug.release();
 	}
 }

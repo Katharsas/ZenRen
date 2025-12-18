@@ -122,8 +122,7 @@ namespace render
 		VertexLightTemplate(VertexLightType type, Color colLight, Uvi uviLightmap, uint32_t instanceId = instanceIdNone)
 		{
 			assert((type == VertexLightType::WORLD_LIGHTMAP) == (uviLightmap.i >= 0.f));
-			assert((type == VertexLightType::OBJECT_COLOR
-				|| type == VertexLightType::OBJECT_DECAL) == (instanceId < instanceIdNone));
+			assert((type == VertexLightType::OBJECT_COLOR) == (instanceId < instanceIdNone));
 			packed = packLight(type, colLight, uviLightmap, (uint16_t) instanceId);
 		};
 		VertexLightType type() const { return unpackLightType(packed); }
