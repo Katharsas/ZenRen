@@ -257,15 +257,15 @@ namespace render::pass::world
 		std::initializer_list fullLayout = {
 			inputLayout<VertexPos>(),
 			inputLayout<VertexNorUv>(),
-			inputLayout<VertexBasic>(),
 			inputLayout<TexIndex>(),
+			inputLayout<VertexBasic>(),
 		};
 		GetVertexBuffers getFullBuffers = [](const MeshBatch& mesh) -> vector<VertexBuffer> {
 			return {
 				mesh.vbPos,
 				mesh.vbNormalUv,
+				mesh.vbTexIndices,
 				mesh.vbOther,
-				mesh.vbTexIndices
 			};
 		};
 		main = ShaderContext::init(d3d, "forward/world", fullLayout, getFullBuffers);

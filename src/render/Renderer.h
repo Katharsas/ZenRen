@@ -23,8 +23,8 @@ namespace render
 
 		VertexBuffer vbPos = { sizeof(VertexPos) };
 		VertexBuffer vbNormalUv = { sizeof(VertexNorUv) };
-		VertexBuffer vbOther = { sizeof(VertexBasic) };
 		VertexBuffer vbTexIndices = { sizeof(TexIndex) };// indices into texture array (base color textures)
+		VertexBuffer vbOther = { sizeof(VertexBasic) };
 
 		void release()
 		{
@@ -32,8 +32,8 @@ namespace render
 			render::release(vbIndices.buffer);
 			render::release(vbPos.buffer);
 			render::release(vbNormalUv.buffer);
-			render::release(vbOther.buffer);
 			render::release(vbTexIndices.buffer);
+			render::release(vbOther.buffer);
 		}
 	};
 

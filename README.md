@@ -27,6 +27,7 @@ Requires a DirectX 11 capable GPU.
 ![YBerions Temple](Screenshots/yberion_temple.jpg)
 
 ### Build (Windows 10+ only)
+- Clone repo with `--recurse-submodules`
 - Install Visual Studio 2022+ (Desktop C++)
 - Install Windows 11 SDK (any version, also works on Windows 10, can be installed through VS Installer)
 - **Visual Studio CMake** (recommended)

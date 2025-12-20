@@ -15,21 +15,19 @@ struct VS_IN
 #else
     uint uvTexColor : TEXCOORD0;
 #endif
+    
+    uint iTexColor : INDEX0;
 
 #if !VERTEX_INPUT_LIGHT_DISABLED
 #if VERTEX_INPUT_RAW
     float3 colLight : COLOR0;
-    uint instanceId : OTHER0;
+    uint instanceId : INDEX1;
     float3 uviTexLightmap : TEXCOORD1;
-    uint lightType : OTHER1;
+    uint lightType : OTHER0;
 #else
     uint lightFirst : OTHER0;
     uint lightSecond : OTHER1;
 #endif
-    
-    uint iTexColor : OTHER2;
-#else
-    uint iTexColor : OTHER0;
 #endif
 };
 

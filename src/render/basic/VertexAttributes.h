@@ -11,7 +11,7 @@ namespace render
 	using TexIndex = uint32_t;
 	template <> inline VertexAttributes inputLayout<TexIndex>() {
 		return {
-			{  Type::UINT, Semantic::OTHER }
+			{  Type::UINT, Semantic::INDEX }
 		};
 	}
 
@@ -96,8 +96,7 @@ namespace render
 			//assert((m_type == (uint32_t)VertexLightType::WORLD_LIGHTMAP) == (colLight.a == 0.f));
 
 			assert((type == VertexLightType::WORLD_LIGHTMAP) == (uviLightmap.i >= 0.f));
-			assert((type == VertexLightType::OBJECT_COLOR
-				|| type == VertexLightType::OBJECT_DECAL) == (instanceId < instanceIdNone));
+			assert((type == VertexLightType::OBJECT_COLOR) == (instanceId < instanceIdNone));
 			m_colLight = { colLight.r, colLight.g, colLight.b };
 		};
 		VertexLightType type() const { return (VertexLightType)m_type; }
@@ -108,7 +107,7 @@ namespace render
 	template <> inline VertexAttributes inputLayout<VertexLightTemplate<false>>() {
 		return {
 			{ Type::FLOAT_3, Semantic::COLOR },
-			{ Type::UINT, Semantic::OTHER },
+			{ Type::UINT, Semantic::INDEX },
 			{ Type::FLOAT_3, Semantic::TEXCOORD },
 			{ Type::UINT, Semantic::OTHER },
 		};

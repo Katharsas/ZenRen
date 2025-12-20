@@ -31,22 +31,23 @@ namespace render::d3d
 		}
 	}
 
-	constexpr std::array<DXGI_FORMAT, magic_enum::enum_count<render::Type>()> typeToFormat = { {
+	constexpr std::array typeToFormat = util::createExactCount<DXGI_FORMAT, magic_enum::enum_count<render::Type>()>({
 			DXGI_FORMAT_R32_FLOAT,
 			DXGI_FORMAT_R32G32_FLOAT,
 			DXGI_FORMAT_R32G32B32_FLOAT,
 			DXGI_FORMAT_R32G32B32A32_FLOAT,
 			DXGI_FORMAT_R32_UINT,
 			DXGI_FORMAT_R32G32_UINT,
-	} };
+	});
 
-	const std::array<std::string, magic_enum::enum_count<render::Semantic>()> semanticToString = { {
+	const std::array semanticToString = util::createExactCount<std::string, magic_enum::enum_count<render::Semantic>()>({
 		"POSITION",
 		"NORMAL",
 		"TEXCOORD",
 		"COLOR",
+		"INDEX",
 		"OTHER"
-	} };
+	});
 	
 	DXGI_FORMAT toFormat(render::Type layout)
 	{

@@ -45,6 +45,7 @@ namespace render
 		NORMAL,
 		TEXCOORD,
 		COLOR,
+		INDEX,
 		OTHER
 	};
 

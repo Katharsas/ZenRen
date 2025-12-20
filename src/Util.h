@@ -107,4 +107,19 @@ namespace util
 			return it->second;
 		}
 	}
+
+	template<typename T, std::size_t N>
+	constexpr std::array<T, N> createExactCount(const std::initializer_list<T> init) {
+		static_assert(N > 0, "Array size must be positive!");
+		if (init.size() != N) {
+			throw std::invalid_argument("Initializer list size doesn't match array size!");
+		}
+		std::array<T, N> result {};
+		std::size_t i = 0;
+		for (const auto& val : init) {
+			result[i] = val;
+			i++;
+		}
+		return result;
+	}
 }
