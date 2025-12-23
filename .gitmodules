@@ -13,3 +13,6 @@
 [submodule "lib/meshoptimizer"]
 	path = lib/meshoptimizer
 	url = https://github.com/zeux/meshoptimizer
+[submodule "lib/bvh"]
+	path = lib/bvh
+	url = https://github.com/madmann91/bvh

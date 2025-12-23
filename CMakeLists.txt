@@ -61,10 +61,11 @@ option(ADD_FATAL_EXAMPLE "" OFF)
 option(ADD_G3LOG_UNIT_TEST "" OFF)
 add_subdirectory(lib/g3log EXCLUDE_FROM_ALL)
 
-#add_subdirectory(lib/DirectXMath) # TODO this is header only so we don't need this right?
 add_subdirectory(lib/DirectXTex EXCLUDE_FROM_ALL)
 
 add_subdirectory(lib/meshoptimizer EXCLUDE_FROM_ALL)
+
+add_subdirectory(lib/bvh)
 
 #set(ZK_ENABLE_MMAP OFF)
 set(ZK_BUILD_TESTS OFF)
@@ -126,6 +127,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE "lib/g3log/src")
 target_include_directories(${PROJECT_NAME} PRIVATE "lib/DirectXMath/Inc")
 target_include_directories(${PROJECT_NAME} PRIVATE "lib/DirectXTex/DirectXTex")
 target_include_directories(${PROJECT_NAME} PRIVATE "lib/meshoptimizer/src")
+target_include_directories(${PROJECT_NAME} PRIVATE "lib/bvh/src")
 target_include_directories(${PROJECT_NAME} PRIVATE "lib/ZenKit/include")
 target_include_directories(${PROJECT_NAME} PRIVATE "lib/magic_enum")
 target_include_directories(${PROJECT_NAME} PRIVATE "lib/octree_attcs")
@@ -139,6 +141,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE g3log)
 target_link_libraries(${PROJECT_NAME} PRIVATE imgui)
 target_link_libraries(${PROJECT_NAME} PRIVATE DirectXTex)
 target_link_libraries(${PROJECT_NAME} PRIVATE meshoptimizer)
+target_link_libraries(${PROJECT_NAME} PRIVATE bvh)
 target_link_libraries(${PROJECT_NAME} PRIVATE zenkit)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
