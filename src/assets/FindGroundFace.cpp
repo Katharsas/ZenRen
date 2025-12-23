@@ -124,31 +124,39 @@ namespace assets
 
     std::optional<VertKey> getGroundFaceAtPos(const XMVECTOR pos, const MatToChunksToVertsBasic& meshData, const VertLookupTree& vertLookup)
     {
+        // TODO calculate UV here instead of in caller
+
         Vec3 pos3 = toVec3(pos);
         vector<VertKey> vertKeys;
         if (useNaiveSlowGroundFaceSearch) {
             vertKeys = rayDownIntersectedNaive(meshData, pos3, 100);
+
+            vector<VertexPos> belowVerts;
+            belowVerts.reserve(vertKeys.size() * 3);
+
+            for (auto& vertKey : vertKeys) {
+                auto facePos = vertKey.getPos(meshData);
+                belowVerts.push_back(facePos[0]);
+                belowVerts.push_back(facePos[1]);
+                belowVerts.push_back(facePos[2]);
+            }
+            int closestIndex = closestGroundFace(pos3, belowVerts);
+
+            if (closestIndex == -1) {
+                return std::nullopt;
+            }
+            else {
+                return vertKeys[closestIndex];
+            }
         }
         else {
-            vertKeys = rayDownIntersected(vertLookup, pos3, 100);
-        }
-
-        vector<VertexPos> belowVerts;
-        belowVerts.reserve(vertKeys.size() * 3);
-
-        for (auto& vertKey : vertKeys) {
-            auto facePos = vertKey.getPos(meshData);
-            belowVerts.push_back(facePos[0]);
-            belowVerts.push_back(facePos[1]);
-            belowVerts.push_back(facePos[2]);
-        }
-        int closestIndex = closestGroundFace(pos3, belowVerts);
-
-        if (closestIndex == -1) {
-            return std::nullopt;
-        }
-        else {
-            return vertKeys[closestIndex];
+            auto lookupResult = rayDownIntersected(vertLookup, pos3, 100);
+            if (lookupResult.has_value()) {
+                return lookupResult.value().vertKey;
+            }
+            else {
+                return std::nullopt;
+            }
         }
     }
 }
