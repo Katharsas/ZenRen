@@ -91,8 +91,13 @@ namespace assets
     {
         vector<StaticInstance> statics;
 
+        auto sampler = render::stats::TimeSampler();
+        sampler.start();
+
         const FaceLookupContext worldMeshContext = { createVertLookup(worldMeshData), worldMeshData };
         const LightLookupContext lightsStaticContext = { createLightLookup(lightsStatic), lightsStatic };
+
+        sampler.logMillisAndRestart("VOBs: Created groundface/light lookup trees");
 
         forEachVob(rootVobs, [&](zenkit::VirtualObject const* const vobPtr) -> void {
             if (!loadVob(vobPtr)) {
@@ -137,6 +142,8 @@ namespace assets
             }
             statics.push_back(instance);
         });
+
+        sampler.logMillisAndRestart("VOBs: Calculated instance and light data");
 
         LOG(INFO) << "VOBs: Loaded " << statics.size() << " instances";
         return statics;

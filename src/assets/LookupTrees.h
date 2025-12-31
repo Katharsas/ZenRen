@@ -58,13 +58,15 @@ namespace assets
 
 
 	using BvhPrecomp = bvh::v2::PrecomputedTri<float>;
+	using BvhBBox = bvh::v2::BBox<float, 3>;
 	using BvhNode = bvh::v2::Node<float, 3>;
 	using Bvh = bvh::v2::Bvh<BvhNode>;
 
 	struct VertLookupTree
 	{
 		Bvh bvh;
-		std::vector<BvhPrecomp> precomputed;
+		std::vector<BvhBBox> bboxes;
+		//std::vector<BvhPrecomp> precomputed;
 		std::unordered_map<uint32_t, render::VertKey> treeIndexToVert;
 
 		//const std::vector<render::VertKey> bboxIdsToVertIds(const std::vector<size_t>& bboxIds) const {
@@ -85,8 +87,8 @@ namespace assets
 		float hitDistance;
 	};
 
-	std::optional<VertLookupResult> rayDownIntersected(const VertLookupTree& lookup, const Vec3& pos, float searchSizeY);
-	std::optional<VertLookupResult> rayIntersected(const VertLookupTree& lookup, const DirectX::XMVECTOR& rayPosStart, const DirectX::XMVECTOR& rayPosEnd);
+	std::vector<render::VertKey> rayDownIntersected(const VertLookupTree& lookup, const Vec3& pos, float searchSizeY);
+	std::vector<render::VertKey> rayIntersected(const VertLookupTree& lookup, const DirectX::XMVECTOR& rayPosStart, const DirectX::XMVECTOR& rayPosEnd);
 
 	struct FaceLookupContext
 	{

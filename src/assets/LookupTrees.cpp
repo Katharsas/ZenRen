@@ -45,29 +45,59 @@ namespace assets
         return OrthoTree::BoundingBoxND<3, float>{ {minX, minY, minZ}, {maxX, maxY, maxZ} };
     }
 
-    /*
+    using BvhVec3 = bvh::v2::Vec<float, 3>;
+
+    BvhBBox createBbox(const array<VertexPos, 3>& verts)
+    {
+        float minX = FLT_MAX, minY = FLT_MAX, minZ = FLT_MAX;
+        float maxX = -FLT_MAX, maxY = -FLT_MAX, maxZ = -FLT_MAX;
+        for (uint32_t i = 0; i < 3; i++) {
+            auto& vert = verts[i];
+            minX = std::min(minX, vert.x);
+            minY = std::min(minY, vert.y);
+            minZ = std::min(minZ, vert.z);
+            maxX = std::max(maxX, vert.x);
+            maxY = std::max(maxY, vert.y);
+            maxZ = std::max(maxZ, vert.z);
+        }
+        return BvhBBox { {minX, minY, minZ}, { maxX, maxY, maxZ } };
+    }
+
+    BvhVec3 createTriCenter(const array<VertexPos, 3>& verts)
+    {
+        Vec3 center = mul(add(add(verts[0], verts[1]), verts[2]), 1.f / 3.f);
+        return BvhVec3 { center.x , center.y, center.z };
+    }
+
+    bvh::v2::ThreadPool thread_pool;
+    bvh::v2::ParallelExecutor executor(thread_pool);
+    
     VertLookupTree createVertLookup(const MatToChunksToVertsBasic& meshData)
     {
         // TODO bboxes for each face could be created during mesh loading ideally (?)
-        vector<OrthoBoundingBox3D> bboxes;
 
         VertLookupTree result;
-        uint32_t bbIndex = 0;
+        uint32_t treeIndex = 0;
+
+        //std::vector<BvhBBox> bboxes;
+        std::vector<BvhVec3> centers;
 
         forEachFace(meshData, [&](const VertKey& vertKey) -> void {
-            bboxes.push_back(createBB3D(vertKey.getPos(meshData)));
-            result.bboxIndexToVert.insert({ bbIndex, vertKey });
-            bbIndex++;
+            auto tri = vertKey.getPos(meshData);
+            centers.push_back(createTriCenter(tri));
+            result.bboxes.push_back(createBbox(tri));
+            result.treeIndexToVert.insert({ treeIndex, vertKey });
+            treeIndex++;
         });
 
-        result.tree = OrthoOctree(bboxes
-            , 8 // max depth
-            , std::nullopt // user-provided bounding Box for all
-            , 10 // max element in a node; 10 works well for us and has been observed to work well in general according to lib author (Github)
-        );
+        typename bvh::v2::DefaultBuilder<BvhNode>::Config config;
+        config.quality = bvh::v2::DefaultBuilder<BvhNode>::Quality::High;
+        result.bvh = bvh::v2::DefaultBuilder<BvhNode>::build(thread_pool, result.bboxes, centers, config);
+
         return result;
 	}
 
+    /*
     vector<VertKey> rayDownIntersected(const VertLookupTree& lookup, const Vec3& pos, float searchSizeY)
     {
         auto intersectedBoxes = lookup.tree.RayIntersectedAll({ pos.x, pos.y, pos.z }, { 0, -1, 0 }, rayIntersectTolerance, searchSizeY);
@@ -151,10 +181,10 @@ namespace assets
         return result;
     }
 
-    using BvhVec3 = bvh::v2::Vec<float, 3>;
-    using BvhBBox = bvh::v2::BBox<float, 3>;
-    using BvhTri = bvh::v2::Tri<float, 3>;
-    using BvhRay = bvh::v2::Ray<float, 3>;
+    //using BvhVec3 = bvh::v2::Vec<float, 3>;
+    //using BvhBBox = bvh::v2::BBox<float, 3>;
+    //using BvhTri = bvh::v2::Tri<float, 3>;
+    //using BvhRay = bvh::v2::Ray<float, 3>;
 
     BvhVec3 toBvhVec3(const XMVECTOR& xm4)
     {
@@ -166,52 +196,9 @@ namespace assets
     // Permuting the primitive data allows to remove indirections during traversal, which makes it faster.
     static constexpr bool should_permute = false;
 
-    VertLookupTree createVertLookup(const MatToChunksToVertsBasic& meshData)
+    vector<VertKey> rayIntersected(const VertLookupTree& lookup, BvhVec3 rayOrigin, BvhVec3 rayDir, float rayMaxLength)
     {
-        VertLookupTree result;
-        std::vector<BvhTri> tris;
-        
-        uint32_t index = 0;
-        forEachFace(meshData, [&](const VertKey& vertKey) -> void {
-            const auto& verts = vertKey.getPos(meshData);
-            tris.push_back({
-                { verts[0].x, verts[0].y, verts[0].z },
-                { verts[1].x, verts[1].y, verts[1].z },
-                { verts[2].x, verts[2].y, verts[2].z },
-            });
-            result.treeIndexToVert.insert({ index, vertKey });
-            index++;
-        });
-
-        bvh::v2::ThreadPool thread_pool;
-        bvh::v2::ParallelExecutor executor(thread_pool);
-
-        std::vector<BvhBBox> bboxes(tris.size());
-        std::vector<BvhVec3> centers(tris.size());
-        executor.for_each(0, tris.size(), [&](size_t begin, size_t end) {
-            for (size_t i = begin; i < end; ++i) {
-                bboxes[i] = tris[i].get_bbox();
-                centers[i] = tris[i].get_center();
-            }
-        });
-
-        typename bvh::v2::DefaultBuilder<BvhNode>::Config config;
-        config.quality = bvh::v2::DefaultBuilder<BvhNode>::Quality::Medium;
-        result.bvh = bvh::v2::DefaultBuilder<BvhNode>::build(thread_pool, bboxes, centers, config);
-
-        result.precomputed.resize(tris.size());
-        executor.for_each(0, tris.size(), [&](size_t begin, size_t end) {
-            for (size_t i = begin; i < end; ++i) {
-                auto j = should_permute ? result.bvh.prim_ids[i] : i;
-                result.precomputed[i] = tris[j];
-            }
-        });
-
-        return result;
-    }
-
-    std::optional<VertLookupResult> rayIntersected(const VertLookupTree& lookup, BvhVec3 rayOrigin, BvhVec3 rayDir, float rayMaxLength)
-    {
+        using BvhRay = bvh::v2::Ray<float, 3>;
         auto ray = BvhRay {
             rayOrigin,
             rayDir,
@@ -223,41 +210,55 @@ namespace assets
         static constexpr size_t stackSize = 64;
         static constexpr bool useRobustTraversal = false;
 
-        auto hitId = invalidId;
-        Uv hitPoint;
+        vector<VertKey> result;
 
-        // Traverse the BVH and get the u, v coordinates of the closest intersection.
+        auto inv_dir = ray.template get_inv_dir<!useRobustTraversal>();
+        auto inv_org = -inv_dir * ray.org;
+        auto inv_dir_pad = ray.pad_inv_dir(inv_dir);
+        auto octant = ray.get_octant();
+
         bvh::v2::SmallStack<Bvh::Index, stackSize> stack;
         lookup.bvh.intersect<false, useRobustTraversal>(ray, lookup.bvh.get_root().index, stack,
             [&](size_t begin, size_t end) {
-            for (size_t i = begin; i < end; ++i) {
-                size_t j = should_permute ? i : lookup.bvh.prim_ids[i];
-                if (auto hit = lookup.precomputed[j].intersect(ray)) {
-                    hitId = i;
-                    std::tie(ray.tmax, hitPoint.u, hitPoint.v) = *hit;
-                }
-            }
-            return hitId != invalidId;
-        });
+                //if (end - begin >= 5) {
+                //    LOG(INFO) << "Leaf Tris: " << std::to_string(end - begin);
+                //}
+                
+                for (size_t i = begin; i < end; ++i) {
+                    BvhBBox bbox = lookup.bboxes.at(i);
+                    BvhVec3 minBounds;
+                    BvhVec3 maxBounds;
+                    for (size_t j = 0; j < 3; ++j) {
+                        minBounds[j] = octant[j] ? bbox.max[j] : bbox.min[j];
+                        maxBounds[j] = octant[j] ? bbox.min[j] : bbox.max[j];
+                    }
+                    auto tmin = bvh::v2::fast_mul_add(minBounds, inv_dir, inv_org);
+                    auto tmax = bvh::v2::fast_mul_add(maxBounds, inv_dir, inv_org);
 
-        if (hitId != invalidId) {
-            return VertLookupResult{
-                .vertKey = lookup.treeIndexToVert.at(hitId),
-                .hitPoint = hitPoint,
-                .hitDistance = ray.tmax,
-            };
-        }
-        else {
-            return std::nullopt;
-        }
+                    auto t0 = std::max(std::max(tmin[0], tmin[1]), std::max(tmin[2], ray.tmin));
+                    auto t1 = std::min(std::min(tmax[0], tmax[1]), std::min(tmax[2], ray.tmax));
+                    bool intersect =  t0 <= t1;
+
+                    if (intersect) {
+                        result.push_back(lookup.treeIndexToVert.at(i));
+                        //if (result.size() % 1000 == 0) {
+                        //    LOG(INFO) << "Result count: " << std::to_string(result.size());
+                        //}
+                    }
+                }
+                return true;
+            }
+        );
+
+        return result;
     }
 
-    std::optional<VertLookupResult> rayDownIntersected(const VertLookupTree& lookup, const Vec3& pos, float searchSizeY)
+    vector<VertKey> rayDownIntersected(const VertLookupTree& lookup, const Vec3& pos, float searchSizeY)
     {
         return rayIntersected(lookup, BvhVec3 { pos.x, pos.y, pos.z }, { 0, -1, 0 }, searchSizeY);
     }
 
-    std::optional<VertLookupResult> rayIntersected(const VertLookupTree& lookup, const XMVECTOR& rayPosStart, const XMVECTOR& rayPosEnd)
+    vector<VertKey> rayIntersected(const VertLookupTree& lookup, const XMVECTOR& rayPosStart, const XMVECTOR& rayPosEnd)
     {
         auto dirXm = DirectX::XMVectorSubtract(rayPosEnd, rayPosStart);
         auto lengthXm = DirectX::XMVector3LengthEst(dirXm);
